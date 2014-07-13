@@ -1,0 +1,451 @@
+import numpy as np
+import scipy as sp
+import scipy.sparse as sps
+import scipy.linalg as la
+import scipy.special as ssp
+import math as m
+import cmath as cm
+from wignerpy._wignerpy import wigner3j, wigner3jvec
+from random import random
+import healpy as hp
+import healpy.pixelfunc as hpf
+
+#some constant
+pi=m.pi
+e=m.e
+
+###############################################
+#functions for coordinate transformation
+############################################
+def ctos(cart):
+	[x,y,z] = cart
+	if [x,y]==[0,0]:
+		return [z,0,0]
+	return np.array([m.sqrt(x**2+y**2+z**2),m.atan2(m.sqrt(x**2+y**2),z),m.atan2(y,x)])
+
+def stoc(spher):
+	[r,theta,phi]=spher
+	return np.array([r*m.cos(phi)*m.sin(theta),r*m.sin(theta)*m.sin(phi),r*m.cos(theta)])
+
+def rotatez(dirlist,t):
+	[theta,phi] = dirlist
+	rm = np.array([[m.cos(t),-m.sin(t),0],[m.sin(t),m.cos(t),0],[0,0,1]])
+	return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
+
+
+def rotatey(dirlist,t):
+	[theta,phi] = dirlist
+	rm = np.array([[m.cos(t),0,m.sin(t)],[0,1,0],[-m.sin(t),0,m.cos(t)]])
+	return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
+	
+	
+def rotationalMatrix(phi,theta,xi):
+	m1=np.array([[m.cos(xi),m.sin(xi),0],[-m.sin(xi),m.cos(xi),0],[0,0,1]])
+	m2=np.array([[1,0,0],[0,m.cos(theta),m.sin(theta)],[0,-m.sin(theta),m.cos(theta)]])
+	m3=np.array([[m.cos(phi),m.sin(phi),0],[-m.sin(phi),m.cos(phi),0],[0,0,1]])
+	return m1.dot(m2).dot(m3)
+	
+
+#given the Euler angles and [theta,phi], return the [theta',phi'] after the rotation
+def rotation(theta,phi,eulerlist):
+	return ctos(rotationalMatrix(eulerlist[0],eulerlist[1],eulerlist[2]).dot(stoc([1,theta,phi])))[1:3]
+
+
+#############################################
+#spherical special functions
+##############################################
+def sphj(l,z):
+	return ssp.sph_jn(l,z)[0][-1]
+
+def spheh(l,m,theta,phi):
+	return ssp.sph_harm(m,l,phi,theta)
+	
+############################################
+#other functions
+################################################
+#claculate alm from a skymap (each element has the form [theta,phi,intensity])
+nside=30                           #increase this for higher accuracy
+def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
+	alm={}
+	for l in range(lmax+1):
+		for mm in range(-l,l+1):
+			alm[(l,mm)]=0
+			for p in skymap:
+				alm[(l,mm)] += np.conj(spheh(l,mm,p[0],p[1]))*p[2]*dtheta*dphi*m.sin(p[0])
+	return alm
+
+
+##########################################
+##some testing
+##########################################
+
+####################################################################
+##test get alm
+#nside=30
+#a11=np.zeros([nside,nside,3],dtype=complex)
+#for i in range(len(a11)):
+	#for j in range(len(a11[i])):
+		#a11[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
+
+#skymap = np.array([pix for sublist in a11 for pix in sublist ])
+#skymapalm=get_alm(skymap)
+######################################################################
+
+
+################################################################################
+## test the orthonormality of spherical harmonics
+#nside=101
+#a11=np.zeros([nside,nside,3],dtype=complex)
+#for i in range(len(a11)):
+	#for j in range(len(a11[i])):
+		#a11[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
+		
+		
+#nside=101
+#a32=np.zeros([nside,nside,3],dtype=complex)
+#for i in range(len(a32)):
+	#for j in range(len(a32[i])):
+		#a32[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])	
+
+#s=complex(0.0)
+#for i in range(len(a11)):
+	#for j in range(len(a11[i])):
+		#theta=a11[i][j][0]
+		#phi=a11[i][j][1]
+		#s+=(a11[i][j][2]*np.conj(1.0*ssp.sph_harm(1,1,phi,theta))*m.sin(theta))*(pi/nside)*(2*pi/nside)
+##############################################################################
+
+###################################################################################
+##check a_lm of e^(ikdu) (cool, correct)
+#d=np.array([3.0,6.0,0.0])
+#l=2
+#mm=2
+#k=3
+
+#nside=101
+#skymap=np.zeros([nside,nside,3],dtype=complex)
+#s=complex(0.0)
+#for i in range(len(skymap)):
+	#for j in range(len(skymap[i])):
+		#c1 = np.conj(1.0*ssp.sph_harm(mm,l,2*pi/nside*j,pi/nside*i))
+		#c2 = e**(1j*k*(stoc([1,pi/nside*i,2*pi/nside*j]).dot(d)))
+		#skymap[i][j]=np.array([pi/nside*i,2*pi/nside*j,c1*c2*m.sin(pi/nside*i)])	
+		#s += c1*c2*m.sin(pi/nside*i)*(pi/nside)*(2*pi/nside)
+######################################################################################
+
+
+
+########################################################################
+##create a beam function from spherical harmonics
+#Blm = {}
+#for i in range(4):
+	#for j in range(-i,i+1):
+		#Blm[(i,j)]=0.0
+#Blm[(1,-1)]=-0.36
+#Blm[(1,1)]=-0.36
+#Blm[(2,1)]=-0.46
+#Blm[(2,-1)]=-0.46
+#Blm[(3,1)]=-0.30
+#Blm[(3,-1)]=-0.30
+
+#def beam(theta,phi):
+	#b = 0
+	#for key in Blm:
+		#b+=Blm[key]*ssp.sph_harm(key[1],key[0],phi,theta)
+	#return b
+	
+##calculate Bulm from Blm
+#lmax=max([key for key in Blm])[0]
+#k=3
+#d=np.array([3.0,6.0,0.0])
+#Bulm={}
+#for l in range(lmax+1):
+	#for mm in range(-l,l+1):
+		#Bulm[(l,mm)]=0
+		#for l1 in range(lmax+1):
+			#for mm1 in range(-l1,l1+1):
+				#for l2 in range(abs(l-l1),l+l1+1):
+					#mm2=-(mm+mm1)
+					#if abs(mm2)<=l2:
+						#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphj(l2,k*la.norm(d))*np.conj(spheh(l2,mm2,ctos(d)[1],ctos(d)[2]))*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
+###############################################
+
+				
+######################################################################
+##rotation to equatorial coordinate
+#latitude = 70/180.0*pi
+#def equatorial_beam(theta,phi,dphi=latitude):
+	#[thetaR,phiR]=rotation(theta,phi,[0,-dphi,0])
+	#return beam(thetaR,phiR)
+
+
+#nside=30
+#equabeam=np.zeros([nside,nside,3],dtype=complex)
+#for i in range(len(equabeam)):
+	#for j in range(len(equabeam[i])):
+		#equabeam[i][j]=np.array([pi/nside*i,2*pi/nside*j,equatorial_beam(pi/nside*i,2*pi/nside*j)])
+
+#Blm_rotate = get_alm(np.array([pix for sublist in equabeam for pix in sublist ]),4)
+##################################################################################
+
+#############################################################
+##create a function that calculates the visibility given the beam, skymap(in equatorial coordinate), baseline, and frequency
+#alm={}
+#alm[(1,1)]=1
+#alm[(2,1)]=0.5
+#alm[(3,2)]=0.1
+
+#phi=0
+#v=0
+
+#commoncomp=list(set([key for key in alm])&set([key for key in Blm]))   #get the intersect of the component of alm and Blm
+
+##calculate Bulm
+#lmax=max([key for key in Blm])[0]
+#k=3
+#d=np.array([3.0,6.0,0.0])
+#Bulm={}
+#for l in range(lmax+1):
+	#for mm in range(-l,l+1):
+		#Bulm[(l,mm)]=0
+		#for l1 in range(lmax+1):
+			#for mm1 in range(-l1,l1+1):
+				#for l2 in range(abs(l-l1),l+l1+1):
+					#mm2=-(mm+mm1)
+					#if abs(mm2)<=l2:
+						#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphj(l2,k*la.norm(d))*np.conj(spheh(l2,mm2,ctos(d)[1],ctos(d)[2]))*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
+
+#for comp in commoncomp:
+	#v += alm[comp]*Bulm[comp]*e**(i*comp[1]*phi)
+###########################################################################
+
+
+###########################################################################
+#old get_Bulm function
+	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
+	#def get_Bulm(self,freq=137,d=np.array([3.0,6.0,0.0])):
+		#k = 2*pi*freq/299.792458
+		#lmax=max([max([key for key in self.Blm])[0],self.numberofl])
+		#self.numberofl=lmax
+		#sphehdict = {}
+		#for l in range(2*lmax+1):
+			#for mm in range(-l,l+1):
+				#sphehdict[(l,mm)]=spheh(l,mm,ctos(d)[1],ctos(d)[2])
+
+		#sphejdict={}
+		#for l in range(2*lmax+1):
+			#sphejdict[l] = sphj(l,k*la.norm(d))
+		
+		#Bulm={}
+		#for l in range(lmax+1):
+			#for mm in range(-l,l+1):
+				#Bulm[(l,mm)]=0
+				#for l1 in range(lmax+1):
+					#for mm1 in range(-l1,l1+1):
+						#for l2 in range(abs(l-l1),l+l1+1):
+							#mm2=-(mm+mm1)
+							#if Blm[(l1,mm1)] ==0 :
+								#Bulm[(l,mm)] +=0
+							#elif abs(mm2)<=l2:
+								#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphejdict[l2]*np.conj(sphehdict[(l2,mm2)])*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
+								
+		#return Bulm		
+#############################################################################################
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+class Visibility_Simulator:
+	def __init__(self):
+		self.beamhealpix = None
+		self.numberofl = 0
+		self.Blm = np.zeros([3,3],'complex')
+		self.initial_zenith=np.array([45.336111/180.0*pi,0])     #at t=0, the position of zenith in equatorial coordinate
+
+	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
+	def calculate_Bulm(self, L=10,freq=125.195,d=np.array([-3.0,6.0,0.0]),L1=20):    #L= lmax  , L1=l1max
+		k = 2*pi*freq/299.792458
+
+		#an array of the comples conjugate of Ylm's
+		spheharray = np.zeros([L+L1+1,L+L1+1],'complex')
+		for i in range(0,L+L1+1):
+			for mm in range(-i,i+1):
+				spheharray[i][mm]=(spheh(i,mm,ctos(d)[1],ctos(d)[2])).conjugate()
+
+		#an array of spherical Bessel functions
+		sphjarray = np.zeros(L+L1+1,'complex')
+		for l in range(L+L1+1):
+			sphjarray[l] = sphj(l,k*la.norm(d))
+
+		#an array of m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))
+		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'complex')
+		for i in range(L+1):
+			for j in range(L1+1):
+				for kk in range(0,L+L1+1):
+					sqrtarray[i][j][kk] = m.sqrt((2*i+1)*(2*j+1)*(2*kk+1)/(4*pi))
+
+		#Sum over to calculate Bulm
+		Bulm={}
+		for l in range(L+1):
+			for mm in range(-l,l+1):
+				Bulm[(l,mm)]=0
+				for l1 in range(L1+1):
+					for mm1 in range(-l1,l1+1):
+						mm2=-(mm+mm1)
+						wignerarray0 = wigner3jvec(l,l1,0,0)
+						wignerarray = wigner3jvec(l,l1,mm,mm1)
+						l2min = max([abs(l-l1),abs(mm2)])
+						diff = max(abs(mm2)-abs(l-l1),0)
+						for l2 in range(l2min,l+l1+1):
+							if self.Blm[(l1,mm1)] ==0 :
+								Bulm[(l,mm)] +=0
+							else:
+								Bulm[(l,mm)] += 4*pi*(1j**(l2%4))*sphjarray[l2]*spheharray[l2][mm2]*self.Blm[(l1,mm1)]*sqrtarray[l][l1][l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]
+		return Bulm
+	
+	#def rotate_beamhealpixmap(self):
+		#beammap = self.beamhealpix
+		
+			
+	#def calculate_Blm(self):
+	
+	
+	#modify self.Blm to equatorial coordinate (starting from the Blm in horizontal coordinate and the zenith position at t=0)
+	#def rotate_beam(self):
+		#declination = self.initial_zenith[0]
+		#rightascention = self.initial_zenith[1]
+		##create a function of beam from the Blm
+		#def beam(theta,phi):    
+			#b = 0
+			#for key in self.Blm:
+				#b  += self.Blm[key]*spheh(key[0],key[1],theta,phi)
+			#return b
+		
+		##rotate the beam
+		#def equatorial_beam(theta,phi):   
+			#[thetaR,phiR]=rotation(theta,phi,[pi/2+rightascention,pi/2-declination,0])
+			#return beam(thetaR,phiR)
+			
+		#self.numberofl = max([max([key for key in self.Blm])[0],self.numberofl])    #update self.numberofl
+		
+		##calculate the Blm after the rotation
+		#nside=50
+		#equabeam=np.zeros([nside,nside,3],dtype=complex)
+		#for i in range(len(equabeam)):
+			#for j in range(len(equabeam[i])):
+				#equabeam[i][j]=np.array([pi/nside*i,2*pi/nside*j,equatorial_beam(pi/nside*i,2*pi/nside*j)])
+		
+		##modify self.Blm
+		#self.Blm = get_alm(np.array([pix for sublist in equabeam for pix in sublist ]),self.numberofl,pi/nside,2*pi/nside)
+		
+		
+	def calculate_visibility(self, skymap_alm, d,freq ,tlist=[0], L=15):
+		##rotate d to equatorial coordinate
+		#temp = rotation(ctos(d)[1],ctos(d)[2],[0.0,(pi/2-self.initial_zenith[0]),0])
+		#drotate = stoc(np.append(la.norm(d),rotation(temp[0],temp[1],[self.initial_zenith[1],0 ,0 ])))
+		drotate = stoc(np.append(la.norm(d),rotatey(ctos(d)[1:3],pi/2-self.initial_zenith[0])))
+		drotate = stoc(np.append(la.norm(d),rotatez(ctos(drotate)[1:3],0.5)))
+		
+		#calculate Bulm
+		L1 = max([key for key in self.Blm])[0]
+		Bulm = self.calculate_Bulm(L, freq, drotate ,L1)
+		
+		#get the intersect of the component of skymap_alm and self.Blm
+		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))
+		
+		#calculate visibilities
+		vlist = np.zeros(len(tlist),'complex')
+		for i in range(len(tlist)):
+			phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation		
+			v=0
+			for comp in commoncomp:
+				v += skymap_alm[comp]*Bulm[comp]*e**(1.0j*((comp[1]*phi)%(2*pi)))	
+			vlist[i]=v	
+		return vlist
+
+
+
+
+
+		
+#############################
+##test the class
+#############################
+btest=Visibility_Simulator()
+btest.initial_zenith=np.array([45.336111/180.0*pi,0])
+#Import the healpix map of the beam, then calculate the Blm of the beam
+with open('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/beamhealpixmap_05.txt') as f:
+	data = np.array([np.array([float(line)]) for line in f])
+
+data = data.flatten()
+beam_alm = hp.sphtfunc.map2alm(data,iter=10)
+
+Blm={}
+for l in range(21):
+	for mm in range(-l,l+1):
+		Blm[(l,mm)] = beam_alm[hp.sphtfunc.Alm.getidx(32,l,abs(mm))]
+
+btest.Blm=Blm
+
+
+                       #_       
+  #__ _ ____ __    __ _| |_ __  
+ #/ _` (_-< '  \  / _` | | '  \ 
+ #\__, /__/_|_|_| \__,_|_|_|_|_|
+ #|___/                         
+#create sky map alm
+pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm1.fits32')
+pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm2.fits32')
+pca3 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm3.fits32')
+gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+
+equatorial_GSM = np.zeros(12*32**2,'float')
+#rotate sky map
+for i in range(12*32**2):
+	ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(32,i)) 
+	pixindex, weight = hpf.get_neighbours(32,ang[0],ang[1])
+	for pix in range(len(pixindex)):
+		equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
+		
+almlist = hp.sphtfunc.map2alm(equatorial_GSM,iter=10)
+alm={}
+for l in range(96):
+	for mm in range(-l,l+1):
+		alm[(l,mm)] = almlist[hp.sphtfunc.Alm.getidx(95,l,abs(mm))]
+
+
+
+#set frequency and baseline vector
+freq = 125.195
+d=np.array([-6.0,-3.0,0.0])
+
+timelist = 1/10.0*np.arange(24*10+1)
+v2 = btest.calculate_visibility(alm, d, freq, timelist)
+print v2
+
+savelist = np.zeros([len(timelist),3],'float')
+for i in range(len(timelist)):
+	savelist[i][0] = timelist[i]
+	savelist[i][1] = v2[i].real
+	savelist[i][2] = v2[i].imag
+
+
+f_handle = open('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/spherical_result/sphericalharmonics_L10_05.txt','w')
+for i in savelist:
+	np.savetxt(f_handle, [i])
+f_handle.close()
+
+
