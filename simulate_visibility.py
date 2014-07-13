@@ -387,7 +387,7 @@ class Visibility_Simulator:
 btest=Visibility_Simulator()
 btest.initial_zenith=np.array([45.336111/180.0*pi,0])
 #Import the healpix map of the beam, then calculate the Blm of the beam
-with open('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/beamhealpixmap_05.txt') as f:
+with open('/home/eric/simulate_visibilities/beamhealpix/beamhealpixmap_05.txt') as f:
 	data = np.array([np.array([float(line)]) for line in f])
 
 data = data.flatten()
@@ -407,9 +407,9 @@ btest.Blm=Blm
  #\__, /__/_|_|_| \__,_|_|_|_|_|
  #|___/                         
 #create sky map alm
-pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm1.fits32')
-pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm2.fits32')
-pca3 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm3.fits32')
+pca1 = hp.fitsfunc.read_map('/home/eric/simulate_visibilities/GSM_32/gsm1.fits32')
+pca2 = hp.fitsfunc.read_map('/home/eric/simulate_visibilities/GSM_32/gsm2.fits32')
+pca3 = hp.fitsfunc.read_map('/home/eric/simulate_visibilities/GSM_32/gsm3.fits32')
 gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
 
 equatorial_GSM = np.zeros(12*32**2,'float')
@@ -443,7 +443,7 @@ for i in range(len(timelist)):
 	savelist[i][2] = v2[i].imag
 
 
-f_handle = open('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/spherical_result/sphericalharmonics_L10_05.txt','w')
+f_handle = open('/home/eric/simulate_visibilities/visibility_result/sphericalharmonics_L10_05.txt','w')
 for i in savelist:
 	np.savetxt(f_handle, [i])
 f_handle.close()
