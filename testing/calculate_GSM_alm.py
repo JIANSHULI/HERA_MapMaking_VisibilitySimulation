@@ -25,16 +25,19 @@ import time
 #plt.show()
 
 
-pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm1.fits32')
-pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm2.fits32')
-pca3 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/Simulate visibilities/GSM_32/gsm3.fits32')
-gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm1.fits64')
+pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm2.fits64')
+pca3 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm3.fits64')
+gsm = 422.952*(0.307706*pca1 -0.281772*pca2+0.0123976*pca3)
 
-equatorial_GSM = np.zeros(12*32**2,'float')
+
+
+nside=64
+equatorial_GSM = np.zeros(12*nside**2,'float')
 #rotate sky map
-for i in range(12*32**2):
-	ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(32,i)) 
-	pixindex, weight = hpf.get_neighbours(32,ang[0],ang[1])
+for i in range(12*nside**2):
+	ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i)) 
+	pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
 	for pix in range(len(pixindex)):
 		equatorial_GSM[i] += np.log(weight[pix]*gsm[pixindex[pix]])
 
@@ -43,7 +46,7 @@ almlist = hp.sphtfunc.map2alm(equatorial_GSM)
 alm={}
 for l in range(96):
 	for mm in range(-l,l+1):
-		alm[(l,mm)] = almlist[hp.sphtfunc.Alm.getidx(95,l,abs(mm))]
+		alm[(l,mm)] = almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))]
 
 hp.visufunc.mollview(equatorial_GSM)
 plt.show()
