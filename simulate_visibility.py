@@ -380,115 +380,115 @@ class Visibility_Simulator:
 
 
 
-		
-#############################
-##test the class
-#############################
-btest=Visibility_Simulator()
-btest.initial_zenith=np.array([45.336111/180.0*pi,0])
-#Import the healpix map of the beam, then calculate the Blm of the beam
-with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/beamhealpix/beamhealpixmap.txt') as f:
-	data = np.array([np.array([float(line)]) for line in f])
 
-data = data.flatten()
-beam_alm = hp.sphtfunc.map2alm(data,iter=10)
+	#############################
+	##test the class
+	#############################
+	btest=Visibility_Simulator()
+	btest.initial_zenith=np.array([45.336111/180.0*pi,0])
+	#Import the healpix map of the beam, then calculate the Blm of the beam
+	with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/beamhealpix/beamhealpixmap.txt') as f:
+		data = np.array([np.array([float(line)]) for line in f])
 
-Blm={}
-for l in range(21):
-	for mm in range(-l,l+1):
-		if mm >= 0:
-			Blm[(l,mm)] = (1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))]
-		if mm < 0:
-			Blm[(l,mm)] = np.conj((1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))])
+	data = data.flatten()
+	beam_alm = hp.sphtfunc.map2alm(data,iter=10)
+
+	Blm={}
+	for l in range(21):
+		for mm in range(-l,l+1):
+			if mm >= 0:
+				Blm[(l,mm)] = (1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))]
+			if mm < 0:
+				Blm[(l,mm)] = np.conj((1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))])
+				
+	btest.Blm=Blm
+
+
+						   #_       
+	  #__ _ ____ __    __ _| |_ __  
+	 #/ _` (_-< '  \  / _` | | '  \ 
+	 #\__, /__/_|_|_| \__,_|_|_|_|_|
+	 #|___/                         
+	#create sky map alm
+	pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm1.fits32')
+	pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm2.fits32')
+	pca3 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm3.fits32')
+	gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+
+	nside=32
+	equatorial_GSM = np.zeros(12*nside**2,'float')
+	#rotate sky map
+	for i in range(12*nside**2):
+		ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i)) 
+		pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
+		for pix in range(len(pixindex)):
+			equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
 			
-btest.Blm=Blm
+	almlist = hp.sphtfunc.map2alm(equatorial_GSM,iter=10)
+	alm={}
+	for l in range(96):
+		for mm in range(-l,l+1):
+			if mm >= 0:
+				alm[(l,mm)] = (1.0j)**mm*almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))]
+			if mm < 0:
+				alm[(l,mm)] = np.conj((1.0j)**mm*almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))])
 
 
-                       #_       
-  #__ _ ____ __    __ _| |_ __  
- #/ _` (_-< '  \  / _` | | '  \ 
- #\__, /__/_|_|_| \__,_|_|_|_|_|
- #|___/                         
-#create sky map alm
-pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm1.fits32')
-pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm2.fits32')
-pca3 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm3.fits32')
-gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+	#set frequency and baseline vector
+	freq = 125.195
+	d=np.array([-6.0,-3.0,0.0])
 
-nside=32
-equatorial_GSM = np.zeros(12*nside**2,'float')
-#rotate sky map
-for i in range(12*nside**2):
-	ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i)) 
-	pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
-	for pix in range(len(pixindex)):
-		equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
-		
-almlist = hp.sphtfunc.map2alm(equatorial_GSM,iter=10)
-alm={}
-for l in range(96):
-	for mm in range(-l,l+1):
-		if mm >= 0:
-			alm[(l,mm)] = (1.0j)**mm*almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))]
-		if mm < 0:
-			alm[(l,mm)] = np.conj((1.0j)**mm*almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))])
+	timelist = 1/10.0*np.arange(24*10+1)
+	v2 = btest.calculate_visibility(alm, d, freq, timelist)
+	print v2
+
+	savelist = np.zeros([len(timelist),3],'float')
+	for i in range(len(timelist)):
+		savelist[i][0] = timelist[i]
+		savelist[i][1] = v2[i].real
+		savelist[i][2] = v2[i].imag
 
 
-#set frequency and baseline vector
-freq = 125.195
-d=np.array([-6.0,-3.0,0.0])
-
-timelist = 1/10.0*np.arange(24*10+1)
-v2 = btest.calculate_visibility(alm, d, freq, timelist)
-print v2
-
-savelist = np.zeros([len(timelist),3],'float')
-for i in range(len(timelist)):
-	savelist[i][0] = timelist[i]
-	savelist[i][1] = v2[i].real
-	savelist[i][2] = v2[i].imag
+	f_handle = open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L20.txt','w')
+	for i in savelist:
+		np.savetxt(f_handle, [i])
+	f_handle.close()
 
 
-f_handle = open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L20.txt','w')
-for i in savelist:
-	np.savetxt(f_handle, [i])
-f_handle.close()
+	##############################
+	###check the result is the same as mathematica
+	##############################
+	#btest=Visibility_Simulator()
+	#btest.initial_zenith=np.array([pi/2,0])
+	##Import the healpix map of the beam, then calculate the Blm of the beam
+	#Blm={}
+	#for l in range(21):
+		#for mm in range(-l,l+1):
+			#Blm[(l,mm)] = 0
+
+	#Blm[(1, -1)] = Blm[(1, 1)] = -0.36;
+	#Blm[(2, 1)] = Blm[(2, -1)] = -0.46;
+	#Blm[(3, 1)] = Blm[(3, -1)] = -0.30;
+
+	#btest.Blm=Blm
+
+						   ##_       
+	  ##__ _ ____ __    __ _| |_ __  
+	 ##/ _` (_-< '  \  / _` | | '  \ 
+	 ##\__, /__/_|_|_| \__,_|_|_|_|_|
+	 ##|___/                         
+	##create sky map alm
+
+	#alm={}
+	#alm[(1,1)] = 1
+	#alm[(2,1)] = 0.5
+	#alm[(3,2)] = 0.1
 
 
-##############################
-###check the result is the same as mathematica
-##############################
-#btest=Visibility_Simulator()
-#btest.initial_zenith=np.array([pi/2,0])
-##Import the healpix map of the beam, then calculate the Blm of the beam
-#Blm={}
-#for l in range(21):
-	#for mm in range(-l,l+1):
-		#Blm[(l,mm)] = 0
+	##set frequency and baseline vector
+	#freq = 3*299.792458/(2*pi)
+	#d=np.array([3.0,6.0,0.0])
 
-#Blm[(1, -1)] = Blm[(1, 1)] = -0.36;
-#Blm[(2, 1)] = Blm[(2, -1)] = -0.46;
-#Blm[(3, 1)] = Blm[(3, -1)] = -0.30;
-
-#btest.Blm=Blm
-
-                       ##_       
-  ##__ _ ____ __    __ _| |_ __  
- ##/ _` (_-< '  \  / _` | | '  \ 
- ##\__, /__/_|_|_| \__,_|_|_|_|_|
- ##|___/                         
-##create sky map alm
-
-#alm={}
-#alm[(1,1)] = 1
-#alm[(2,1)] = 0.5
-#alm[(3,2)] = 0.1
-
-
-##set frequency and baseline vector
-#freq = 3*299.792458/(2*pi)
-#d=np.array([3.0,6.0,0.0])
-
-#timelist = [0]
-#v2 = btest.calculate_visibility(alm, d, freq, timelist)
-#print v2
+	#timelist = [0]
+	#v2 = btest.calculate_visibility(alm, d, freq, timelist)
+	#print v2
