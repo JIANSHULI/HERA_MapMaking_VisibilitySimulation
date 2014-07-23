@@ -352,7 +352,7 @@ class Visibility_Simulator:
 		#self.Blm = get_alm(np.array([pix for sublist in equabeam for pix in sublist ]),self.numberofl,pi/nside,2*pi/nside)
 		
 		
-	def calculate_visibility(self, skymap_alm, d,freq ,tlist=[0], L = 10):
+	def calculate_visibility(self, skymap_alm, d,freq ,tlist=[0], L = 95):
 		##rotate d to equatorial coordinate
 		#temp = rotation(ctos(d)[1],ctos(d)[2],[0.0,(pi/2-self.initial_zenith[0]),0])
 		#drotate = stoc(np.append(la.norm(d),rotation(temp[0],temp[1],[self.initial_zenith[1],0 ,0 ])))
@@ -397,9 +397,9 @@ Blm={}
 for l in range(21):
 	for mm in range(-l,l+1):
 		if mm >= 0:
-			Blm[(l,mm)] = beam_alm[hp.sphtfunc.Alm.getidx(32,l,abs(mm))]
+			Blm[(l,mm)] = (1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))]
 		if mm < 0:
-			Blm[(l,mm)] = -np.conj(beam_alm[hp.sphtfunc.Alm.getidx(32,l,abs(mm))])
+			Blm[(l,mm)] = np.conj((1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))])
 			
 btest.Blm=Blm
 
@@ -429,14 +429,14 @@ alm={}
 for l in range(96):
 	for mm in range(-l,l+1):
 		if mm >= 0:
-			alm[(l,mm)] = almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))]
+			alm[(l,mm)] = (1.0j)**mm*almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))]
 		if mm < 0:
-			alm[(l,mm)] = -np.conj(almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))])
+			alm[(l,mm)] = np.conj((1.0j)**mm*almlist[hp.sphtfunc.Alm.getidx(nside*3-1,l,abs(mm))])
 
 
 #set frequency and baseline vector
 freq = 125.195
-d=np.array([6.0,3.0,0.0])
+d=np.array([-6.0,-3.0,0.0])
 
 timelist = 1/10.0*np.arange(24*10+1)
 v2 = btest.calculate_visibility(alm, d, freq, timelist)
@@ -449,7 +449,7 @@ for i in range(len(timelist)):
 	savelist[i][2] = v2[i].imag
 
 
-f_handle = open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L10_test.txt','w')
+f_handle = open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L20.txt','w')
 for i in savelist:
 	np.savetxt(f_handle, [i])
 f_handle.close()

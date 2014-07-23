@@ -18,8 +18,8 @@ with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/V
 with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L10.txt') as f:
 	spherical_10 = np.array([np.array([float(x) for x in line.split()]) for line in f])
 
-with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L95.txt') as f:
-	spherical_95 = np.array([np.array([float(x) for x in line.split()]) for line in f])
+with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L20.txt') as f:
+	spherical_20 = np.array([np.array([float(x) for x in line.split()]) for line in f])
 	
 with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/sphericalharmonics_L10_test.txt') as f:
 	spherical_10test = np.array([np.array([float(x) for x in line.split()]) for line in f])
@@ -28,8 +28,8 @@ with open('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/visibility_result/s
 	spherical_10r = np.array([np.array([float(x) for x in line.split()]) for line in f])
 
 
-p1 = correct_v
-p2 = spherical_10
+p1 = spherical_20
+p2 = correct_v
 
 shift=0
 plt.plot([(i[0]+shift)%24 for i in p1],[i[1] for i in p1],'bo')
