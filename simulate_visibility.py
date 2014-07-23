@@ -382,9 +382,10 @@ class Visibility_Simulator:
 #add in a line to test github
 #add another line
 
-	#############################
-	##test the class
-	#############################
+#############################
+##test the class
+#############################
+if __name__ == '__main__':
 	btest=Visibility_Simulator()
 	btest.initial_zenith=np.array([45.336111/180.0*pi,0])
 	#Import the healpix map of the beam, then calculate the Blm of the beam
