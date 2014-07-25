@@ -9,7 +9,7 @@ from wignerpy._wignerpy import wigner3j, wigner3jvec
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
-
+import os,time
 #some constant
 pi=m.pi
 e=m.e
@@ -315,6 +315,62 @@ class Visibility_Simulator:
 							else:
 								Bulm[(l,mm)] += 4*pi*(1j**(l2%4))*sphjarray[l2]*spheharray[l2][mm2]*self.Blm[(l1,mm1)]*sqrtarray[l][l1][l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]
 		return Bulm
+
+	def calculate_Bulm_jf(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max
+		k = 2*pi*freq/299.792458
+		timer = time.time()
+		
+		#an array of the comples conjugate of Ylm's
+		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex')
+		for i in range(0,L+L1+1):
+			for mm in range(-i,i+1):
+				spheharray[i, mm]=(spheh(i,mm,ctos(d)[1],ctos(d)[2])).conjugate()
+		if verbose:
+			print float(time.time() - timer)/60
+		
+		#an array of spherical Bessel functions
+		sphjarray = np.zeros(L+L1+1,'complex')
+		for l in range(L+L1+1):
+			sphjarray[l] = sphj(l,k*la.norm(d))
+		if verbose:
+			print float(time.time() - timer)/60
+		
+		#an array of m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))
+		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'complex')
+		for i in range(L+1):
+			for j in range(L1+1):
+				for kk in range(0,L+L1+1):
+					sqrtarray[i, j, kk] = m.sqrt((2*i+1)*(2*j+1)*(2*kk+1)/(4*pi))
+		if verbose:
+			print float(time.time() - timer)/60
+		
+		#Sum over to calculate Bulm
+		Bulm={}
+		for l in range(L+1):
+			for mm in range(-l,l+1):
+				Bulm[(l,mm)]=0
+				for l1 in range(L1+1):
+					for mm1 in range(-l1,l1+1):
+						mm2=-(-mm+mm1)
+						wignerarray0 = wigner3jvec(l,l1,0,0)
+						wignerarray = wigner3jvec(l,l1,-mm,mm1)
+						l2min = max([abs(l-l1),abs(mm2)])
+						diff = max(abs(mm2)-abs(l-l1),0)
+						for l2 in range(l2min,l+l1+1):
+							#if self.Blm[(l1,mm1)] ==0 :
+								#Bulm[(l,mm)] += 0
+							#else:
+								#if l == 26 and mm == -26 and l1 == 5 and mm1 == -1:
+									#print 4*pi*(-1)**mm * (1j**l2)*sphjarray[l2]*spheharray[l2, mm2]*self.Blm[(l1,mm1)]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min],
+									##print wigner3jvec(l,l1,0,0)
+									##print diff+l2-l2min, diff, l2, l2min
+									#print l2, mm2, (spheh(l2, mm2,ctos(d)[1],ctos(d)[2])).conjugate(), spheharray[l2, mm2]
+									#print l2, (1j**l2), sphjarray[l2], self.Blm[(l1,mm1)], spheharray[l2, mm2], sqrtarray[l, l1, l2], wignerarray0[diff+l2-l2min], (-1)**mm, wignerarray[l2-l2min]
+								Bulm[(l,mm)] += (1j**l2)*sphjarray[l2]*spheharray[l2, mm2]*self.Blm[(l1,mm1)]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]
+				Bulm[(l,mm)] = 4*pi*(-1)**mm * Bulm[(l,mm)]
+		if verbose:
+			print float(time.time() - timer)/60
+		return Bulm
 	
 	#def rotate_beamhealpixmap(self):
 		#beammap = self.beamhealpix
@@ -375,10 +431,91 @@ class Visibility_Simulator:
 				v += skymap_alm[comp]*Bulm[comp]*e**(1.0j*((comp[1]*phi)%(2*pi)))	
 			vlist[i]=v	
 		return vlist
+	def calculate_visibility_jf(self, skymap_alm, d,freq ,tlist, L, verbose = False):
+		##rotate d to equatorial coordinate
+		#temp = rotation(ctos(d)[1],ctos(d)[2],[0.0,(pi/2-self.initial_zenith[0]),0])
+		#drotate = stoc(np.append(la.norm(d),rotation(temp[0],temp[1],[self.initial_zenith[1],0 ,0 ])))
+		#print ctos(d)[1:3], rotatey(ctos(d)[1:3],self.initial_zenith[0]), rotatez(rotatey(ctos(d)[1:3],self.initial_zenith[0]), self.initial_zenith[1])
+		drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3],self.initial_zenith[0]), self.initial_zenith[1])))
+		#drotate = stoc(np.append(la.norm(d),rotatez(ctos(drotate)[1:3],pi/2.0)))
+		if verbose:
+			print drotate
+		#calculate Bulm
+		L1 = max([key for key in self.Blm])[0]
+		Bulm = self.calculate_Bulm_jf(L, freq, drotate ,L1, verbose = verbose)
+		
+		#get the intersect of the component of skymap_alm and self.Blm
+		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))
+		if verbose:
+			print len(commoncomp)
+		#calculate visibilities
+		vlist = np.zeros(len(tlist),'complex128')
+		for i in range(len(tlist)):
+			phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation		
+			v=0
+			for comp in commoncomp:
+				v += skymap_alm[comp]*Bulm[comp]*e**(1.0j*comp[1]*phi)	
+			vlist[i]=v	
+		return vlist
 
+#################################
+####IO functions for alms########
+#################################
+def read_alm(filename):
+	if not os.path.isfile(filename):
+		raise Exception("File %s does not exist."%filename)
+	raw = np.fromfile(filename, dtype = 'complex64')
+	lmax = int(len(raw)**0.5) - 1
+	if lmax != len(raw)**0.5 - 1:
+		raise Exception("Invalid array length of %i found in file %s. Array must be of length (l+1)^2."%(len(raw), filename))
+	result = {}
+	cnter = 0
+	for l in range(lmax + 1):
+		for mm in range(-l, l + 1):
+			result[(l, mm)] = raw[cnter]
+			cnter = cnter + 1
+	return result
+			
 
+def read_real_alm(filename):
+	if not os.path.isfile(filename):
+		raise Exception("File %s does not exist."%filename)
+	raw = np.fromfile(filename, dtype = 'complex64')
+	lmax = int(m.floor((2*len(raw))**0.5)) - 1
+	if (lmax + 1) * (lmax + 2) / 2 != len(raw):
+		raise Exception("Invalid array length of %i found in file %s. Array must be of length (l+1)(l+2)/2."%(len(raw), filename))
+	result = {}
+	cnter = 0
+	for l in range(lmax + 1):
+		for mm in range(0, l + 1):
+			result[(l, mm)] = raw[cnter]
+			cnter = cnter + 1
+	return result
 
+def convert_healpy_alm(healpyalm, lmax):
+	if len(healpyalm) != (lmax + 1) * (lmax + 2) / 2:
+		raise Exception('Length of input 1D healpy alm (%i) does not match the lmax inputed (%i). Length should be (l+1)(l+2)/2 for a real map alm.'%(len(healpyalm), lmax))
+	result = {}
+	cnter = 0
+	for mm in range(lmax + 1):
+		for l in range(mm, lmax + 1):
+			result[(l, mm)] = healpyalm[cnter]
+			cnter = cnter + 1
+	return result
+	
+def expand_real_alm(real_alm):
+	lmax = np.max(np.array(real_alm.keys()))
+	if len(real_alm) != (lmax+1)*(lmax+2)/2:
+		raise Exception('Input real_alm does not look like a real_alm. Max l %i does not agree with length %i of input real_alm.'%(lmax, len(real_alm)))
+	result = {}
+	for l in range(lmax + 1):
+		for mm in range(0, l + 1):
+			result[(l, mm)] = real_alm[(l,mm)]
+	for l in range(lmax + 1):
+		for mm in range(-l, 0):
+			result[(l, mm)] = (-1)**mm * np.conjugate(real_alm[(l, -mm)])
 
+	return result
 #add in a line to test github
 #add another line
 
