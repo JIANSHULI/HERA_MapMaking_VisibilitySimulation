@@ -276,47 +276,7 @@ class Visibility_Simulator:
 		self.initial_zenith=np.array([45.336111/180.0*pi,0])     #at t=0, the position of zenith in equatorial coordinate
 
 	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
-	def calculate_Bulm(self, L=10,freq=125.195,d=np.array([-3.0,6.0,0.0]),L1=20):    #L= lmax  , L1=l1max
-		k = 2*pi*freq/299.792458
-
-		#an array of the comples conjugate of Ylm's
-		spheharray = np.zeros([L+L1+1,L+L1+1],'complex')
-		for i in range(0,L+L1+1):
-			for mm in range(-i,i+1):
-				spheharray[i][mm]=(spheh(i,mm,ctos(d)[1],ctos(d)[2])).conjugate()
-
-		#an array of spherical Bessel functions
-		sphjarray = np.zeros(L+L1+1,'complex')
-		for l in range(L+L1+1):
-			sphjarray[l] = sphj(l,k*la.norm(d))
-
-		#an array of m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))
-		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'complex')
-		for i in range(L+1):
-			for j in range(L1+1):
-				for kk in range(0,L+L1+1):
-					sqrtarray[i][j][kk] = m.sqrt((2*i+1)*(2*j+1)*(2*kk+1)/(4*pi))
-
-		#Sum over to calculate Bulm
-		Bulm={}
-		for l in range(L+1):
-			for mm in range(-l,l+1):
-				Bulm[(l,mm)]=0
-				for l1 in range(L1+1):
-					for mm1 in range(-l1,l1+1):
-						mm2=-(mm+mm1)
-						wignerarray0 = wigner3jvec(l,l1,0,0)
-						wignerarray = wigner3jvec(l,l1,mm,mm1)
-						l2min = max([abs(l-l1),abs(mm2)])
-						diff = max(abs(mm2)-abs(l-l1),0)
-						for l2 in range(l2min,l+l1+1):
-							if self.Blm[(l1,mm1)] ==0 :
-								Bulm[(l,mm)] +=0
-							else:
-								Bulm[(l,mm)] += 4*pi*(1j**(l2%4))*sphjarray[l2]*spheharray[l2][mm2]*self.Blm[(l1,mm1)]*sqrtarray[l][l1][l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]
-		return Bulm
-
-	def calculate_Bulm_jf(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max
+	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max
 		k = 2*pi*freq/299.792458
 		timer = time.time()
 		
@@ -331,7 +291,7 @@ class Visibility_Simulator:
 		#an array of spherical Bessel functions
 		sphjarray = np.zeros(L+L1+1,'complex')
 		for l in range(L+L1+1):
-			sphjarray[l] = sphj(l,k*la.norm(d))
+			sphjarray[l] = sphj(l, -k*la.norm(d))
 		if verbose:
 			print float(time.time() - timer)/60
 		
@@ -372,91 +332,50 @@ class Visibility_Simulator:
 			print float(time.time() - timer)/60
 		return Bulm
 	
-	#def rotate_beamhealpixmap(self):
-		#beammap = self.beamhealpix
-		
-			
-	#def calculate_Blm(self):
-	
-	
-	#modify self.Blm to equatorial coordinate (starting from the Blm in horizontal coordinate and the zenith position at t=0)
-	#def rotate_beam(self):
-		#declination = self.initial_zenith[0]
-		#rightascention = self.initial_zenith[1]
-		##create a function of beam from the Blm
-		#def beam(theta,phi):    
-			#b = 0
-			#for key in self.Blm:
-				#b  += self.Blm[key]*spheh(key[0],key[1],theta,phi)
-			#return b
-		
-		##rotate the beam
-		#def equatorial_beam(theta,phi):   
-			#[thetaR,phiR]=rotation(theta,phi,[pi/2+rightascention,pi/2-declination,0])
-			#return beam(thetaR,phiR)
-			
-		#self.numberofl = max([max([key for key in self.Blm])[0],self.numberofl])    #update self.numberofl
-		
-		##calculate the Blm after the rotation
-		#nside=50
-		#equabeam=np.zeros([nside,nside,3],dtype=complex)
-		#for i in range(len(equabeam)):
-			#for j in range(len(equabeam[i])):
-				#equabeam[i][j]=np.array([pi/nside*i,2*pi/nside*j,equatorial_beam(pi/nside*i,2*pi/nside*j)])
-		
-		##modify self.Blm
-		#self.Blm = get_alm(np.array([pix for sublist in equabeam for pix in sublist ]),self.numberofl,pi/nside,2*pi/nside)
-		
-		
-	def calculate_visibility(self, skymap_alm, d,freq ,tlist=[0], L = 95):
+	def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):
 		##rotate d to equatorial coordinate
-		#temp = rotation(ctos(d)[1],ctos(d)[2],[0.0,(pi/2-self.initial_zenith[0]),0])
-		#drotate = stoc(np.append(la.norm(d),rotation(temp[0],temp[1],[self.initial_zenith[1],0 ,0 ])))
-		drotate = stoc(np.append(la.norm(d),rotatey(ctos(d)[1:3],pi/2-self.initial_zenith[0])))
-		#drotate = stoc(np.append(la.norm(d),rotatez(ctos(drotate)[1:3],pi/2.0)))
-		
-		#calculate Bulm
-		L1 = max([key for key in self.Blm])[0]
-		Bulm = self.calculate_Bulm(L, freq, drotate ,L1)
-		
-		#get the intersect of the component of skymap_alm and self.Blm
-		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))
-		
-		#calculate visibilities
-		vlist = np.zeros(len(tlist),'complex')
-		for i in range(len(tlist)):
-			phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation		
-			v=0
-			for comp in commoncomp:
-				v += skymap_alm[comp]*Bulm[comp]*e**(1.0j*((comp[1]*phi)%(2*pi)))	
-			vlist[i]=v	
-		return vlist
-	def calculate_visibility_jf(self, skymap_alm, d,freq ,tlist, L, verbose = False):
-		##rotate d to equatorial coordinate
-		#temp = rotation(ctos(d)[1],ctos(d)[2],[0.0,(pi/2-self.initial_zenith[0]),0])
-		#drotate = stoc(np.append(la.norm(d),rotation(temp[0],temp[1],[self.initial_zenith[1],0 ,0 ])))
-		#print ctos(d)[1:3], rotatey(ctos(d)[1:3],self.initial_zenith[0]), rotatez(rotatey(ctos(d)[1:3],self.initial_zenith[0]), self.initial_zenith[1])
 		drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3],self.initial_zenith[0]), self.initial_zenith[1])))
-		#drotate = stoc(np.append(la.norm(d),rotatez(ctos(drotate)[1:3],pi/2.0)))
 		if verbose:
 			print drotate
+
 		#calculate Bulm
 		L1 = max([key for key in self.Blm])[0]
-		Bulm = self.calculate_Bulm_jf(L, freq, drotate ,L1, verbose = verbose)
+		Bulm = self.calculate_Bulm(L, freq, drotate ,L1, verbose = verbose)
 		
 		#get the intersect of the component of skymap_alm and self.Blm
 		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))
 		if verbose:
 			print len(commoncomp)
+
 		#calculate visibilities
-		vlist = np.zeros(len(tlist),'complex128')
-		for i in range(len(tlist)):
-			phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation		
-			v=0
-			for comp in commoncomp:
-				v += skymap_alm[comp]*Bulm[comp]*e**(1.0j*comp[1]*phi)	
-			vlist[i]=v	
+		if tlist != None:
+			vlist = np.zeros(len(tlist),'complex128')
+			for i in range(len(tlist)):
+				phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation		
+				v=0
+				for comp in commoncomp:
+					v += np.conjugate(skymap_alm[comp]) * Bulm[comp] * e**(-1.0j*comp[1]*phi)	
+				vlist[i]=v
+		else:
+			lcommon = max(np.array(commoncomp)[:,0])
+			if nt == None:
+				nfourier = 2 * lcommon + 1
+			elif nt < 2 * lcommon + 1: #make sure nfourier is a multiple of nt and bigger than 2 * lcommon + 1
+				nfourier = 0
+				while nfourier < 2 * lcommon + 1:
+					nfourier = nfourier +  nt
+			else:
+				nfourier = nt
+			
+			self.cm = np.zeros(nfourier, dtype = 'complex128')
+			for mm in range(-lcommon, lcommon + 1):
+				for l in range(abs(mm), lcommon + 1):
+					self.cm[(mm)%(2*lcommon+1)] += np.conjugate(skymap_alm[(l, mm)]) * Bulm[(l, mm)]
+			vlist = np.fft.fft(self.cm)
+			if nt < nfourier:
+				vlist = vlist[::(nfourier/nt)]
 		return vlist
+
 
 #################################
 ####IO functions for alms########
