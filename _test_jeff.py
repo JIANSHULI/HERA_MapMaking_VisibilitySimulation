@@ -67,5 +67,42 @@ class TestMethods(unittest.TestCase):
         self.result = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=np.array([0,3,0]), freq=self.freq, nt=(6*self.nside-1), L = 3*self.nside-1, verbose = False)
         print "Total time: %f"%(float(time.time() - timer)/60)
         np.testing.assert_almost_equal(np.abs((self.result-self.correct_result)/self.correct_result), np.zeros(len(self.correct_result)), 5)
+
+class TestGSM(unittest.TestCase):
+    def setUp(self):
+        self.test_dir = os.path.dirname(os.path.realpath(__file__)) + '/testing/'
+        self.blmequ = sv.read_real_alm(self.test_dir + 'bx125.195.bin')
+        self.blmax = 5
+        self.freq = 125.195#my correct answers are computed with c=300,so im rescaing freq here to compensate
+        self.zenithequ = sv.ctos(np.fromfile(self.test_dir + 'zenith.bin', dtype = 'float32'))[1:]
+        self.correct_result = np.loadtxt(self.test_dir + 'Revised_Location_Visibilties_for_6_m_south_3_m_east_0_m_up_xx_pol_125.195_MHz.dat')
+        self.correct_result = self.correct_result[:-1, 1] + 1j * self.correct_result[:-1, 2]
+        self.nside = 32
+        
+        self.vs = sv.Visibility_Simulator()
+        self.vs.initial_zenith = self.zenithequ
+        self.vs.Blm = sv.expand_real_alm(self.blmequ)
+        self.rot = np.fromfile(self.test_dir + 'x5rot.bin', dtype = 'float32').reshape((3,3))
+    def test_josh_gsm(self):
+            pca1 = hp.fitsfunc.read_map(self.test_dir + '/GSM_32/gsm1.fits32')
+            pca2 = hp.fitsfunc.read_map(self.test_dir + '/GSM_32/gsm2.fits32')
+            pca3 = hp.fitsfunc.read_map(self.test_dir + '/GSM_32/gsm3.fits32')
+            gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+            nside=32
+            equatorial_GSM = np.zeros(12*nside**2,'float')
+            #rotate sky map
+            for i in range(12*nside**2):
+                ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i)) 
+                pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
+                for pix in range(len(pixindex)):
+                    equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
+            self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
+            self.result = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
+            print len(self.result), np.argmax(np.real(self.result)) - np.argmax(np.real(self.correct_result)), np.argmax(np.imag(self.result)) - np.argmax(np.imag(self.correct_result))
+            plt.plot(np.real(self.result), 'r--', np.real(self.correct_result), 'b--')
+            plt.show()
+            plt.plot(np.imag(self.result), 'r--', np.imag(self.correct_result), 'b--')
+            plt.show()
+            #self.assertAlmostEqual(np.mean(abs((self.result-self.correct_result)/self.correct_result))**2, 0, 2)
 if __name__ == '__main__':
     unittest.main()

@@ -370,7 +370,7 @@ class Visibility_Simulator:
 			self.cm = np.zeros(nfourier, dtype = 'complex128')
 			for mm in range(-lcommon, lcommon + 1):
 				for l in range(abs(mm), lcommon + 1):
-					self.cm[(mm)%(2*lcommon+1)] += np.conjugate(skymap_alm[(l, mm)]) * Bulm[(l, mm)]
+					self.cm[mm] += np.conjugate(skymap_alm[(l, mm)]) * Bulm[(l, mm)]
 			vlist = np.fft.fft(self.cm)
 			if nt < nfourier:
 				vlist = vlist[::(nfourier/nt)]
