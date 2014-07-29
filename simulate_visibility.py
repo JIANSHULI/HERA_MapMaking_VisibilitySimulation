@@ -9,7 +9,7 @@ from wignerpy._wignerpy import wigner3j, wigner3jvec
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
-import os,time
+import os, time, sys
 #some constant
 pi=m.pi
 e=m.e
@@ -270,10 +270,8 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 
 class Visibility_Simulator:
 	def __init__(self):
-		self.beamhealpix = None
-		self.numberofl = 0
 		self.Blm = np.zeros([3,3],'complex')
-		self.initial_zenith=np.array([45.336111/180.0*pi,0])     #at t=0, the position of zenith in equatorial coordinate
+		self.initial_zenith=np.array([0, 45.336111/180.0*pi])     #at t=0, the position of zenith in equatorial coordinate in ra dec radians
 
 	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
 	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max
@@ -281,19 +279,30 @@ class Visibility_Simulator:
 		timer = time.time()
 		
 		#an array of the comples conjugate of Ylm's
-		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex')
-		for i in range(0,L+L1+1):
-			for mm in range(-i,i+1):
-				spheharray[i, mm]=(spheh(i,mm,ctos(d)[1],ctos(d)[2])).conjugate()
+		dth = ctos(d)[1]
+		dph = ctos(d)[2]
 		if verbose:
-			print float(time.time() - timer)/60
+			print "Tabulizing spherical harmonics...", dth, dph
+		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex')
+
+		for i in range(0,L+L1+1):
+			if verbose:
+				print i,
+				sys.stdout.flush()
+			for mm in range(-i,i+1):
+				spheharray[i, mm]=(spheh(i,mm,dth,dph)).conjugate()
+		if verbose:
+			print "Done", float(time.time() - timer)/60
 		
 		#an array of spherical Bessel functions
+		if verbose:
+			print "Tabulizing spherical bessel j..."
 		sphjarray = np.zeros(L+L1+1,'complex')
 		for l in range(L+L1+1):
 			sphjarray[l] = sphj(l, -k*la.norm(d))
+
 		if verbose:
-			print float(time.time() - timer)/60
+			print "Done", float(time.time() - timer)/60
 		
 		#an array of m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))
 		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'complex')
@@ -334,7 +343,7 @@ class Visibility_Simulator:
 	
 	def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):
 		##rotate d to equatorial coordinate
-		drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3],self.initial_zenith[0]), self.initial_zenith[1])))
+		drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0])))
 		if verbose:
 			print drotate
 
