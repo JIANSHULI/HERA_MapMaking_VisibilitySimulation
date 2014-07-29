@@ -6,6 +6,7 @@ import scipy.special as ssp
 import math as m
 import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
+from spharm import spharm
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
@@ -58,8 +59,8 @@ def sphj(l,z):
 	return ssp.sph_jn(l,z)[0][-1]
 
 def spheh(l,m,theta,phi):
-	return ssp.sph_harm(m,l,phi,theta)
-	
+	#return ssp.sph_harm(m,l,phi,theta)
+	return spharm(l,m,theta,phi)
 ############################################
 #other functions
 ################################################
@@ -291,6 +292,10 @@ class Visibility_Simulator:
 				sys.stdout.flush()
 			for mm in range(-i,i+1):
 				spheharray[i, mm]=(spheh(i,mm,dth,dph)).conjugate()
+				#if np.isnan(spheharray[i, mm]) or np.isinf(spheharray[i, mm]):#using conjugate relation since scipy has bug for sph_harm with l=151 m=-151 and such
+					#spheharray[i, mm]=(spheh(i,-mm,dth,dph))*(-1)**mm
+					#if np.isnan(spheharray[i, mm]) or np.isinf(spheharray[i, mm]):
+						#spheharray[i, mm]=0
 		if verbose:
 			print "Done", float(time.time() - timer)/60
 		
