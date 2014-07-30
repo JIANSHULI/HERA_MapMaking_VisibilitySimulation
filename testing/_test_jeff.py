@@ -81,7 +81,7 @@ class TestGSM(unittest.TestCase):
         self.zenithequ = np.array(self.zenithequ)[::-1]
         self.correct_result = np.loadtxt(self.test_dir + 'Revised_Location_Visibilties_for_6_m_south_3_m_east_0_m_up_xx_pol_125.195_MHz.dat')
         self.correct_result = self.correct_result[:-1, 1] + 1j * self.correct_result[:-1, 2]
-        
+
 
         self.vs = sv.Visibility_Simulator()
         self.vs.initial_zenith = self.zenithequ
@@ -161,29 +161,38 @@ class TestSpeed(unittest.TestCase):
 
         nside = self.nside
         print "Reading fits...",
+        sys.stdout.flush()
         pca1 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm1.fits' + str(nside))
         pca2 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm2.fits' + str(nside))
         pca3 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm3.fits' + str(nside))
         gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
         print "Done reading"
+        sys.stdout.flush()
         equatorial_GSM = np.zeros(12*nside**2,'float')
-        
+
         #rotate sky map
         print "Rotating map...",
+        sys.stdout.flush()
         for i in range(12*nside**2):
             ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
             pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
             for pix in range(len(pixindex)):
                 equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
         print "Done rotating"
+        sys.stdout.flush()
 
         print "Creating map alm...",
+        sys.stdout.flush()
         self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
         print "Done alm"
-        
+        sys.stdout.flush()
+
+        print "Computing visibilities...",
+        sys.stdout.flush()
         timer = time.time()
         self.result = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([21.0,21.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = True)
-        print (time.time() - timer)/60,'min'
+        print "done", (time.time() - timer)/60, 'min'
+        sys.stdout.flush()
         #print len(self.result), np.argmax(np.real(self.result)) - np.argmax(np.real(self.correct_result)), np.argmax(np.imag(self.result)) - np.argmax(np.imag(self.correct_result))
         plt.plot(np.real(self.result), 'r--', np.real(self.correct_result), 'b--')
         plt.show()

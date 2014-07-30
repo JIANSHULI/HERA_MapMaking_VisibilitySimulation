@@ -38,14 +38,14 @@ def rotatey(dirlist,t):
 	[theta,phi] = dirlist
 	rm = np.array([[m.cos(t),0,m.sin(t)],[0,1,0],[-m.sin(t),0,m.cos(t)]])
 	return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
-	
-	
+
+
 def rotationalMatrix(phi,theta,xi):
 	m1=np.array([[m.cos(xi),m.sin(xi),0],[-m.sin(xi),m.cos(xi),0],[0,0,1]])
 	m2=np.array([[1,0,0],[0,m.cos(theta),m.sin(theta)],[0,-m.sin(theta),m.cos(theta)]])
 	m3=np.array([[m.cos(phi),m.sin(phi),0],[-m.sin(phi),m.cos(phi),0],[0,0,1]])
 	return m1.dot(m2).dot(m3)
-	
+
 
 #given the Euler angles and [theta,phi], return the [theta',phi'] after the rotation
 def rotation(theta,phi,eulerlist):
@@ -100,13 +100,13 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 #for i in range(len(a11)):
 	#for j in range(len(a11[i])):
 		#a11[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
-		
-		
+
+
 #nside=101
 #a32=np.zeros([nside,nside,3],dtype=complex)
 #for i in range(len(a32)):
 	#for j in range(len(a32[i])):
-		#a32[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])	
+		#a32[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
 
 #s=complex(0.0)
 #for i in range(len(a11)):
@@ -130,7 +130,7 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 	#for j in range(len(skymap[i])):
 		#c1 = np.conj(1.0*ssp.sph_harm(mm,l,2*pi/nside*j,pi/nside*i))
 		#c2 = e**(1j*k*(stoc([1,pi/nside*i,2*pi/nside*j]).dot(d)))
-		#skymap[i][j]=np.array([pi/nside*i,2*pi/nside*j,c1*c2*m.sin(pi/nside*i)])	
+		#skymap[i][j]=np.array([pi/nside*i,2*pi/nside*j,c1*c2*m.sin(pi/nside*i)])
 		#s += c1*c2*m.sin(pi/nside*i)*(pi/nside)*(2*pi/nside)
 ######################################################################################
 
@@ -154,7 +154,7 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 	#for key in Blm:
 		#b+=Blm[key]*ssp.sph_harm(key[1],key[0],phi,theta)
 	#return b
-	
+
 ##calculate Bulm from Blm
 #lmax=max([key for key in Blm])[0]
 #k=3
@@ -171,7 +171,7 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 						#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphj(l2,k*la.norm(d))*np.conj(spheh(l2,mm2,ctos(d)[1],ctos(d)[2]))*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
 ###############################################
 
-				
+
 ######################################################################
 ##rotation to equatorial coordinate
 #latitude = 70/180.0*pi
@@ -236,7 +236,7 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 		#sphejdict={}
 		#for l in range(2*lmax+1):
 			#sphejdict[l] = sphj(l,k*la.norm(d))
-		
+
 		#Bulm={}
 		#for l in range(lmax+1):
 			#for mm in range(-l,l+1):
@@ -249,8 +249,8 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 								#Bulm[(l,mm)] +=0
 							#elif abs(mm2)<=l2:
 								#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphejdict[l2]*np.conj(sphehdict[(l2,mm2)])*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
-								
-		#return Bulm		
+
+		#return Bulm
 #############################################################################################
 
 
@@ -278,37 +278,33 @@ class Visibility_Simulator:
 	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max
 		k = 2*pi*freq/299.792458
 		timer = time.time()
-		
-		#an array of the comples conjugate of Ylm's
+
+		#an array of the comples conjugate of Ylm's * j^l * sphjn
 		dth = ctos(d)[1]
 		dph = ctos(d)[2]
 		if verbose:
 			print "Tabulizing spherical harmonics...", dth, dph
+			sys.stdout.flush()
 		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex')
-
 		for i in range(0,L+L1+1):
-			if verbose:
-				print i,
-				sys.stdout.flush()
 			for mm in range(-i,i+1):
-				spheharray[i, mm]=(spheh(i,mm,dth,dph)).conjugate()
-				#if np.isnan(spheharray[i, mm]) or np.isinf(spheharray[i, mm]):#using conjugate relation since scipy has bug for sph_harm with l=151 m=-151 and such
-					#spheharray[i, mm]=(spheh(i,-mm,dth,dph))*(-1)**mm
-					#if np.isnan(spheharray[i, mm]) or np.isinf(spheharray[i, mm]):
-						#spheharray[i, mm]=0
+				spheharray[i, mm]=(spheh(i,mm,dth,dph)).conjugate() * sphj(i, -k*la.norm(d)) * (1.j)**i
 		if verbose:
 			print "Done", float(time.time() - timer)/60
-		
-		#an array of spherical Bessel functions
-		if verbose:
-			print "Tabulizing spherical bessel j..."
-		sphjarray = np.zeros(L+L1+1,'complex')
-		for l in range(L+L1+1):
-			sphjarray[l] = sphj(l, -k*la.norm(d))
+			sys.stdout.flush()
 
-		if verbose:
-			print "Done", float(time.time() - timer)/60
-		
+		##an array of spherical Bessel functions
+		#if verbose:
+			#print "Tabulizing spherical bessel j..."
+			#sys.stdout.flush()
+		#sphjarray = np.zeros(L+L1+1,'complex')
+		#for l in range(L+L1+1):
+			#sphjarray[l] = sphj(l, -k*la.norm(d))
+
+		#if verbose:
+			#print "Done", float(time.time() - timer)/60
+			#sys.stdout.flush()
+
 		#an array of m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))
 		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'complex')
 		for i in range(L+1):
@@ -317,7 +313,8 @@ class Visibility_Simulator:
 					sqrtarray[i, j, kk] = m.sqrt((2*i+1)*(2*j+1)*(2*kk+1)/(4*pi))
 		if verbose:
 			print float(time.time() - timer)/60
-		
+			sys.stdout.flush()
+
 		#Sum over to calculate Bulm
 		Bulm={}
 		for l in range(L+1):
@@ -326,10 +323,13 @@ class Visibility_Simulator:
 				for l1 in range(L1+1):
 					for mm1 in range(-l1,l1+1):
 						mm2=-(-mm+mm1)
-						wignerarray0 = wigner3jvec(l,l1,0,0)
-						wignerarray = wigner3jvec(l,l1,-mm,mm1)
 						l2min = max([abs(l-l1),abs(mm2)])
 						diff = max(abs(mm2)-abs(l-l1),0)
+
+						wignerarray0 = wigner3jvec(l,l1,0,0)
+						wignerarray = wigner3jvec(l,l1,-mm,mm1)
+
+						delta = 0
 						for l2 in range(l2min,l+l1+1):
 							#if self.Blm[(l1,mm1)] ==0 :
 								#Bulm[(l,mm)] += 0
@@ -340,35 +340,39 @@ class Visibility_Simulator:
 									##print diff+l2-l2min, diff, l2, l2min
 									#print l2, mm2, (spheh(l2, mm2,ctos(d)[1],ctos(d)[2])).conjugate(), spheharray[l2, mm2]
 									#print l2, (1j**l2), sphjarray[l2], self.Blm[(l1,mm1)], spheharray[l2, mm2], sqrtarray[l, l1, l2], wignerarray0[diff+l2-l2min], (-1)**mm, wignerarray[l2-l2min]
-								Bulm[(l,mm)] += (1j**l2)*sphjarray[l2]*spheharray[l2, mm2]*self.Blm[(l1,mm1)]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]
+								delta += spheharray[l2, mm2]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]#(1j**l2)*sphjarray[l2]*
+						Bulm[(l,mm)] += delta * self.Blm[l1,mm1]
 				Bulm[(l,mm)] = 4*pi*(-1)**mm * Bulm[(l,mm)]
 		if verbose:
 			print float(time.time() - timer)/60
+			sys.stdout.flush()
 		return Bulm
-	
+
 	def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):
 		##rotate d to equatorial coordinate
 		drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0])))
 		if verbose:
 			print drotate
+			sys.stdout.flush()
 
 		#calculate Bulm
 		L1 = max([key for key in self.Blm])[0]
 		Bulm = self.calculate_Bulm(L, freq, drotate ,L1, verbose = verbose)
-		
+
 		#get the intersect of the component of skymap_alm and self.Blm
 		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))
 		if verbose:
 			print len(commoncomp)
+			sys.stdout.flush()
 
 		#calculate visibilities
 		if tlist != None:
 			vlist = np.zeros(len(tlist),'complex128')
 			for i in range(len(tlist)):
-				phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation		
+				phi=2*pi/24.0*tlist[i]            #turn t (time in hour) to angle of rotation
 				v=0
 				for comp in commoncomp:
-					v += np.conjugate(skymap_alm[comp]) * Bulm[comp] * e**(-1.0j*comp[1]*phi)	
+					v += np.conjugate(skymap_alm[comp]) * Bulm[comp] * e**(-1.0j*comp[1]*phi)
 				vlist[i]=v
 		else:
 			lcommon = max(np.array(commoncomp)[:,0])
@@ -380,7 +384,7 @@ class Visibility_Simulator:
 					nfourier = nfourier +  nt
 			else:
 				nfourier = nt
-			
+
 			self.cm = np.zeros(nfourier, dtype = 'complex128')
 			for mm in range(-lcommon, lcommon + 1):
 				for l in range(abs(mm), lcommon + 1):
@@ -408,7 +412,7 @@ def read_alm(filename):
 			result[(l, mm)] = raw[cnter]
 			cnter = cnter + 1
 	return result
-			
+
 
 def read_real_alm(filename):
 	if not os.path.isfile(filename):
@@ -435,7 +439,7 @@ def convert_healpy_alm(healpyalm, lmax):
 			result[(l, mm)] = healpyalm[cnter]
 			cnter = cnter + 1
 	return result
-	
+
 def expand_real_alm(real_alm):
 	lmax = np.max(np.array(real_alm.keys()))
 	if len(real_alm) != (lmax+1)*(lmax+2)/2:
@@ -472,15 +476,15 @@ if __name__ == '__main__':
 				Blm[(l,mm)] = (1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))]
 			if mm < 0:
 				Blm[(l,mm)] = np.conj((1.0j)**mm*beam_alm[hp.sphtfunc.Alm.getidx(10,l,abs(mm))])
-				
+
 	btest.Blm=Blm
 
 
-						   #_       
-	  #__ _ ____ __    __ _| |_ __  
-	 #/ _` (_-< '  \  / _` | | '  \ 
+						   #_
+	  #__ _ ____ __    __ _| |_ __
+	 #/ _` (_-< '  \  / _` | | '  \
 	 #\__, /__/_|_|_| \__,_|_|_|_|_|
-	 #|___/                         
+	 #|___/
 	#create sky map alm
 	pca1 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm1.fits32')
 	pca2 = hp.fitsfunc.read_map('/home/eric/Dropbox/MIT/UROP/simulate_visibilities/GSM_32/gsm2.fits32')
@@ -491,11 +495,11 @@ if __name__ == '__main__':
 	equatorial_GSM = np.zeros(12*nside**2,'float')
 	#rotate sky map
 	for i in range(12*nside**2):
-		ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i)) 
+		ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
 		pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
 		for pix in range(len(pixindex)):
 			equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
-			
+
 	almlist = hp.sphtfunc.map2alm(equatorial_GSM,iter=10)
 	alm={}
 	for l in range(96):
@@ -544,11 +548,11 @@ if __name__ == '__main__':
 
 	#btest.Blm=Blm
 
-						   ##_       
-	  ##__ _ ____ __    __ _| |_ __  
-	 ##/ _` (_-< '  \  / _` | | '  \ 
+						   ##_
+	  ##__ _ ____ __    __ _| |_ __
+	 ##/ _` (_-< '  \  / _` | | '  \
 	 ##\__, /__/_|_|_| \__,_|_|_|_|_|
-	 ##|___/                         
+	 ##|___/
 	##create sky map alm
 
 	#alm={}
