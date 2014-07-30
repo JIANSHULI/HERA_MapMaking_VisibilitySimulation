@@ -6,5 +6,6 @@
 #include <math.h>
 #include "python_api_macros.h"
 #include <boost/math/special_functions/spherical_harmonic.hpp>
+#include <boost/math/special_functions/bessel.hpp>
 
 #endif

@@ -26,10 +26,22 @@ PyObject *spharm_wrap(PyObject *self, PyObject *args){
     return Py_BuildValue("dd", res_real, res_imag);
 }
 
+PyObject *spbessel_wrap(PyObject *self, PyObject *args){
+    uint n;
+    double x, res;
+    if (!PyArg_ParseTuple(args, "Id", &n, &x))
+        return NULL;
+    res = boost::math::sph_bessel(n, fabs(x)) * (((x<0)&&(n&1))*(-2)+1);
+    return Py_BuildValue("d", res);
+}
+
+
 // Module methods
 static PyMethodDef boost_math_methods[] = {
     {"spharm", (PyCFunction) spharm_wrap, METH_VARARGS,
         "Return the spherical harmonics Y of l, m, theta, phi."},
+    {"spbessel", (PyCFunction) spbessel_wrap, METH_VARARGS,
+        "Return the spherical bessel j of l, x."},
 
     {NULL, NULL}  /* Sentinel */
 };

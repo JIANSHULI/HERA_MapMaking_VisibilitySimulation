@@ -6,7 +6,7 @@ import scipy.special as ssp
 import math as m
 import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
-from spharm import spharm
+from boost import spharm, spbessel
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
@@ -56,7 +56,10 @@ def rotation(theta,phi,eulerlist):
 #spherical special functions
 ##############################################
 def sphj(l,z):
-	return ssp.sph_jn(l,z)[0][-1]
+	#return ssp.sph_jn(l,z)[0][-1]
+	#if ssp.sph_jn(l,z)[0][-1]-spbessel(l,z)!=0:
+		#print l, "%.30e, %.30e, %.30e"%(z, ssp.sph_jn(l,z)[0][-1], spbessel(l,z))
+	return spbessel(l,z)
 
 def spheh(l,m,theta,phi):
 	#return ssp.sph_harm(m,l,phi,theta)
@@ -74,198 +77,6 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 			for p in skymap:
 				alm[(l,mm)] += np.conj(spheh(l,mm,p[0],p[1]))*p[2]*dtheta*dphi*m.sin(p[0])
 	return alm
-
-
-##########################################
-##some testing
-##########################################
-
-####################################################################
-##test get alm
-#nside=30
-#a11=np.zeros([nside,nside,3],dtype=complex)
-#for i in range(len(a11)):
-	#for j in range(len(a11[i])):
-		#a11[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
-
-#skymap = np.array([pix for sublist in a11 for pix in sublist ])
-#skymapalm=get_alm(skymap)
-######################################################################
-
-
-################################################################################
-## test the orthonormality of spherical harmonics
-#nside=101
-#a11=np.zeros([nside,nside,3],dtype=complex)
-#for i in range(len(a11)):
-	#for j in range(len(a11[i])):
-		#a11[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
-
-
-#nside=101
-#a32=np.zeros([nside,nside,3],dtype=complex)
-#for i in range(len(a32)):
-	#for j in range(len(a32[i])):
-		#a32[i][j]=np.array([pi/nside*i,2*pi/nside*j,1.0*ssp.sph_harm(1,1,2*pi/nside*j,pi/nside*i)])
-
-#s=complex(0.0)
-#for i in range(len(a11)):
-	#for j in range(len(a11[i])):
-		#theta=a11[i][j][0]
-		#phi=a11[i][j][1]
-		#s+=(a11[i][j][2]*np.conj(1.0*ssp.sph_harm(1,1,phi,theta))*m.sin(theta))*(pi/nside)*(2*pi/nside)
-##############################################################################
-
-###################################################################################
-##check a_lm of e^(ikdu) (cool, correct)
-#d=np.array([3.0,6.0,0.0])
-#l=2
-#mm=2
-#k=3
-
-#nside=101
-#skymap=np.zeros([nside,nside,3],dtype=complex)
-#s=complex(0.0)
-#for i in range(len(skymap)):
-	#for j in range(len(skymap[i])):
-		#c1 = np.conj(1.0*ssp.sph_harm(mm,l,2*pi/nside*j,pi/nside*i))
-		#c2 = e**(1j*k*(stoc([1,pi/nside*i,2*pi/nside*j]).dot(d)))
-		#skymap[i][j]=np.array([pi/nside*i,2*pi/nside*j,c1*c2*m.sin(pi/nside*i)])
-		#s += c1*c2*m.sin(pi/nside*i)*(pi/nside)*(2*pi/nside)
-######################################################################################
-
-
-
-########################################################################
-##create a beam function from spherical harmonics
-#Blm = {}
-#for i in range(4):
-	#for j in range(-i,i+1):
-		#Blm[(i,j)]=0.0
-#Blm[(1,-1)]=-0.36
-#Blm[(1,1)]=-0.36
-#Blm[(2,1)]=-0.46
-#Blm[(2,-1)]=-0.46
-#Blm[(3,1)]=-0.30
-#Blm[(3,-1)]=-0.30
-
-#def beam(theta,phi):
-	#b = 0
-	#for key in Blm:
-		#b+=Blm[key]*ssp.sph_harm(key[1],key[0],phi,theta)
-	#return b
-
-##calculate Bulm from Blm
-#lmax=max([key for key in Blm])[0]
-#k=3
-#d=np.array([3.0,6.0,0.0])
-#Bulm={}
-#for l in range(lmax+1):
-	#for mm in range(-l,l+1):
-		#Bulm[(l,mm)]=0
-		#for l1 in range(lmax+1):
-			#for mm1 in range(-l1,l1+1):
-				#for l2 in range(abs(l-l1),l+l1+1):
-					#mm2=-(mm+mm1)
-					#if abs(mm2)<=l2:
-						#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphj(l2,k*la.norm(d))*np.conj(spheh(l2,mm2,ctos(d)[1],ctos(d)[2]))*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
-###############################################
-
-
-######################################################################
-##rotation to equatorial coordinate
-#latitude = 70/180.0*pi
-#def equatorial_beam(theta,phi,dphi=latitude):
-	#[thetaR,phiR]=rotation(theta,phi,[0,-dphi,0])
-	#return beam(thetaR,phiR)
-
-
-#nside=30
-#equabeam=np.zeros([nside,nside,3],dtype=complex)
-#for i in range(len(equabeam)):
-	#for j in range(len(equabeam[i])):
-		#equabeam[i][j]=np.array([pi/nside*i,2*pi/nside*j,equatorial_beam(pi/nside*i,2*pi/nside*j)])
-
-#Blm_rotate = get_alm(np.array([pix for sublist in equabeam for pix in sublist ]),4)
-##################################################################################
-
-#############################################################
-##create a function that calculates the visibility given the beam, skymap(in equatorial coordinate), baseline, and frequency
-#alm={}
-#alm[(1,1)]=1
-#alm[(2,1)]=0.5
-#alm[(3,2)]=0.1
-
-#phi=0
-#v=0
-
-#commoncomp=list(set([key for key in alm])&set([key for key in Blm]))   #get the intersect of the component of alm and Blm
-
-##calculate Bulm
-#lmax=max([key for key in Blm])[0]
-#k=3
-#d=np.array([3.0,6.0,0.0])
-#Bulm={}
-#for l in range(lmax+1):
-	#for mm in range(-l,l+1):
-		#Bulm[(l,mm)]=0
-		#for l1 in range(lmax+1):
-			#for mm1 in range(-l1,l1+1):
-				#for l2 in range(abs(l-l1),l+l1+1):
-					#mm2=-(mm+mm1)
-					#if abs(mm2)<=l2:
-						#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphj(l2,k*la.norm(d))*np.conj(spheh(l2,mm2,ctos(d)[1],ctos(d)[2]))*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
-
-#for comp in commoncomp:
-	#v += alm[comp]*Bulm[comp]*e**(i*comp[1]*phi)
-###########################################################################
-
-
-###########################################################################
-#old get_Bulm function
-	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
-	#def get_Bulm(self,freq=137,d=np.array([3.0,6.0,0.0])):
-		#k = 2*pi*freq/299.792458
-		#lmax=max([max([key for key in self.Blm])[0],self.numberofl])
-		#self.numberofl=lmax
-		#sphehdict = {}
-		#for l in range(2*lmax+1):
-			#for mm in range(-l,l+1):
-				#sphehdict[(l,mm)]=spheh(l,mm,ctos(d)[1],ctos(d)[2])
-
-		#sphejdict={}
-		#for l in range(2*lmax+1):
-			#sphejdict[l] = sphj(l,k*la.norm(d))
-
-		#Bulm={}
-		#for l in range(lmax+1):
-			#for mm in range(-l,l+1):
-				#Bulm[(l,mm)]=0
-				#for l1 in range(lmax+1):
-					#for mm1 in range(-l1,l1+1):
-						#for l2 in range(abs(l-l1),l+l1+1):
-							#mm2=-(mm+mm1)
-							#if Blm[(l1,mm1)] ==0 :
-								#Bulm[(l,mm)] +=0
-							#elif abs(mm2)<=l2:
-								#Bulm[(l,mm)] += 4*pi*(1j**l2)*sphejdict[l2]*np.conj(sphehdict[(l2,mm2)])*Blm[(l1,mm1)]*m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))*wigner3j(l,l1,l2,0,0,0)*wigner3j(l,l1,l2,mm,mm1,mm2)
-
-		#return Bulm
-#############################################################################################
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -287,8 +98,9 @@ class Visibility_Simulator:
 			sys.stdout.flush()
 		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex')
 		for i in range(0,L+L1+1):
+			tmp = spbessel(i, -k*la.norm(d)) * (1.j)**i
 			for mm in range(-i,i+1):
-				spheharray[i, mm]=(spheh(i,mm,dth,dph)).conjugate() * sphj(i, -k*la.norm(d)) * (1.j)**i
+				spheharray[i, mm]=(spharm(i,mm,dth,dph)).conjugate() * tmp
 		if verbose:
 			print "Done", float(time.time() - timer)/60
 			sys.stdout.flush()
