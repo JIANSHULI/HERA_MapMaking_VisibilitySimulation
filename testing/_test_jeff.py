@@ -95,7 +95,7 @@ class TestGSM(unittest.TestCase):
         freqb = freqa + 10
         beam_healpix = beam_healpixs[freqa] + (self.freq - freqa) * (beam_healpixs[freqb] - beam_healpixs[freqa]) / (freqb - freqa) #linear interpolation
         self.vs.import_beam(beam_healpix)
-        print self.vs.Blm
+
     def test_josh_gsm(self):
         self.nside = 32
         nside = self.nside
