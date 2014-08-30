@@ -113,27 +113,26 @@ class TestGSM(unittest.TestCase):
         self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
         self.result32 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
 
-        self.nside = 64
-        nside = self.nside
-        pca1 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm1.fits' + str(nside))
-        pca2 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm2.fits' + str(nside))
-        pca3 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm3.fits' + str(nside))
-        gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
-        equatorial_GSM = np.zeros(12*nside**2,'float')
-        #rotate sky map
-        for i in range(12*nside**2):
-            ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
-            pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
-            for pix in range(len(pixindex)):
-                equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
-        self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
-        self.result64 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
-        #print len(self.result), np.argmax(np.real(self.result)) - np.argmax(np.real(self.correct_result)), np.argmax(np.imag(self.result)) - np.argmax(np.imag(self.correct_result))
-        plt.plot(np.real(self.result32), 'r--', np.real(self.result64), 'b--', np.real(self.correct_result), 'g--')
-        plt.show()
-        plt.plot(np.imag(self.result32), 'r--', np.imag(self.result64), 'b--', np.imag(self.correct_result), 'g--')
-        plt.show()
-        #self.assertAlmostEqual(np.mean(abs((self.result-self.correct_result)/self.correct_result))**2, 0, 2)
+        #self.nside = 64
+        #nside = self.nside
+        #pca1 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm1.fits' + str(nside))
+        #pca2 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm2.fits' + str(nside))
+        #pca3 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm3.fits' + str(nside))
+        #gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+        #equatorial_GSM = np.zeros(12*nside**2,'float')
+        ##rotate sky map
+        #for i in range(12*nside**2):
+            #ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
+            #pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
+            #for pix in range(len(pixindex)):
+                #equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
+        #self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
+        #self.result64 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
+        #plt.plot(np.real(self.result32), 'r--', np.real(self.result64), 'b--', np.real(self.correct_result), 'g--')
+        #plt.show()
+        #plt.plot(np.imag(self.result32), 'r--', np.imag(self.result64), 'b--', np.imag(self.correct_result), 'g--')
+        #plt.show()
+        np.testing.assert_almost_equal(self.result32 , self.correct_result)
 
 class TestSH(unittest.TestCase):
     def test_spherical_harmonics(self):

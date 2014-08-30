@@ -100,7 +100,8 @@ class Visibility_Simulator:
 		if self.initial_zenith.tolist() == [1000, 1000]:
 			raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
 		beamequ_heal = rotate_healpixmap(beam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0])
-		self.Blm = expand_real_alm(convert_healpy_alm(hp.sphtfunc.map2alm(beamequ_heal), 3 * (len(beamequ_heal)/12)**.5 - 1))
+		self.Blm = expand_real_alm(convert_healpy_alm(hp.sphtfunc.map2alm(beamequ_heal), int(3 * (len(beamequ_heal)/12)**.5 - 1)))
+
 	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
 	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max, takes d in equatorial coord
 		k = 2*pi*freq/299.792458
@@ -112,7 +113,7 @@ class Visibility_Simulator:
 		if verbose:
 			print "Tabulizing spherical harmonics...", dth, dph
 			sys.stdout.flush()
-		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex')
+		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex64')
 		for i in range(0,L+L1+1):
 			tmp = spbessel(i, -k*la.norm(d)) * (1.j)**i
 			for mm in range(-i,i+1):
@@ -121,20 +122,8 @@ class Visibility_Simulator:
 			print "Done", float(time.time() - timer)/60
 			sys.stdout.flush()
 
-		##an array of spherical Bessel functions
-		#if verbose:
-			#print "Tabulizing spherical bessel j..."
-			#sys.stdout.flush()
-		#sphjarray = np.zeros(L+L1+1,'complex')
-		#for l in range(L+L1+1):
-			#sphjarray[l] = sphj(l, -k*la.norm(d))
-
-		#if verbose:
-			#print "Done", float(time.time() - timer)/60
-			#sys.stdout.flush()
-
 		#an array of m.sqrt((2*l+1)*(2*l1+1)*(2*l2+1)/(4*pi))
-		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'complex')
+		sqrtarray = np.zeros([L+1,L1+1,L+L1+1],'float32')
 		for i in range(L+1):
 			for j in range(L1+1):
 				for kk in range(0,L+L1+1):
@@ -159,16 +148,7 @@ class Visibility_Simulator:
 
 						delta = 0
 						for l2 in range(l2min,l+l1+1):
-							#if self.Blm[(l1,mm1)] ==0 :
-								#Bulm[(l,mm)] += 0
-							#else:
-								#if l == 26 and mm == -26 and l1 == 5 and mm1 == -1:
-									#print 4*pi*(-1)**mm * (1j**l2)*sphjarray[l2]*spheharray[l2, mm2]*self.Blm[(l1,mm1)]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min],
-									##print wigner3jvec(l,l1,0,0)
-									##print diff+l2-l2min, diff, l2, l2min
-									#print l2, mm2, (spheh(l2, mm2,ctos(d)[1],ctos(d)[2])).conjugate(), spheharray[l2, mm2]
-									#print l2, (1j**l2), sphjarray[l2], self.Blm[(l1,mm1)], spheharray[l2, mm2], sqrtarray[l, l1, l2], wignerarray0[diff+l2-l2min], (-1)**mm, wignerarray[l2-l2min]
-								delta += spheharray[l2, mm2]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]#(1j**l2)*sphjarray[l2]*
+							delta += spheharray[l2, mm2]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]#(1j**l2)*sphjarray[l2]*
 						Bulm[(l,mm)] += delta * self.Blm[l1,mm1]
 				Bulm[(l,mm)] = 4*pi*(-1)**mm * Bulm[(l,mm)]
 		if verbose:
