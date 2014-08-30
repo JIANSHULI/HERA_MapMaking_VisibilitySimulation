@@ -74,19 +74,28 @@ class TestGSM(unittest.TestCase):
     def setUp(self):
         self.test_dir = os.path.dirname(os.path.realpath(__file__)) + '/'
         self.blmequ = sv.read_real_alm(self.test_dir + 'bx125.195.bin')
-        self.blmax = 5
+        self.blmax = 23
+        self.pol = 'xx'
+        beam_healpixs = {}
         self.freq = 125.195#my correct answers are computed with c=300,so im rescaing freq here to compensate
         self.zenithequ = sv.ctos(np.fromfile(self.test_dir + 'zenith.bin', dtype = 'float32'))[1:]
         self.zenithequ[0] = np.pi/2 - self.zenithequ[0]
         self.zenithequ = np.array(self.zenithequ)[::-1]
+        self.rot = np.fromfile(self.test_dir + 'x5rot.bin', dtype = 'float32').reshape((3,3))#fine tune rotation for ant array
         self.correct_result = np.loadtxt(self.test_dir + 'Revised_Location_Visibilties_for_6_m_south_3_m_east_0_m_up_xx_pol_125.195_MHz.dat')
         self.correct_result = self.correct_result[:-1, 1] + 1j * self.correct_result[:-1, 2]
 
 
         self.vs = sv.Visibility_Simulator()
         self.vs.initial_zenith = self.zenithequ
-        self.vs.Blm = sv.expand_real_alm(self.blmequ)
-        self.rot = np.fromfile(self.test_dir + 'x5rot.bin', dtype = 'float32').reshape((3,3))
+
+        for f in range(110,200,10):
+            beam_healpixs[f] = np.fromfile(self.test_dir + '../data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s.bin'%((self.blmax + 1)/3, f, self.pol), dtype='float32')
+        freqa = int(np.floor(self.freq/10.) * 10)
+        freqb = freqa + 10
+        beam_healpix = beam_healpixs[freqa] + (self.freq - freqa) * (beam_healpixs[freqb] - beam_healpixs[freqa]) / (freqb - freqa) #linear interpolation
+        self.vs.import_beam(beam_healpix)
+        print self.vs.Blm
     def test_josh_gsm(self):
         self.nside = 32
         nside = self.nside

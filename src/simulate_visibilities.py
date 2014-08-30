@@ -28,11 +28,16 @@ def stoc(spher):
 	[r,theta,phi]=spher
 	return np.array([r*m.cos(phi)*m.sin(theta),r*m.sin(theta)*m.sin(phi),r*m.cos(theta)])
 
+def rotatez_matrix(t):
+	return np.array([[m.cos(t),-m.sin(t),0],[m.sin(t),m.cos(t),0],[0,0,1]])
+
 def rotatez(dirlist,t):
 	[theta,phi] = dirlist
 	rm = np.array([[m.cos(t),-m.sin(t),0],[m.sin(t),m.cos(t),0],[0,0,1]])
 	return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
 
+def rotatey_matrix(t):
+	return np.array([[m.cos(t),0,m.sin(t)],[0,1,0],[-m.sin(t),0,m.cos(t)]])
 
 def rotatey(dirlist,t):
 	[theta,phi] = dirlist
@@ -51,7 +56,13 @@ def rotationalMatrix(phi,theta,xi):
 def rotation(theta,phi,eulerlist):
 	return ctos(rotationalMatrix(eulerlist[0],eulerlist[1],eulerlist[2]).dot(stoc([1,theta,phi])))[1:3]
 
-
+def rotate_healpixmap(healpixmap, z1, y1, z2):#the three rotation angles are (fixed rotation axes and right hand convention): rotate around z axis by z1, around y axis by y1, and z axis again by z2. I think they form a set of Euler angles, but not exactly sure.
+    nside = int((len(healpixmap)/12.)**.5)
+    if len(healpixmap)%12 != 0 or 12*(nside**2) != len(healpixmap):
+        raise Exception('ERROR: Input healpixmap length %i is not 12*nside**2!'%len(healpixmap))
+    newmapcoords_in_oldcoords = [rotatez(rotatey(rotatez(hpf.pix2ang(nside, i), -z2), -y1), -z1) for i in range(12*nside**2)]
+    newmap = [hpf.get_interp_val(healpixmap, coord[0], coord[1]) for coord in newmapcoords_in_oldcoords]
+    return newmap
 #############################################
 #spherical special functions
 ##############################################
@@ -83,10 +94,15 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 class Visibility_Simulator:
 	def __init__(self):
 		self.Blm = np.zeros([3,3],'complex')
-		self.initial_zenith=np.array([0, 45.336111/180.0*pi])     #at t=0, the position of zenith in equatorial coordinate in ra dec radians
+		self.initial_zenith = np.array([1000, 1000])     #at t=0, the position of zenith in equatorial coordinate in ra dec radians
 
+	def import_beam(self, beam_healpix_hor):#import beam in horizontal coord in a healpix list and rotate it according to initial_zenith
+		if self.initial_zenith.tolist() == [1000, 1000]:
+			raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
+		beamequ_heal = rotate_healpixmap(beam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0])
+		self.Blm = expand_real_alm(convert_healpy_alm(hp.sphtfunc.map2alm(beamequ_heal), 3 * (len(beamequ_heal)/12)**.5 - 1))
 	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
-	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max
+	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max, takes d in equatorial coord
 		k = 2*pi*freq/299.792458
 		timer = time.time()
 
@@ -160,7 +176,7 @@ class Visibility_Simulator:
 			sys.stdout.flush()
 		return Bulm
 
-	def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):
+	def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):#d in horizontal coord
 		##rotate d to equatorial coordinate
 		drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0])))
 		if verbose:
