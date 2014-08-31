@@ -27,7 +27,13 @@ setup(name = 'wignerpy',
                 ['*.cpp', '*.c', '*.cc']),
             include_dirs = ['src/_boost_math/include', '/usr/include', numpy.get_include()],
             extra_compile_args=['-Wno-write-strings', '-O3']
-        )
+        ),
+        Extension('simulate_visibilities._Bulm',
+            globdir('src/_Bulm/',
+                ['*.cpp', '*.c', '*.cc']),
+            include_dirs = ['src/_Bulm/include', '/usr/include', numpy.get_include()],
+            extra_compile_args=['-Wno-write-strings', '-O3']
+        ),
     ],
     scripts = glob.glob('scripts/*'),
 )

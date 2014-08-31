@@ -7,6 +7,7 @@ import math as m
 import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
 from boost import spharm, spbessel
+from Bulm import compute_Bulm
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
@@ -102,6 +103,18 @@ class Visibility_Simulator:
 		beamequ_heal = rotate_healpixmap(beam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0])
 		self.Blm = expand_real_alm(convert_healpy_alm(hp.sphtfunc.map2alm(beamequ_heal), int(3 * (len(beamequ_heal)/12)**.5 - 1)))
 
+	def calculate_Bulm_C(self, L, freq, d, L1, verbose = False):
+		L1 = max([key for key in self.Blm])[0]
+		Blm = np.zeros((L1+1, 2*L1+1), dtype='complex64')
+		for lm in self.Blm:
+			Blm[lm] = self.Blm[lm]
+		Bulmarray = compute_Bulm(Blm, L, freq, d, L1)
+		Bulmdic = {}
+		for l in range(L+1):
+			for m in range(-l,l+1):
+				Bulmdic[(l,m)] = Bulmarray[(l,m)]
+		return Bulmdic
+
 	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
 	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max, takes d in equatorial coord
 		k = 2*pi*freq/299.792458
@@ -165,7 +178,7 @@ class Visibility_Simulator:
 
 		#calculate Bulm
 		L1 = max([key for key in self.Blm])[0]
-		Bulm = self.calculate_Bulm(L, freq, drotate ,L1, verbose = verbose)
+		Bulm = self.calculate_Bulm_C(L, freq, drotate ,L1, verbose = verbose)
 
 		#get the intersect of the component of skymap_alm and self.Blm
 		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))
