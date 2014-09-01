@@ -103,8 +103,7 @@ class Visibility_Simulator:
 		beamequ_heal = rotate_healpixmap(beam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0])
 		self.Blm = expand_real_alm(convert_healpy_alm(hp.sphtfunc.map2alm(beamequ_heal), int(3 * (len(beamequ_heal)/12)**.5 - 1)))
 
-	def calculate_Bulm_C(self, L, freq, d, L1, verbose = False):
-		L1 = max([key for key in self.Blm])[0]
+	def calculate_Bulm(self, L, freq, d, L1, verbose = False):
 		Blm = np.zeros((L1+1, 2*L1+1), dtype='complex64')
 		for lm in self.Blm:
 			Blm[lm] = self.Blm[lm]
@@ -116,7 +115,7 @@ class Visibility_Simulator:
 		return Bulmdic
 
 	#from Bulm, return Bulm with given frequency(wave vector k) and baseline vector
-	def calculate_Bulm(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max, takes d in equatorial coord
+	def calculate_Bulm_old(self, L, freq, d, L1, verbose = False):    #L= lmax  , L1=l1max, takes d in equatorial coord
 		k = 2*pi*freq/299.792458
 		timer = time.time()
 
@@ -129,8 +128,11 @@ class Visibility_Simulator:
 		spheharray = np.zeros([L+L1+1,2*(L+L1)+1],'complex64')
 		for i in range(0,L+L1+1):
 			tmp = spbessel(i, -k*la.norm(d)) * (1.j)**i
+			#print pi, freq, la.norm(d), i, spbessel(i, -k*la.norm(d))
 			for mm in range(-i,i+1):
 				spheharray[i, mm]=(spharm(i,mm,dth,dph)).conjugate() * tmp
+				#print spheharray[i, mm]
+
 		if verbose:
 			print "Done", float(time.time() - timer)/60
 			sys.stdout.flush()
@@ -141,6 +143,7 @@ class Visibility_Simulator:
 			for j in range(L1+1):
 				for kk in range(0,L+L1+1):
 					sqrtarray[i, j, kk] = m.sqrt((2*i+1)*(2*j+1)*(2*kk+1)/(4*pi))
+					#print i,j,kk,sqrtarray[i, j, kk]
 		if verbose:
 			print float(time.time() - timer)/60
 			sys.stdout.flush()
@@ -162,8 +165,13 @@ class Visibility_Simulator:
 						delta = 0
 						for l2 in range(l2min,l+l1+1):
 							delta += spheharray[l2, mm2]*sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min]#(1j**l2)*sphjarray[l2]*
+							#print l,mm,l1,mm1,l2,sqrtarray[l, l1, l2]*wignerarray0[diff+l2-l2min]*wignerarray[l2-l2min],spheharray[l2, mm2], delta, self.Blm[l1,mm1]
+						#print delta, self.Blm[(l1,mm1)], delta * self.Blm[l1,mm1], Bulm[(l,mm)],
 						Bulm[(l,mm)] += delta * self.Blm[l1,mm1]
+						#print Bulm[(l,mm)]
+				#print l, mm, Bulm[(l,mm)]
 				Bulm[(l,mm)] = 4*pi*(-1)**mm * Bulm[(l,mm)]
+				#print l, mm, Bulm[(l,mm)]
 		if verbose:
 			print float(time.time() - timer)/60
 			sys.stdout.flush()
@@ -178,7 +186,7 @@ class Visibility_Simulator:
 
 		#calculate Bulm
 		L1 = max([key for key in self.Blm])[0]
-		Bulm = self.calculate_Bulm_C(L, freq, drotate ,L1, verbose = verbose)
+		Bulm = self.calculate_Bulm(L, freq, drotate ,L1, verbose = verbose)
 
 		#get the intersect of the component of skymap_alm and self.Blm
 		commoncomp=list(set([key for key in skymap_alm]) & set([key for key in Bulm]))

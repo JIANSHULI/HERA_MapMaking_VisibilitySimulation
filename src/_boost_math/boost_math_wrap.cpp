@@ -20,6 +20,7 @@ PyObject *spharm_wrap(PyObject *self, PyObject *args){
     double theta, phi, res_real, res_imag;
     if (!PyArg_ParseTuple(args, "Iidd", &l, &m, &theta, &phi))
         return NULL;
+    //std::cout << l << " " << m << " " << theta << " " << phi << std::endl;
     std::complex<double> res = boost::math::spherical_harmonic(l, m, theta, phi);
     res_real = real(res);
     res_imag = imag(res);
