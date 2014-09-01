@@ -87,7 +87,7 @@ class TestGSM(unittest.TestCase):
 
 
         self.vs = sv.Visibility_Simulator()
-        self.vs.initial_zenith = self.zenithequ
+        self.vs.initial_zenith = np.array([0,45.2977*np.pi/180])#self.zenithequ
 
         for f in range(110,200,10):
             beam_healpixs[f] = np.fromfile(self.test_dir + '../data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s.bin'%((self.blmax + 1)/3, f, self.pol), dtype='float32')
