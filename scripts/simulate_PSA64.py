@@ -55,17 +55,17 @@ vs.initial_zenith = np.array([0, aa.lat])
 #plt.show()
 #quit()
 ######load beam
-nsideB = 4
-nside = 32
-Bl = nsideB*3 - 1
-L = nside*3 - 1
+for nside B in [4,8,16,32]:
+    nside = 32
+    Bl = nsideB*3 - 1
+    L = nside*3 - 1
 
-beam_healpix = np.zeros((len(freqs),12*nsideB**2), dtype='float32')
-for f in range(len(freqs)):
-    for i in range(12*nsideB**2):
-        beam_healpix[f, i] = aa[0].bm_response(hpf.pix2vec(nsideB, i), pol)[f]
-print beam_healpix.shape
-beam_healpix.tofile('doc/PAPER_bm_%i_%i_%s_nside%i.bin'%(freqs[0], freqs[-1], pol, nsideB))
+    beam_healpix = np.zeros((len(freqs),12*nsideB**2), dtype='float32')
+    for f in range(len(freqs)):
+        for i in range(12*nsideB**2):
+            beam_healpix[f, i] = aa[0].bm_response(hpf.pix2vec(nsideB, i), pol)[f]
+    print beam_healpix.shape
+    beam_healpix.tofile('doc/PAPER_bm_%i_%i_%s_nside%i.bin'%(freqs[0], freqs[-1], pol, nsideB))
 quit()
 vs.Blm = {}
 for l in range(Bl + 1):
