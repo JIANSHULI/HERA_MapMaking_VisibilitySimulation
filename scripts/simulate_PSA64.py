@@ -55,7 +55,7 @@ vs.initial_zenith = np.array([0, aa.lat])
 #plt.show()
 #quit()
 ######load beam
-for nside B in [4,8,16,32]:
+for nsideB in [4,8,16,32]:
     nside = 32
     Bl = nsideB*3 - 1
     L = nside*3 - 1
