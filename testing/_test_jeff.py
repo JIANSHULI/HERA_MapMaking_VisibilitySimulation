@@ -107,12 +107,11 @@ class TestGSM(unittest.TestCase):
         #rotate sky map
         for i in range(12*nside**2):
             ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
-            pixindex, weight = hpf.get_neighbours(nside,ang[0],ang[1])
-            for pix in range(len(pixindex)):
-                equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
+            equatorial_GSM[i] = hpf.get_interp_val(gsm, ang[0], ang[1])
         self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
         self.result32 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
-
+        print self.result32[0], self.result32[-1]
+        print self.correct_result[0], self.correct_result[-1]
         #self.nside = 64
         #nside = self.nside
         #pca1 = hp.fitsfunc.read_map(self.test_dir + '/../data/gsm1.fits' + str(nside))
