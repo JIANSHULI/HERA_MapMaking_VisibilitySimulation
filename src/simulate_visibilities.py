@@ -181,15 +181,15 @@ class Visibility_Simulator:
             sys.stdout.flush()
         return Bulm
 
-    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, nt = None, tlist = None, verbose = False):#d in horizontal coord
+    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d in horizontal coord
         if self.initial_zenith.tolist() == [1000, 1000]:
             raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
         if tlist == None and nt == None:
                 raise Exception("ERROR: neither nt nor tlist was specified. Must input what lst you want in sidereal hours")
         d_equ = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0])))
-        if beam_healpix_hor == None:
+        if beam_healpix_hor == None and beam_heal_equ == None:
             raise Exception("ERROR: conversion from alm for beam to beam_healpix not yet supported, so please specify beam_healpix as a keyword directly, in horizontal coord.")
-        else:
+        elif beam_heal_equ == None:
             beam_heal_equ = np.array(rotate_healpixmap(beam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0]))
         if tlist == None:
             tlist = np.arange(0.,24.,24./nt)
