@@ -105,6 +105,10 @@ class Visibility_Simulator:
 
     def calculate_Bulm(self, L, freq, d, L1, verbose = False):
         Blm = np.zeros((L1+1, 2*L1+1), dtype='complex64')
+        try:
+            _ = self.Blm[(L1, L1)]
+        except:
+            raise Exception("Error: Existing alm for the beam cannot handle the requested L1 = %i! Make sure you have imported beam."%L1)
         for lm in self.Blm:
             Blm[lm] = self.Blm[lm]
         Bulmarray = compute_Bulm(Blm, L, freq, d, L1)
@@ -177,7 +181,32 @@ class Visibility_Simulator:
             sys.stdout.flush()
         return Bulm
 
+    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, nt = None, tlist = None, verbose = False):#d in horizontal coord
+        if self.initial_zenith.tolist() == [1000, 1000]:
+            raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
+        if tlist == None and nt == None:
+                raise Exception("ERROR: neither nt nor tlist was specified. Must input what lst you want in sidereal hours")
+        d_equ = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0])))
+        if beam_healpix_hor == None:
+            raise Exception("ERROR: conversion from alm for beam to beam_healpix not yet supported, so please specify beam_healpix as a keyword directly, in horizontal coord.")
+        else:
+            beam_heal_equ = np.array(rotate_healpixmap(beam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0]))
+        if tlist == None:
+            tlist = np.arange(0.,24.,24./nt)
+        else:
+            tlist = np.array(tlist)
+
+        angle_list = tlist/12.*np.pi
+        result = np.empty(len(angle_list), dtype='complex64')
+        ps_vec = -np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+        ik = 2.j*np.pi*freq/299.792458
+        for i, phi in zip(range(len(angle_list)), angle_list):
+            #print beam_heal_equ.shape, np.pi/2 - dec, ra - phi
+            result[i] = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - phi) * np.exp(ik*rotatez_matrix(phi).dot(d_equ).dot(ps_vec))
+        return result
     def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):#d in horizontal coord
+        if self.initial_zenith.tolist() == [1000, 1000]:
+            raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
         ##rotate d to equatorial coordinate
         drotate = stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0])))
         if verbose:

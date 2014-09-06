@@ -109,7 +109,7 @@ class TestGSM(unittest.TestCase):
             ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
             equatorial_GSM[i] = hpf.get_interp_val(gsm, ang[0], ang[1])
         self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
-        self.result32 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
+        self.result32 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result)-1, L = 3*self.nside-1, verbose = False)
         print self.result32[0], self.result32[-1]
         print self.correct_result[0], self.correct_result[-1]
         #self.nside = 64
@@ -126,7 +126,7 @@ class TestGSM(unittest.TestCase):
             #for pix in range(len(pixindex)):
                 #equatorial_GSM[i] += weight[pix]*gsm[pixindex[pix]]
         #self.alm = sv.convert_healpy_alm(hp.sphtfunc.map2alm(equatorial_GSM), 3 * nside - 1)
-        #self.result64 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result), L = 3*self.nside-1, verbose = False)
+        #self.result64 = self.vs.calculate_visibility(sv.expand_real_alm(self.alm), d=self.rot.dot(np.array([6.0,3.0,0.0])), freq=self.freq, nt=len(self.correct_result)-1, L = 3*self.nside-1, verbose = False)
         #plt.plot(np.real(self.result32), 'r--', np.real(self.result64), 'b--', np.real(self.correct_result), 'g--')
         #plt.show()
         #plt.plot(np.imag(self.result32), 'r--', np.imag(self.result64), 'b--', np.imag(self.correct_result), 'g--')
