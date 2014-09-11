@@ -7,35 +7,19 @@ import healpy.pixelfunc as hpf
 import sys
 import omnical.calibration_omni as omni
 nt = 80
-nside = 8
+nside = 16
 nUBL = 75#34
 #nside = 16
 #nUBL = 75
+nps = 2#number of point sources to include
 freq = 160.
 thresh = 1
 ubls = np.array([bl for bl in omni.read_redundantinfo('/home/omniscope/omnical/doc/redundantinfo_X5_q3x.bin')['ubl']*[1.5, 1.5, 0] if la.norm(bl) < thresh * (nside * 299.792458 / freq)])
 if len(ubls) != nUBL:
     raise Exception('%i != %i!'%(len(ubls), nUBL))
-thresh2 = .6
-subublindex = np.array([u for u in range(nUBL) if la.norm(ubls[u]) < thresh2 * (nside * 299.792458 / freq)])
-print "%i out of %i to include"%(len(subublindex), nUBL)
+#thresh2 = .7
 
-pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside))
-pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside))
-pca3 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm3.fits' + str(nside))
-gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
-equatorial_GSM = np.zeros(12*nside**2,'float')
-#rotate sky map
-print "Rotating GSM...",
-sys.stdout.flush()
-for i in range(12*nside**2):
-    ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
-    equatorial_GSM[i] = hpf.get_interp_val(gsm, ang[0], ang[1])
-print "done."
-sys.stdout.flush()
-
-
-nside_standard = 8#64
+nside_standard = 32#64
 nt_standard = 80#160
 pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside_standard))
 pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside_standard))
@@ -50,26 +34,82 @@ for i in range(12*nside_standard**2):
     equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
 print "done."
 sys.stdout.flush()
-###################################plot actual errors and such, see if the gridding is too coarse
 
-A = np.fromfile('/home/omniscope/simulate_visibilities/data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside, nt*nUBL, 12*nside**2),dtype='complex64').reshape((nUBL, nt, 12*nside**2))[subublindex].reshape((len(subublindex) * nt, 12*nside**2))/nside**2
+if nside > 4:
+    pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside))
+    pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside))
+    pca3 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm3.fits' + str(nside))
+    gsm = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+    equatorial_GSM = np.zeros(12*nside**2,'float')
+    #rotate sky map
+    print "Rotating GSM...",
+    sys.stdout.flush()
+    for i in range(12*nside**2):
+        ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside,i))
+        equatorial_GSM[i] = hpf.get_interp_val(gsm, ang[0], ang[1])
+    print "done."
+    sys.stdout.flush()
 
-#ublindex = [u for u in range(len(ubls_standard)) if la.norm(ubls_standard[u]) < (nside * 299.792458 / freq)]
-A_standard = np.fromfile('/home/omniscope/simulate_visibilities/data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, 12*nside_standard**2))/nside_standard**2
 
-vis = A_standard.dot(equatorial_GSM_standard)
-visold = A.dot(equatorial_GSM)
-plt.plot(np.real(vis))
-plt.plot(np.real(visold))
-plt.show()
-#quit()
-vis = vis + .01 * (2**-.5) * np.mean(np.abs(vis)) * (np.random.randn(len(vis)) + np.random.randn(len(vis)) * 1.j)
-print vis.shape, A.shape
-sys.stdout.flush()
-solution = la.pinv(A.conjugate().transpose().dot(A), rcond = 1e-10).dot(A.conjugate().transpose().dot(vis))
-hpv.mollview(equatorial_GSM, return_projected_map=True, min=0,max=5000,fig=1,title='Original map')
-hpv.mollview(solution, return_projected_map=True, min=0,max=5000,fig=2,title='Our solution')
-hpv.mollview(np.log10(np.abs(solution-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-3, max=0,title='log10(relative error)')
+for ps in [True, False]:#range(-5,5):
+    thresh2 = 1
+    subublindex = np.array([u for u in range(nUBL) if la.norm(ubls[u]) < thresh2 * (nside * 299.792458 / freq)])
+    print "%i out of %i to include"%(len(subublindex), nUBL)
+    ###################################plot actual errors and such, see if the gridding is too coarse
+
+    #A = np.fromfile('/home/omniscope/simulate_visibilities/data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside, nt*nUBL, 12*nside**2),dtype='complex64').reshape((nUBL, nt, 12*nside**2))[subublindex].reshape((len(subublindex) * nt, 12*nside**2))/nside**2
+
+    #ublindex = [u for u in range(len(ubls_standard)) if la.norm(ubls_standard[u]) < (nside * 299.792458 / freq)]
+    A_standard = np.fromfile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, 12*nside_standard**2))
+    A_standard = np.concatenate((A_standard, np.fromfile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, 12*nside_standard**2))))
+
+    average_size = nside_standard/nside
+    B = np.zeros((12*nside**2,12*nside_standard**2),dtype='float32')
+    for ringpix in range(12*nside_standard**2):
+        B[hpf.nest2ring(nside, hpf.ring2nest(nside_standard, ringpix)/average_size**2), ringpix] = average_size**-2
+    B.tofile('/home/omniscope/data/GSM_data/Bmatrix_nside%i_to_nside%i.bin'%(nside_standard,nside))
+    if nside <= 4:
+        equatorial_GSM = B.dot(equatorial_GSM_standard)
+
+    ##plt.imshow(B.transpose().dot(B))
+    ##plt.colorbar()
+    ##plt.show()
+    ##print "Computing BtBi...",
+    ##sys.stdout.flush()
+    ##rcondB = 1e-3
+    ##BtBi = la.pinv(B.transpose().dot(B) , rcond=rcondB)#+ 10.**sigmap*np.identity(len(B[0])), rcond=rcondB)
+    ##print "Done."
+    ##sys.stdout.flush()
+    ##BtBi.astype('float32').tofile('/home/omniscope/data/GSM_data/BtBi_nside%i_to_nside%i.bin'%(nside_standard,nside))
+    #plt.imshow(np.abs(B.transpose().dot(B)))
+    #plt.show()
+
+    A = A_standard.dot(B.transpose())
+    if ps:
+        psAx = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, nps))
+        psAy = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, nps))
+        A = np.concatenate((A, np.concatenate((psAx, psAy))),axis = 1)
+    print "Computing AtAi...",
+    sys.stdout.flush()
+    rcondA = 1e-6
+    AtAi = la.pinv(A.conjugate().transpose().dot(A), rcond=rcondA)
+    print "Done."
+    sys.stdout.flush()
+    AtAi.astype('complex64').tofile('/home/omniscope/data/GSM_data/ABtABi_%iubl_nside%i_to_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, nt_standard*nUBL, 12*nside_standard**2))
+
+    #plt.imshow(np.abs(AtAi.dot(A.transpose().conjugate().dot(A))))
+    #plt.show()
+    vis = A_standard.dot(equatorial_GSM_standard)
+
+    vis = vis + .01 * (2**-.5) * np.mean(np.abs(vis)) * (np.random.randn(len(vis)) + np.random.randn(len(vis)) * 1.j)
+    print vis.shape, A.shape
+    sys.stdout.flush()
+    solution = AtAi.dot(A.conjugate().transpose().dot(vis))[:12*nside**2]/average_size**2
+    #hpv.mollview(equatorial_GSM_standard, min=0,max=5000,fig=1,title='Original map')
+    #hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
+    #hpv.mollview(solution, min=0,max=5000,fig=3,title='Our solution')
+    #hpv.mollview(solution/B.dot(equatorial_GSM_standard), min=0, max=3, fig=4,title='sol/mean')
+    hpv.mollview(np.log10(np.abs(solution-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-2, max=0,title='log10(relative error)')
 plt.show()
 
 #################################plot actual errors and such, see if adding PAPER PSA128 helps

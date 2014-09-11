@@ -15,12 +15,13 @@ import omnical.calibration_omni as omni
 
 tlist = np.arange(16, 24, .1)
 
-infofile = '/home/omniscope/omnical/doc/redundantinfo_X5_q3y.bin'#'/home/omniscope/omnical/doc/redundantinfo_PSA128_26ba_6bu_08-15-2014.bin'#
-pol = 'yy'
+p = 'x'
+infofile = '/home/omniscope/omnical/doc/redundantinfo_X5_q3%s.bin'%(p)#'/home/omniscope/omnical/doc/redundantinfo_PSA128_26ba_6bu_08-15-2014.bin'#
+pol = p+p
 info = omni.read_redundantinfo(infofile)
+nside = 32
+nside_target = 8
 
-nside = 8
-nside_target = 4
 inclusion_thresh = 1 #betweennnn 0 and 1. ubl/lambda must be this times nside_target less
 all_ubl = False
 bnside = 8
@@ -34,7 +35,10 @@ elif 'X5' in infofile:
     lat_degree = 45.2977
     infoubl = info['ubl'].dot([[1.5,0,0],[0,1.5,0],[0,0,0]])
     beam_healpix = np.fromfile('/home/omniscope/simulate_visibilities/data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s.bin'%(bnside, freq, pol), dtype='float32')
+    point_sources = [[np.pi*((23+(23.+26./60.)/60.)/12.), np.pi*(58.+48./60.)/180.], [np.pi*((19.+(59.+28.3566/60.)/60.)/12.), np.pi*(40.+(44.+2.096/60.)/60.)/180.]]
+    nps = len(point_sources)
 elif 'PSA' in infofile:
+    raise Exception('PSA point source not yet programmed.')
     lat_degree = -(30.+ 43./60. + 17.5/3600.)
     infoubl = info['ubl'].dot([[4,0,0],[0,15,0],[0,0,0]])
     calfile = 'psa6240_v003'
@@ -66,17 +70,19 @@ print "%i UBLs to include"%len(ubls)
 if len(tlist)*len(ubls) < 12*nside**2:
     for i in range(5):
         print 'Not enough degree of freedom! %i*%i<%i.'%(len(tlist), len(ubls), 12*nside**2)
-A = np.empty((len(tlist)*len(ubls), 12*nside**2), dtype='complex64')
-for i in range(12*nside**2):
-    dec, ra = hpf.pix2ang(nside, i)#gives theta phi
-    dec = np.pi/2 - dec
-    print "%.1f%%"%(100.*float(i)/(12.*nside**2)),
-    sys.stdout.flush()
 
-    A[:, i] = np.array([vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
+
+A = np.empty((len(tlist)*len(ubls), nps), dtype='complex64')
+for i in range(nps):
+    ra, dec = point_sources[i]
+    theta = np.pi/2 - dec
+    phi = ra
+    theta_heal, phi_heal = hpf.pix2ang(nside, hpf.ang2pix(nside, theta, phi))
+
+    A[:, i] = np.array([vs.calculate_pointsource_visibility(phi_heal, np.pi/2.-theta_heal, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
 print float(time.time()-timer)/60.
 if all_ubl:
-    A.tofile('/home/omniscope/data/GSM_data/Amatrix_allubl_nside%i_%iby%i_'%(nside, len(A), len(A[0])) + infofile.split('/')[-1])
+    A.tofile('/home/omniscope/data/GSM_data/AmatrixPS_allubl_nside%i_%iby%i_'%(nside, len(A), len(A[0])) + infofile.split('/')[-1])
 else:
-    A.tofile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_'%(len(ubls), nside, len(A), len(A[0])) + infofile.split('/')[-1])
+    A.tofile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_'%(len(ubls), nside, len(A), len(A[0])) + infofile.split('/')[-1])
 
