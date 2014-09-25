@@ -7,7 +7,8 @@ import healpy.pixelfunc as hpf
 import sys
 import omnical.calibration_omni as omni
 nt = 80
-nside = 16
+tavg = 2
+nside = 8
 nUBL = 75#34
 #nside = 16
 #nUBL = 75
@@ -51,17 +52,18 @@ if nside > 4:
     sys.stdout.flush()
 
 
-for ps in [True, False]:#range(-5,5):
+for rcondA in [1e-4]:#range(-5,5):
+    ps = True
     thresh2 = 1
     subublindex = np.array([u for u in range(nUBL) if la.norm(ubls[u]) < thresh2 * (nside * 299.792458 / freq)])
     print "%i out of %i to include"%(len(subublindex), nUBL)
     ###################################plot actual errors and such, see if the gridding is too coarse
 
-    #A = np.fromfile('/home/omniscope/simulate_visibilities/data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside, nt*nUBL, 12*nside**2),dtype='complex64').reshape((nUBL, nt, 12*nside**2))[subublindex].reshape((len(subublindex) * nt, 12*nside**2))/nside**2
+    #A = np.fromfile('/home/omniscope/simulate_visibilities/data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside, nt*nUBL, 12*nside**2),dtype='complex64').reshape((nUBL, nt, 12*nside**2))[subublindex,::tavg].reshape((len(subublindex) * nt/tavg, 12*nside**2))/nside**2
 
     #ublindex = [u for u in range(len(ubls_standard)) if la.norm(ubls_standard[u]) < (nside * 299.792458 / freq)]
-    A_standard = np.fromfile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, 12*nside_standard**2))
-    A_standard = np.concatenate((A_standard, np.fromfile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, 12*nside_standard**2))))
+    A_standard = np.fromfile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(tavg*nt_standard/nt)].reshape((len(subublindex)*nt/tavg, 12*nside_standard**2))
+    A_standard = np.concatenate((A_standard, np.fromfile('/home/omniscope/data/GSM_data/Amatrix_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, 12*nside_standard**2),dtype='complex64').reshape((nUBL, nt_standard, 12*nside_standard**2))[subublindex, ::(tavg*nt_standard/nt)].reshape((len(subublindex)*nt/tavg, 12*nside_standard**2))))
 
     average_size = nside_standard/nside
     B = np.zeros((12*nside**2,12*nside_standard**2),dtype='float32')
@@ -86,16 +88,18 @@ for ps in [True, False]:#range(-5,5):
 
     A = A_standard.dot(B.transpose())
     if ps:
-        psAx = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, nps))
-        psAy = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(nt_standard/nt)].reshape((len(subublindex)*nt, nps))
+        psAx = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(tavg*nt_standard/nt)].reshape((len(subublindex)*nt/tavg, nps))
+        psAy = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(tavg*nt_standard/nt)].reshape((len(subublindex)*nt/tavg, nps))
         A = np.concatenate((A, np.concatenate((psAx, psAy))),axis = 1)
     print "Computing AtAi...",
     sys.stdout.flush()
-    rcondA = 1e-6
-    AtAi = la.pinv(A.conjugate().transpose().dot(A), rcond=rcondA)
+    #rcondA = 1e-6
+    ev, _ = la.eigh(A.conjugate().transpose().dot(A))
+    maxev = np.max(np.abs(ev))
+    AtAi = la.pinv(A.conjugate().transpose().dot(A) + maxev * rcondA * np.identity(len(A[0])))#, rcond=rcondA)
     print "Done."
     sys.stdout.flush()
-    AtAi.astype('complex64').tofile('/home/omniscope/data/GSM_data/ABtABi_%iubl_nside%i_to_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, nt_standard*nUBL, 12*nside_standard**2))
+    AtAi.astype('complex64').tofile('/home/omniscope/data/GSM_data/ABtABi_%iubl_nside%i_to_nside%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, len(AtAi), len(AtAi[0])))
 
     #plt.imshow(np.abs(AtAi.dot(A.transpose().conjugate().dot(A))))
     #plt.show()
@@ -105,9 +109,9 @@ for ps in [True, False]:#range(-5,5):
     print vis.shape, A.shape
     sys.stdout.flush()
     solution = AtAi.dot(A.conjugate().transpose().dot(vis))[:12*nside**2]/average_size**2
-    #hpv.mollview(equatorial_GSM_standard, min=0,max=5000,fig=1,title='Original map')
-    #hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
-    #hpv.mollview(solution, min=0,max=5000,fig=3,title='Our solution')
+    hpv.mollview(equatorial_GSM_standard, min=0,max=5000,fig=1,title='Original map')
+    hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
+    hpv.mollview(solution, min=0,max=5000,fig=3,title='Our solution')
     #hpv.mollview(solution/B.dot(equatorial_GSM_standard), min=0, max=3, fig=4,title='sol/mean')
     hpv.mollview(np.log10(np.abs(solution-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-2, max=0,title='log10(relative error)')
 plt.show()

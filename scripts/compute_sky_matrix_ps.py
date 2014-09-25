@@ -15,12 +15,12 @@ import omnical.calibration_omni as omni
 
 tlist = np.arange(16, 24, .1)
 
-p = 'x'
+p = 'y'
 infofile = '/home/omniscope/omnical/doc/redundantinfo_X5_q3%s.bin'%(p)#'/home/omniscope/omnical/doc/redundantinfo_PSA128_26ba_6bu_08-15-2014.bin'#
 pol = p+p
 info = omni.read_redundantinfo(infofile)
-nside = 32
-nside_target = 8
+nside = 16
+nside_target = 16
 
 inclusion_thresh = 1 #betweennnn 0 and 1. ubl/lambda must be this times nside_target less
 all_ubl = False

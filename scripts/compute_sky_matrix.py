@@ -15,12 +15,13 @@ import omnical.calibration_omni as omni
 
 tlist = np.arange(16, 24, .1)
 
-infofile = '/home/omniscope/omnical/doc/redundantinfo_X5_q3y.bin'#'/home/omniscope/omnical/doc/redundantinfo_PSA128_26ba_6bu_08-15-2014.bin'#
-pol = 'yy'
+p = 'x'
+infofile = '/home/omniscope/omnical/doc/redundantinfo_X5_q3%s.bin'%(p)#'/home/omniscope/omnical/doc/redundantinfo_PSA128_26ba_6bu_08-15-2014.bin'#
+pol = p+p
 info = omni.read_redundantinfo(infofile)
 
-nside = 8
-nside_target = 4
+nside = 16
+nside_target = 16
 inclusion_thresh = 1 #betweennnn 0 and 1. ubl/lambda must be this times nside_target less
 all_ubl = False
 bnside = 8
@@ -70,7 +71,7 @@ A = np.empty((len(tlist)*len(ubls), 12*nside**2), dtype='complex64')
 for i in range(12*nside**2):
     dec, ra = hpf.pix2ang(nside, i)#gives theta phi
     dec = np.pi/2 - dec
-    print "%.1f%%"%(100.*float(i)/(12.*nside**2)),
+    print "\r%.1f%%"%(100.*float(i)/(12.*nside**2)),
     sys.stdout.flush()
 
     A[:, i] = np.array([vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
