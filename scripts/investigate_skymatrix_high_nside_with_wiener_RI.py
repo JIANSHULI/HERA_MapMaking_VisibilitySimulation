@@ -10,9 +10,9 @@ import omnical.calibration_omni as omni
 tavg = 2
 ps = False
 force_recompute = False
-nside = 8
+nside = 32
 nt = 80
-nside_standard = 8#64
+nside_standard = 32#64
 nt_standard = 80#160
 nUBL = 75#34
 #nside = 16
@@ -27,18 +27,7 @@ ubls = np.array([bl for bl in omni.read_redundantinfo('/home/omniscope/omnical/d
 if len(ubls) != nUBL:
     raise Exception('%i != %i!'%(len(ubls), nUBL))
 
-#compute S
-angular_scale = 1/(freq/300*np.max([la.norm(ubl) for ubl in ubls]))
-print "Computing S matrix...",
-sys.stdout.flush()
-S = np.identity(12 * nside**2)
-S = np.maximum(np.array([np.concatenate((hp.sphtfunc.smoothing(pix_vec, sigma = angular_scale, verbose = False), np.zeros(nps))) for pix_vec in S]), 0)
-if ps:
-    tmp = []
-    for i in range(nps):
-        tmp += [np.zeros(12 * nside**2 + nps)]
-        tmp[i][12 * nside**2 + i] = 1
-    S = np.concatenate((S, tmp))
+
 
 pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside_standard))
 pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside_standard))
@@ -72,6 +61,19 @@ if nside != nside_standard:
 else:
     equatorial_GSM = equatorial_GSM_standard
 
+
+#compute S
+angular_scale = 1/(freq/300*np.max([la.norm(ubl) for ubl in ubls]))
+print "Computing S matrix...",
+sys.stdout.flush()
+S = np.identity(12 * nside**2)
+S = np.maximum(np.array([np.concatenate((hp.sphtfunc.smoothing(pix_vec, sigma = angular_scale, verbose = False), np.zeros(nps))) for pix_vec in S]), 0)
+if ps:
+    tmp = []
+    for i in range(nps):
+        tmp += [np.zeros(12 * nside**2 + nps)]
+        tmp[i][12 * nside**2 + i] = 1
+    S = np.concatenate((S, tmp))
 
 for rcondA in [1e-6]:#range(-5,5):
     for noise in [.01]:
@@ -121,6 +123,7 @@ for rcondA in [1e-6]:#range(-5,5):
             A = A_standard
 
 
+
         if ps:
             print "Appending point sources...",
             sys.stdout.flush()
@@ -129,12 +132,15 @@ for rcondA in [1e-6]:#range(-5,5):
             psAy = np.fromfile('/home/omniscope/data/GSM_data/AmatrixPS_%iubl_nside%i_%iby%i_redundantinfo_X5_q3y.bin'%(nUBL, nside_standard, nt_standard*nUBL, nps),dtype='complex64').reshape((nUBL, nt_standard, nps))[subublindex, ::(tavg*nt_standard/nt)].reshape((len(subublindex)*nt/tavg, nps))
             A = np.concatenate((A, np.concatenate((psAx, psAy))),axis = 1)
 
-
-        AtAi_file = '/home/omniscope/data/GSM_data/ABtABi_RI_%iubl_nside%i_to_nside%i_rcond%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, np.log10(rcondA), len(A[0]), len(A[0]))
+        print "Making A real...",
+        sys.stdout.flush()
         A = np.concatenate((np.real(A), np.imag(A)))
         print "A type:", A.dtype
         A_standard = np.concatenate((np.real(A_standard), np.imag(A_standard)))
 
+
+
+        AtAi_file = '/home/omniscope/data/GSM_data/ABtABi_RI_%iubl_nside%i_to_nside%i_rcond%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, np.log10(rcondA), len(A[0]), len(A[0]))
         if os.path.isfile(AtAi_file):
             print "Reading AtAi...",
             sys.stdout.flush()
@@ -169,12 +175,22 @@ for rcondA in [1e-6]:#range(-5,5):
         raw_solution = AtAi.dot(A.transpose().dot(vis))/average_size**2
         #solution = np.concatenate((raw_solution[:12*nside**2], raw_solution[12*nside**2 + nps: -nps]))
 
-        #####wiener filter
+        #########################
+        #####wiener filter#########################
+        #########################
+
+        #update S matrix
+        print "Updating S matrix...",
+        sys.stdout.flush()
+        pix_weight = [la.norm(A[:,i]) for i in range(len(A[0]))]
+        void_pix = [i for i in range(len(pix_weight)) if pix_weight[i] == 0]
+        S[void_pix] = 0
+        S[:, void_pix] = 0
+        S = S * (np.median(equatorial_GSM))**2
 
         rcondSN = rcondA
-        SNR = 1
-        N = AtAi * noise**2 * SNR
-        wiener_file = '/home/omniscope/data/GSM_data/SNi_Gaussian_RI_SNR_%i_%iubl_nside%i_to_nside%i_rcondA%i_rcondSN%i_noise%i_%iby%i_redundantinfo_X5_q3x.bin'%(np.log10(SNR), nUBL, nside_standard, nside, np.log10(rcondA), np.log10(rcondSN), np.log10(noise), len(N), len(N))
+        N = AtAi * (noise * np.mean(np.abs(vis)))**2
+        wiener_file = '/home/omniscope/data/GSM_data/SNi_Gaussian_RI_partialS_absSNR_%iubl_nside%i_to_nside%i_rcondA%i_rcondSN%i_noise%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, np.log10(rcondA), np.log10(rcondSN), np.log10(noise), len(N), len(N))
         if os.path.isfile(wiener_file) and not force_recompute:
             print "Reading Wiener filter component...",
             sys.stdout.flush()
@@ -216,7 +232,7 @@ for rcondA in [1e-6]:#range(-5,5):
             #hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
         hpv.mollview(raw_solution[:12*nside**2], min=0,max=5000,title='Raw solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
         hpv.mollview(np.log10(np.abs(raw_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-2, max=0,title='log10(relative error), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-        hpv.mollview(w_solution[:12*nside**2], title='Wiener solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
+        hpv.mollview(w_solution[:12*nside**2], min=0,max=5000, title='Wiener solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
         hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-2, max=0,title='log10(relative error wiener), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
         #hpv.mollview(solution/B.dot(equatorial_GSM_standard), min=0, max=3, fig=4,title='sol/mean')
 
