@@ -10,9 +10,9 @@ import omnical.calibration_omni as omni
 tavg = 2
 ps = False
 force_recompute = False
-nside = 32
+nside = 16
 nt = 80
-nside_standard = 32#64
+nside_standard = 16#64
 nt_standard = 80#160
 nUBL = 75#34
 #nside = 16
@@ -188,55 +188,58 @@ for rcondA in [1e-6]:#range(-5,5):
         S[:, void_pix] = 0
         S = S * (np.median(equatorial_GSM))**2
 
-        rcondSN = rcondA
-        N = AtAi * (noise * np.mean(np.abs(vis)))**2
-        wiener_file = '/home/omniscope/data/GSM_data/SNi_Gaussian_RI_partialS_absSNR_%iubl_nside%i_to_nside%i_rcondA%i_rcondSN%i_noise%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, np.log10(rcondA), np.log10(rcondSN), np.log10(noise), len(N), len(N))
-        if os.path.isfile(wiener_file) and not force_recompute:
-            print "Reading Wiener filter component...",
+        for rcondSN in [1e-4]:#rcondSN = rcondA
+            N = AtAi * (noise * np.mean(np.abs(vis)))**2
+            wiener_file = '/home/omniscope/data/GSM_data/SNi_Gaussian_RI_partialS_absSNR_%iubl_nside%i_to_nside%i_rcondA%i_rcondSN%i_noise%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, np.log10(rcondA), np.log10(rcondSN), np.log10(noise), len(N), len(N))
+            if os.path.isfile(wiener_file) and not force_recompute:
+                print "Reading Wiener filter component...",
+                sys.stdout.flush()
+                try:
+                    SNi = np.fromfile(wiener_file, dtype = 'float64').reshape((len(N), len(N)))
+                except ValueError:
+                    SNi = np.fromfile(wiener_file, dtype = 'complex128').reshape((len(N), len(N)))
+            else:
+                print "Computing Wiener filter component...",
+                sys.stdout.flush()
+                SNi = la.pinv(S + N, rcond = rcondSN)#should i do abs(N) ?
+                print SNi.dtype
+                SNi.tofile(wiener_file)
+            print "Computing Wiener filter...",
             sys.stdout.flush()
-            try:
-                SNi = np.fromfile(wiener_file, dtype = 'float64').reshape((len(N), len(N)))
-            except ValueError:
-                SNi = np.fromfile(wiener_file, dtype = 'complex128').reshape((len(N), len(N)))
-        else:
-            print "Computing Wiener filter component...",
+            wiener = S.dot(SNi)
+
+            print "Applying Wiener filter...",
             sys.stdout.flush()
-            SNi = la.pinv(S + N, rcond = rcondSN)#should i do abs(N) ?
-            print SNi.dtype
-            SNi.tofile(wiener_file)
-        print "Computing Wiener filter...",
-        sys.stdout.flush()
-        wiener = S.dot(SNi)
+            w_solution = wiener.dot(raw_solution)
+            #plt.imshow(np.log10(wiener))
+            #plt.colorbar()
+            #plt.show()
 
-        print "Applying Wiener filter...",
-        sys.stdout.flush()
-        w_solution = wiener.dot(raw_solution)
-        #plt.imshow(np.log10(wiener))
-        #plt.colorbar()
-        #plt.show()
-
-        ###adding back point source for plotting:
-        if ps:
-            for i in range(len(point_sources)):
-                ra, dec = point_sources[i]
-                theta = np.pi/2 - dec
-                phi = ra
-                raw_solution[hpf.ang2pix(nside, theta, phi)] += raw_solution[12*nside**2 + i]
-                w_solution[hpf.ang2pix(nside, theta, phi)] += w_solution[12*nside**2 + i]
+            ###adding back point source for plotting:
+            if ps:
+                for i in range(len(point_sources)):
+                    ra, dec = point_sources[i]
+                    theta = np.pi/2 - dec
+                    phi = ra
+                    raw_solution[hpf.ang2pix(nside, theta, phi)] += raw_solution[12*nside**2 + i]
+                    w_solution[hpf.ang2pix(nside, theta, phi)] += w_solution[12*nside**2 + i]
 
 
-        #plt.plot(np.abs(ev))
-        #plt.show()
-        #hpv.mollview(equatorial_GSM_standard, min=0,max=5000,fig=1,title='Original map')
-        #if nside != nside_standard:
-            #hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
-        hpv.mollview(raw_solution[:12*nside**2], min=0,max=5000,title='Raw solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-        hpv.mollview(np.log10(np.abs(raw_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-2, max=0,title='log10(relative error), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-        hpv.mollview(w_solution[:12*nside**2], min=0,max=5000, title='Wiener solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-        hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=True, min=-2, max=0,title='log10(relative error wiener), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-        #hpv.mollview(solution/B.dot(equatorial_GSM_standard), min=0, max=3, fig=4,title='sol/mean')
+            #plt.plot(np.abs(ev))
+            #plt.show()
+            hpv.mollview(equatorial_GSM_standard, min=0,max=5000,title='Original map')
+            hpv.mollview(wiener.dot(equatorial_GSM), min=0,max=5000,title='Wienered map')
+            #if nside != nside_standard:
+                #hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
+            hpv.mollview(raw_solution[:12*nside**2], min=0,max=5000,title='Raw solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
+            hpv.mollview(np.log10(np.abs(raw_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=False, min=-2, max=0,title='log10(relative error), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
+            hpv.mollview(w_solution[:12*nside**2], min=0,max=5000, title='Wiener solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
+            hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=False, min=-2, max=0,title='log10(relative error wiener to input), rcond = %i, rcondSN = %i, noise = %i'%(np.log10(rcondA), np.log10(rcondSN), np.log10(noise)))
 
-        print " "
+            hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-wiener.dot(equatorial_GSM))/wiener.dot(equatorial_GSM)), return_projected_map=False, min=-2, max=0,title='log10(relative error wiener to W_input), rcond = %i, rcondSN = %i, noise = %i'%(np.log10(rcondA), np.log10(rcondSN), np.log10(noise)))
+            #hpv.mollview(solution/B.dot(equatorial_GSM_standard), min=0, max=3, fig=4,title='sol/mean')
+
+            print " "
 plt.show()
 
 #################################plot actual errors and such, see if adding PAPER PSA128 helps
