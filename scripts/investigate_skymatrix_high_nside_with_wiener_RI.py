@@ -10,9 +10,9 @@ import omnical.calibration_omni as omni
 tavg = 2
 ps = False
 force_recompute = False
-nside = 16
+nside = 32
 nt = 80
-nside_standard = 16#64
+nside_standard = 32#64
 nt_standard = 80#160
 nUBL = 75#34
 #nside = 16
@@ -188,7 +188,7 @@ for rcondA in [1e-6]:#range(-5,5):
         S[:, void_pix] = 0
         S = S * (np.median(equatorial_GSM))**2
 
-        for rcondSN in [1e-4]:#rcondSN = rcondA
+        for rcondSN in [1e-6]:#rcondSN = rcondA
             N = AtAi * (noise * np.mean(np.abs(vis)))**2
             wiener_file = '/home/omniscope/data/GSM_data/SNi_Gaussian_RI_partialS_absSNR_%iubl_nside%i_to_nside%i_rcondA%i_rcondSN%i_noise%i_%iby%i_redundantinfo_X5_q3x.bin'%(nUBL, nside_standard, nside, np.log10(rcondA), np.log10(rcondSN), np.log10(noise), len(N), len(N))
             if os.path.isfile(wiener_file) and not force_recompute:
@@ -232,11 +232,11 @@ for rcondA in [1e-6]:#range(-5,5):
             #if nside != nside_standard:
                 #hpv.mollview(equatorial_GSM, min=0,max=5000,fig=2,title='mean map')
             hpv.mollview(raw_solution[:12*nside**2], min=0,max=5000,title='Raw solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-            hpv.mollview(np.log10(np.abs(raw_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=False, min=-2, max=0,title='log10(relative error), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
+            hpv.mollview(np.log10(np.abs(raw_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=False, min=-3, max=0,title='log10(relative error), rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
             hpv.mollview(w_solution[:12*nside**2], min=0,max=5000, title='Wiener solution, rcond = %i, noise = %i'%(np.log10(rcondA), np.log10(noise)))
-            hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=False, min=-2, max=0,title='log10(relative error wiener to input), rcond = %i, rcondSN = %i, noise = %i'%(np.log10(rcondA), np.log10(rcondSN), np.log10(noise)))
+            hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-equatorial_GSM)/equatorial_GSM), return_projected_map=False, min=-3, max=0,title='log10(relative error wiener to input), rcond = %i, rcondSN = %i, noise = %i'%(np.log10(rcondA), np.log10(rcondSN), np.log10(noise)))
 
-            hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-wiener.dot(equatorial_GSM))/wiener.dot(equatorial_GSM)), return_projected_map=False, min=-2, max=0,title='log10(relative error wiener to W_input), rcond = %i, rcondSN = %i, noise = %i'%(np.log10(rcondA), np.log10(rcondSN), np.log10(noise)))
+            hpv.mollview(np.log10(np.abs(w_solution[:12*nside**2]-wiener.dot(equatorial_GSM))/wiener.dot(equatorial_GSM)), return_projected_map=False, min=-3, max=0,title='log10(relative error wiener to W_input), rcond = %i, rcondSN = %i, noise = %i'%(np.log10(rcondA), np.log10(rcondSN), np.log10(noise)))
             #hpv.mollview(solution/B.dot(equatorial_GSM_standard), min=0, max=3, fig=4,title='sol/mean')
 
             print " "
