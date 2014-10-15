@@ -14,17 +14,30 @@ import healpy.visufunc as hpv
 import scipy.interpolate as si
 import omnical.calibration_omni as omni
 
+def pinv_sym(M, rcond = 1.e-15):
+    eigvl,eigvc = la.eigh(M)
+    eigvli = np.empty_like(eigvl)
+    max_eigv = max(eigvl)
+    for i in range(len(eigvli)):
+        if eigvl[i] < max_eigv * rcond:
+            eigvli[i] = 0
+        else:
+            eigvli[i] = 1/eigvl[i]
+    return (eigvc*eigvli).dot(eigvc.transpose())
 
 tag = "q3_abscalibrated"
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 nt = 440
 nf = 1
 nUBL = 75
-nside = 16
+nside = 8
 bnside = 8
 lat_degree = 45.2977
 force_recompute = False
+force_recompute_AtNiAi = False
 
+C = 299.792458
+kB = 1.3806488* 1.e-23
 
 #deal with beam: create a dictionary for 'x' and 'y' each with a callable function of the form y(freq) in MHz
 local_beam = {}
@@ -39,13 +52,15 @@ A = {}
 data = {}
 Ni = {}
 for p in ['x', 'y']:
+    pol = p+p
+
     #tf file
     tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
     tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
     tlist = np.real(tflist[:, 0])
     flist = np.imag(tflist[0, :])
     freq = flist[0]
-    pol = p+p
+    #print freq, tlist
 
     #ubl file
     ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
@@ -54,7 +69,8 @@ for p in ['x', 'y']:
 
     #beam
     beam_healpix = local_beam[p](freq)
-
+    #hpv.mollview(beam_healpix, title='beam %s'%p)
+    #plt.show()
 
     vs = sv.Visibility_Simulator()
     vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
@@ -87,7 +103,7 @@ for p in ['x', 'y']:
     var_filename = datadir + tag + '_%s%s_%i_%i.var'%(p, p, nt, nUBL)
     Ni[p] = 1./np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL)).transpose().flatten()
     data_filename = datadir + tag + '_%s%s_%i_%i.dat'%(p, p, nt, nUBL)
-    data[p] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL)).transpose().flatten()
+    data[p] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL)).transpose().flatten()*1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2))#.conjugate()there's a conjugate convention difference??maybe??
 
 data = np.concatenate((data['x'],data['y']))
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
@@ -97,24 +113,54 @@ Ni = np.concatenate((Ni['x'],Ni['y']))
 Ni = np.concatenate((Ni/2, Ni/2))
 A = np.concatenate((A['x'],A['y']))
 A = np.concatenate((np.real(A), np.imag(A))).astype('float32')
-
+pix_mask = np.array([la.norm(col) != 0 for col in A.transpose()])
+A = A[:, pix_mask]
+npix = A.shape[1]
 #compute AtNi
-AtNi = A.transpose().conjugate() * Ni
+AtNi = A.transpose() * Ni
+
 
 #compute AtNiAi
 rcondA = 1.e-6
-AtNiAi_filename = datadir + tag + '_%i_%i.AtNiAi%i'%(12*nside**2, 12*nside**2, np.log10(rcondA))
-if os.path.isfile(AtNiAi_filename) and not force_recompute:
+AtNiAi_filename = datadir + tag + '_%i_%i.AtNiAi%i'%(npix, npix, np.log10(rcondA))
+if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
     print "Reading AtNiAi matrix from %s"%AtNiAi_filename
-    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((12*nside**2, 12*nside**2))
+    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((npix, npix))
+
 else:
     print "Computing AtNiAi matrix..."
     timer = time.time()
-    AtNiAi = la.pinv(AtNi.dot(A), rcond=rcondA)
+    #AtNiAi = la.pinv(AtNi.dot(A), rcond=rcondA)
+    AtNiAi = pinv_sym(AtNi.dot(A), rcond = rcondA)
     print "%f minutes used"%(float(time.time()-timer)/60.)
     AtNiAi.tofile(AtNiAi_filename)
 
+
+
 #compute raw x
-x = AtNiAi.dot(AtNi.dot(data))
+x = np.zeros(12*nside**2, dtype='float32')
+x[pix_mask] = AtNiAi.dot(AtNi.dot(data))
 hpv.mollview(x, min=0,max=5000,title='raw solution')
+
+#simulate
+nside_standard = nside
+pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside_standard))
+pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside_standard))
+pca3 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm3.fits' + str(nside_standard))
+gsm_standard = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
+#rotate sky map
+print "Rotating GSM_standard...",
+sys.stdout.flush()
+for i in range(12*nside_standard**2):
+    ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
+    equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
+print "done."
+sys.stdout.flush()
+sim_data = A.dot(equatorial_GSM_standard[pix_mask])
+sim_sol = np.zeros(12*nside**2)
+sim_sol[pix_mask] = AtNiAi.dot(AtNi.dot(sim_data))
+hpv.mollview(sim_sol, min=0,max=5000,title='simulated solution')
+
+
 plt.show()
