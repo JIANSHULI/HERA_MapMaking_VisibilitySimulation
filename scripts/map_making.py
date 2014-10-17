@@ -28,7 +28,9 @@ nt = 440
 nf = 1
 nUBL = 75
 nside = 32
-S_type = 'uniform'
+S_scale = 2
+S_thresh = 1000#Kelvin
+S_type = 'uniform%irm%i'%(S_scale,S_thresh)
 bnside = 8
 lat_degree = 45.2977
 force_recompute = False
@@ -101,7 +103,7 @@ for p in ['x', 'y']:
 
     #get Ni (1/variance) and data
     var_filename = datadir + tag + '_%s%s_%i_%i.var'%(p, p, nt, nUBL)
-    Ni[p] = 1./np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL)).transpose().flatten()
+    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL)).transpose().flatten() * (1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2)))**2)
     data_filename = datadir + tag + '_%s%s_%i_%i.dat'%(p, p, nt, nUBL)
     data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL)).transpose().flatten()*1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2))).conjugate()#there's a conjugate convention difference
 
@@ -122,7 +124,7 @@ AtNi = A.transpose() * Ni
 
 #compute AtNiAi
 rcondA = 1.e-6
-AtNiAi_filename = datadir + tag + '_%i_%i.AtNiAi%i'%(npix, npix, np.log10(rcondA))
+AtNiAi_filename = datadir + tag + '_%i_%i.2AtNiAi%i'%(npix, npix, np.log10(rcondA))
 if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
     print "Reading AtNiAi matrix from %s"%AtNiAi_filename
     AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((npix, npix))
@@ -157,7 +159,7 @@ for i in range(12*nside_standard**2):
     equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
 print "done."
 sys.stdout.flush()
-sim_data = A.dot(equatorial_GSM_standard[pix_mask])
+sim_data = A.dot(equatorial_GSM_standard[pix_mask]) + np.random.randn(len(data))/Ni**.5
 sim_sol = np.zeros(12*nside**2)
 sim_sol[pix_mask] = AtNiAi.dot(AtNi.dot(sim_data))
 
@@ -171,17 +173,22 @@ if os.path.isfile(S_filename) and not force_recompute_S:
 else:
     print "Computing S matrix %s..."%S_type,
     sys.stdout.flush()
-    angular_scale = 1/(freq/300*np.max([la.norm(ubl) for ubl in ubls]))
+    angular_scale = S_scale / (freq/300*np.max([la.norm(ubl) for ubl in ubls]))
     S = np.identity(12 * nside**2)
     S = np.maximum(np.array([hp.sphtfunc.smoothing(pix_vec, sigma = angular_scale, verbose = False) for pix_vec in S]), 0)[pix_mask][:, pix_mask]
-    if S_type == 'uniform':
+    ps_mask = (equatorial_GSM_standard[pix_mask] > S_thresh) #mask for points with high flux
+    S[ps_mask] = 0 #can't do these two operations at once
+    S[:, ps_mask] = 0 #can't do these two operations at once
+    S = S + np.diag(ps_mask.astype(int))
+
+    if 'uniform' in S_type:
         S = S * np.median(equatorial_GSM_standard)**2
     else:
         S = ((S*equatorial_GSM_standard[pix_mask]).transpose()*equatorial_GSM_standard[pix_mask]).transpose()
     S.astype('float32').tofile(S_filename)
 
 rcondSE = 1e-6
-SEi_filename = datadir + tag + '_%i_%i.SEi_%s_%i_%i'%(len(S), len(S), S_type, np.log10(rcondA), np.log10(rcondSE))
+SEi_filename = datadir + tag + '_%i_%i.2SEi_%s_%i_%i'%(len(S), len(S), S_type, np.log10(rcondA), np.log10(rcondSE))
 if os.path.isfile(SEi_filename) and not force_recompute_SEi:
     print "Reading Wiener filter component...",
     sys.stdout.flush()
