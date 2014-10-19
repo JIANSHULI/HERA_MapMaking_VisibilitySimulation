@@ -1,4 +1,3 @@
-import simulate_visibilities.simulate_visibilities as sv
 import numpy as np
 import healpy as hp
 import scipy.linalg as la
