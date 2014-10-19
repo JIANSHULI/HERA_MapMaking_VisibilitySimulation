@@ -1,7 +1,8 @@
 import numpy as np
 import scipy as sp
 import scipy.sparse as sps
-import scipy.linalg as la
+import scipy.linalg as sla
+import numpy.linalg as la
 import scipy.special as ssp
 import math as m
 import cmath as cm
@@ -90,7 +91,22 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
                 alm[(l,mm)] += np.conj(spheh(l,mm,p[0],p[1]))*p[2]*dtheta*dphi*m.sin(p[0])
     return alm
 
+class InverseCholeskyMatrix:#for a positive definite matrix, Cholesky decomposition is M = L.Lt, where L lower triangular. This decomposition helps computing inv(M).v faster, by avoiding calculating inv(M). Once we have L, the product is simply inv(Lt).inv(L).v, and inverse of triangular matrices multiplying a vector is fast. sla.solve_triangular(M, v) = inv(M).v
+    def __init__(self, matrix):
+        if type(matrix).__module__ != np.__name__ or len(matrix.shape) != 2:
+            raise TypeError("matrix must be a 2D numpy array");
+        try:
+            self.L = la.cholesky(matrix)#L.dot(L.conjugate().transpose()) = matrix, L lower triangular
+            self.Lt = self.L.conjugate().transpose()
+            print la.norm(self.L.dot(self.Lt)-matrix)/la.norm(matrix)
+        except:
+            raise TypeError("cholesky failed. matrix is not positive definite.")
 
+    def dotv(self, vector):
+        return sla.solve_triangular(self.Lt, sla.solve_triangular(self.L, vector, lower=True), lower=False)
+
+    def dotM(self, matrix):
+        return np.array([self.dotv(v) for v in matrix.transpose()]).transpose()
 
 class Visibility_Simulator:
     def __init__(self):
