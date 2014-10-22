@@ -11,18 +11,21 @@ import healpy.visufunc as hpv
 import scipy.interpolate as si
 import omnical.calibration_omni as omni
 
-def pinv_sym(M, rcond = 1.e-15):
+def pinv_sym(M, rcond = 1.e-15, verbose = True):
     eigvl,eigvc = la.eigh(M)
-    eigvli = np.empty_like(eigvl)
     max_eigv = max(eigvl)
-    for i in range(len(eigvli)):
-        if eigvl[i] < max_eigv * rcond:
-            eigvli[i] = 0
-        else:
-            eigvli[i] = 1/eigvl[i]
+    if verbose and min(eigvl) < 0 and np.abs(min(eigvl)) > max_eigv * rcond:
+        print "!WARNING!: negative eigenvalue %.2e is smaller than the added identity %.2e! min rcond %.2e needed."%(min(eigvl), max_eigv * rcond, np.abs(min(eigvl))/max_eigv)
+    eigvli = 1 / (max_eigv * rcond + eigvl)
+    #for i in range(len(eigvli)):
+        #if eigvl[i] < max_eigv * rcond:
+            #eigvli[i] = 0
+        #else:
+            #eigvli[i] = 1/eigvl[i]
     return (eigvc*eigvli).dot(eigvc.transpose())
 
 tag = "q3_abscalibrated"
+datatag = '_v2.rad'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 nt = 440
 nf = 1
@@ -64,6 +67,17 @@ for p in ['x', 'y']:
     freq = flist[0]
     #print freq, tlist
 
+    #tf mask file, 0 means flagged bad data
+    try:
+        tfm_filename = datadir + tag + '_%s%s_%i_%i.tfm'%(p, p, nt, nf)
+        tfmlist = np.fromfile(tfm_filename, dtype='float32').reshape((nt,nf))
+        tmask = np.array(tfmlist[:,0].astype('bool'))
+        #print tmask
+    except:
+        print "No mask file found"
+        tmask = np.zeros_like(tlist).astype(bool)
+    #print freq, tlist
+
     #ubl file
     ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
     ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
@@ -85,7 +99,7 @@ for p in ['x', 'y']:
 
     if os.path.isfile(A_filename) and not force_recompute:
         print "Reading A matrix from %s"%A_filename
-        A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(tlist)*len(ubls), 12*nside**2))
+        A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), 12*nside**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside**2))
     else:
         print "Computing A matrix for %s pol..."%p
         timer = time.time()
@@ -100,12 +114,13 @@ for p in ['x', 'y']:
 
         print "%f minutes used"%(float(time.time()-timer)/60.)
         A[p].tofile(A_filename)
+        A[p] = A[p].reshape((len(ubls), len(tlist), 12*nside**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside**2))
 
     #get Ni (1/variance) and data
     var_filename = datadir + tag + '_%s%s_%i_%i.var'%(p, p, nt, nUBL)
-    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL)).transpose().flatten() * (1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2)))**2)
-    data_filename = datadir + tag + '_%s%s_%i_%i.dat'%(p, p, nt, nUBL)
-    data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL)).transpose().flatten()*1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2))).conjugate()#there's a conjugate convention difference
+    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose().flatten() * (1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2)))**2)
+    data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + datatag
+    data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose().flatten()*1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2))).conjugate()#there's a conjugate convention difference
 
 data = np.concatenate((data['x'],data['y']))
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
@@ -113,24 +128,24 @@ data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 #plt.show()
 Ni = np.concatenate((Ni['x'],Ni['y']))
 Ni = np.concatenate((Ni/2, Ni/2))
-A = np.concatenate((A['x'],A['y']))
+pix_mask = np.array([la.norm(col) != 0 for col in A['x'].transpose()])
+A = np.concatenate((A['x'][:, pix_mask],A['y'][:, pix_mask]))
 A = np.concatenate((np.real(A), np.imag(A))).astype('float32')
-pix_mask = np.array([la.norm(col) != 0 for col in A.transpose()])
-A = A[:, pix_mask]
 npix = A.shape[1]
 #compute AtNi
 AtNi = A.transpose() * Ni
 
 
 #compute AtNiAi
-rcondA = 1.e-6
-AtNiAi_filename = datadir + tag + '_%i_%i.2AtNiAi%i'%(npix, npix, np.log10(rcondA))
+rcondA = 1.e-5
+AtNiAi_filename = datadir + tag + '_%i_%i.4AtNiAi%i'%(npix, npix, np.log10(rcondA))
 if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
     print "Reading AtNiAi matrix from %s"%AtNiAi_filename
     AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((npix, npix))
 
 else:
-    print "Computing AtNiAi matrix..."
+    print "Computing AtNiAi matrix...",
+    sys.stdout.flush()
     timer = time.time()
     #AtNiAi = la.pinv(AtNi.dot(A), rcond=rcondA)
     AtNiAi = pinv_sym(AtNi.dot(A), rcond = rcondA)
@@ -154,18 +169,37 @@ equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
 #rotate sky map
 print "Rotating GSM_standard...",
 sys.stdout.flush()
+#print hp.rotator.Rotator(coord='cg').mat
 for i in range(12*nside_standard**2):
     ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
     equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
 print "done."
 sys.stdout.flush()
+#hpv.mollview(np.log10(gsm_standard), min=0,max=4, coord='G', title='GSM')
+#hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord='EG', title='GSM')
+#hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord='CG', title='GSM')
+#import ephem
+#Cas_A = ephem.readdb('Cas-A,f|J, 23:23:26.0, 58:48:00,99.00,2000')
+#Cas_A.compute()
+#gal = ephem.Galactic(Cas_A)
+#galvec = [np.cos(gal.lat)*np.cos(gal.lon), np.cos(gal.lat)*np.sin(gal.lon), np.sin(gal.lat)]
+#equvec = [np.cos(Cas_A.a_dec)*np.cos(Cas_A.a_ra), np.cos(Cas_A.a_dec)*np.sin(Cas_A.a_ra), np.sin(Cas_A.a_dec)]
+#print hp.rotator.Rotator(coord='cg').mat.dot(equvec), galvec
+#equatorial_GSM_standard2 = np.zeros(12*nside_standard**2,'float')
+#for i in range(12*nside_standard**2):
+    #ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
+    #equatorial_GSM_standard2[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
+#hpv.mollview(np.log10(equatorial_GSM_standard2), min=0,max=4, coord='CG', title='GSM')
+
+#plt.show()
+#quit()
 sim_data = A.dot(equatorial_GSM_standard[pix_mask]) + np.random.randn(len(data))/Ni**.5
 sim_sol = np.zeros(12*nside**2)
 sim_sol[pix_mask] = AtNiAi.dot(AtNi.dot(sim_data))
 
 #compute S
 
-S_filename = datadir + tag + '_%i_%i.S_%s'%(len(AtNiAi), len(AtNiAi), S_type)
+S_filename = datadir + tag + '_%i_%i.2S_%s'%(len(AtNiAi), len(AtNiAi), S_type)
 if os.path.isfile(S_filename) and not force_recompute_S:
     print "Reading S matrix %s..."%S_type,
     sys.stdout.flush()
@@ -173,6 +207,7 @@ if os.path.isfile(S_filename) and not force_recompute_S:
 else:
     print "Computing S matrix %s..."%S_type,
     sys.stdout.flush()
+    timer = time.time()
     angular_scale = S_scale / (freq/300*np.max([la.norm(ubl) for ubl in ubls]))
     S = np.identity(12 * nside**2)
     S = np.maximum(np.array([hp.sphtfunc.smoothing(pix_vec, sigma = angular_scale, verbose = False) for pix_vec in S]), 0)[pix_mask][:, pix_mask]
@@ -180,60 +215,63 @@ else:
     S[ps_mask] = 0 #can't do these two operations at once
     S[:, ps_mask] = 0 #can't do these two operations at once
     S = S + np.diag(ps_mask.astype(int))
+    S = S + np.identity(len(S)) * 1.e-2#to make S positive definite
 
     if 'uniform' in S_type:
         S = S * np.median(equatorial_GSM_standard)**2
     else:
         S = ((S*equatorial_GSM_standard[pix_mask]).transpose()*equatorial_GSM_standard[pix_mask]).transpose()
+    print "%f minutes used"%(float(time.time()-timer)/60.)
     S.astype('float32').tofile(S_filename)
 
-rcondSE = 1e-6
-SEi_filename = datadir + tag + '_%i_%i.2SEi_%s_%i_%i'%(len(S), len(S), S_type, np.log10(rcondA), np.log10(rcondSE))
+#rcondSE = 1e-6
+#SEi_filename = datadir + tag + '_%i_%i.3SEi_%s_%i_%i'%(len(S), len(S), S_type, np.log10(rcondA), np.log10(rcondSE))
+#if os.path.isfile(SEi_filename) and not force_recompute_SEi:
+    #print "Reading Wiener filter component...",
+    #sys.stdout.flush()
+    #SEi = np.fromfile(SEi_filename, dtype = 'float32').reshape((len(S), len(S)))
+#else:
+    #print "Computing Wiener filter component...",
+    #sys.stdout.flush()
+    #SEi = pinv_sym(S + AtNiAi, rcond = rcondSE).astype('float32')
+    #SEi.tofile(SEi_filename)
+
+SEi_filename = datadir + tag + '_%i_%i.2CSEi_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
 if os.path.isfile(SEi_filename) and not force_recompute_SEi:
     print "Reading Wiener filter component...",
     sys.stdout.flush()
-    SEi = np.fromfile(SEi_filename, dtype = 'float32').reshape((len(S), len(S)))
+    SEi = sv.InverseCholeskyMatrix.fromfile(SEi_filename, len(S), 'float32')
 else:
     print "Computing Wiener filter component...",
     sys.stdout.flush()
-    SEi = pinv_sym(S + AtNiAi, rcond = rcondSE).astype('float32')
+    timer = time.time()
+    SEi = sv.InverseCholeskyMatrix(S + AtNiAi).astype('float32')
     SEi.tofile(SEi_filename)
-
-#wiener_filename = datadir + tag + '_%i_%i.wie%i%i'%(len(S), len(S), np.log10(rcondA), np.log10(rcondSE))
-#print "Computing Wiener filter...",
-#sys.stdout.flush()
-#wiener = S.dot(SEi)
-
-##investigate wiener filter
-#for row in [1,2,3,-3,-2,-1]:
-    #kernel = np.zeros_like(x)
-    #kernel[pix_mask] = (S[[row]].dot(SEi))[0]
-    #hpv.mollview(kernel)
-#plt.show()
-#quit()
+    print "%f minutes used"%(float(time.time()-timer)/60.)
 
 print "Applying Wiener filter...",
 sys.stdout.flush()
 w_solution = np.zeros_like(x)
-w_solution[pix_mask] = S.dot(SEi.dot(x[pix_mask]))
+w_solution[pix_mask] = S.dot(SEi.dotv(x[pix_mask]))
 w_GSM = np.zeros_like(equatorial_GSM_standard)
-w_GSM[pix_mask] = S.dot(SEi.dot(equatorial_GSM_standard[pix_mask]))
+w_GSM[pix_mask] = S.dot(SEi.dotv(equatorial_GSM_standard[pix_mask]))
 w_sim_sol = np.zeros_like(sim_sol)
-w_sim_sol[pix_mask] = S.dot(SEi.dot(sim_sol[pix_mask]))
+w_sim_sol[pix_mask] = S.dot(SEi.dotv(sim_sol[pix_mask]))
 
 if False:
-    hpv.mollview(equatorial_GSM_standard, min=0,max=5000,title='GSM')
-    hpv.mollview(w_GSM, min=0,max=5000,title='wiener GSM')
-    hpv.mollview(x, min=0,max=5000,title='raw solution')
-    hpv.mollview(w_solution, min=0,max=5000,title='wiener solution')
-    hpv.mollview(sim_sol, min=0,max=5000,title='simulated noiseless solution')
-    hpv.mollview(w_sim_sol, min=0,max=5000,title='simulated wiener noiseless solution')
+    hpv.mollview(equatorial_GSM_standard, min=0,max=5000, coord='CG', title='GSM')
+    hpv.mollview(w_GSM, min=0,max=5000, coord='CG', title='wiener GSM')
+    hpv.mollview(x, min=0,max=5000, coord='CG', title='raw solution')
+    hpv.mollview(w_solution, min=0,max=5000, coord='CG', title='wiener solution')
+    hpv.mollview(sim_sol, min=0,max=5000, coord='CG', title='simulated noisy solution')
+    hpv.mollview(w_sim_sol, min=0,max=5000, coord='CG', title='simulated wiener noisy solution')
 else:
-    hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4,title='GSM')
-    hpv.mollview(np.log10(w_GSM), min=0,max=4,title='wiener GSM')
-    hpv.mollview(np.log10(x), min=0,max=4,title='raw solution')
-    hpv.mollview(np.log10(w_solution), min=0,max=4,title='wiener solution')
-    hpv.mollview(np.log10(np.abs(w_solution)), min=0,max=4,title='abs wiener solution')
-    hpv.mollview(np.log10(sim_sol), min=0,max=4,title='simulated noiseless solution')
-    hpv.mollview(np.log10(w_sim_sol), min=0,max=4,title='simulated wiener noiseless solution')
+    #hpv.mollview(np.log10(gsm_standard), min=0,max=4, coord='G', title='GSM')
+    hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord='CG', title='GSM')
+    hpv.mollview(np.log10(w_GSM), min=0,max=4, coord='CG', title='wiener GSM')
+    hpv.mollview(np.log10(x), min=0,max=4, coord='CG', title='raw solution')
+    hpv.mollview(np.log10(w_solution), min=0,max=4, coord='CG', title='wiener solution')
+    hpv.mollview(np.log10(np.abs(w_solution)), min=0,max=4, coord='CG', title='abs wiener solution')
+    hpv.mollview(np.log10(sim_sol), min=0,max=4, coord='CG', title='simulated noisy solution')
+    hpv.mollview(np.log10(w_sim_sol), min=0,max=4, coord='CG', title='simulated wiener noisy solution')
 plt.show()

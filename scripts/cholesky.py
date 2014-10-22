@@ -129,10 +129,10 @@ data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 #plt.show()
 Ni = np.concatenate((Ni['x'],Ni['y']))
 Ni = np.concatenate((Ni/2, Ni/2))
-A = np.concatenate((A['x'],A['y']))
+
+pix_mask = np.array([la.norm(col) != 0 for col in A['x'].transpose()])
+A = np.concatenate((A['x'][:, pix_mask],A['y'][:, pix_mask]))
 A = np.concatenate((np.real(A), np.imag(A))).astype('float32')
-pix_mask = np.array([la.norm(col) != 0 for col in A.transpose()])
-A = A[:, pix_mask]
 npix = A.shape[1]
 #compute AtNi
 AtNi = A.transpose() * Ni
@@ -235,6 +235,11 @@ eigS, eigvc = la.eigh(S + 1e-2 * np.identity(len(S[0])))
 #plt.show()
 #quit()
 timer = time.time()
+SEi = la.pinv(AtNiAi + S)
+s0 = S.dot(SEi.dot(equatorial_GSM_standard[pix_mask]))
+print "%f minutes used"%(float(time.time()-timer)/60.)
+
+timer = time.time()
 #cholesky = la.cholesky(AtNiAi + S + rcondSE * np.median(equatorial_GSM_standard)**2 * np.identity(len(S)))
 SEi = InverseCholeskyMatrix(AtNiAi + S + rcondSE * np.median(equatorial_GSM_standard)**2 * np.identity(len(S)))
 s1 = S.dot(SEi.dotv(equatorial_GSM_standard[pix_mask]))
@@ -245,6 +250,7 @@ SEi = la.pinv(AtNiAi + S + rcondSE * np.median(equatorial_GSM_standard)**2 * np.
 s2 = S.dot(SEi.dot(equatorial_GSM_standard[pix_mask]))
 print "%f minutes used"%(float(time.time()-timer)/60.)
 
+plt.plot(s0)
 plt.plot(s1)
 plt.plot(s2)
 plt.show()

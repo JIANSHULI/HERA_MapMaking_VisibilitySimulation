@@ -98,15 +98,38 @@ class InverseCholeskyMatrix:#for a positive definite matrix, Cholesky decomposit
         try:
             self.L = la.cholesky(matrix)#L.dot(L.conjugate().transpose()) = matrix, L lower triangular
             self.Lt = self.L.conjugate().transpose()
-            print la.norm(self.L.dot(self.Lt)-matrix)/la.norm(matrix)
+            #print la.norm(self.L.dot(self.Lt)-matrix)/la.norm(matrix)
         except:
             raise TypeError("cholesky failed. matrix is not positive definite.")
+
+    @classmethod
+    def fromfile(cls, filename, n, dtype):
+        if not os.path.isfile(filename):
+            raise IOError("%s file not found!"%filename)
+        matrix = cls(np.array([[1,0],[0,1]]))
+        try:
+            matrix.L = np.fromfile(filename, dtype=dtype).reshape((n,n))#L.dot(L.conjugate().transpose()) = matrix, L lower triangular
+            matrix.Lt = matrix.L.conjugate().transpose()
+            #print la.norm(self.L.dot(self.Lt)-matrix)/la.norm(matrix)
+        except:
+            raise TypeError("cholesky import failed. matrix is not %i by %i with dtype=%s."%(n, n, dtype))
+        return matrix
 
     def dotv(self, vector):
         return sla.solve_triangular(self.Lt, sla.solve_triangular(self.L, vector, lower=True), lower=False)
 
     def dotM(self, matrix):
         return np.array([self.dotv(v) for v in matrix.transpose()]).transpose()
+
+    def astype(self, t):
+        self.L = self.L.astype(t)
+        self.Lt = self.Lt.astype(t)
+        return self
+
+    def tofile(self, filename, overwrite = False):
+        if os.path.isfile(filename) and not overwrite:
+            raise IOError("%s file exists!"%filename)
+        self.L.tofile(filename)
 
 class Visibility_Simulator:
     def __init__(self):
