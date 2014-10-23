@@ -2,6 +2,7 @@ import simulate_visibilities.Bulm as Bulm
 import simulate_visibilities.simulate_visibilities as sv
 import numpy as np
 import numpy.linalg as la
+import scipy.linalg as sla
 import time, ephem, sys, os
 import aipy as ap
 import matplotlib.pyplot as plt
@@ -33,7 +34,8 @@ nUBL = 75
 nside = 32
 S_scale = 2
 S_thresh = 1000#Kelvin
-S_type = 'uniform%irm%i'%(S_scale,S_thresh)
+S_type = 'gsm%irm%i'%(S_scale,S_thresh)
+plotcoord = 'C'
 bnside = 8
 lat_degree = 45.2977
 force_recompute = False
@@ -175,27 +177,12 @@ for i in range(12*nside_standard**2):
     equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
 print "done."
 sys.stdout.flush()
-#hpv.mollview(np.log10(gsm_standard), min=0,max=4, coord='G', title='GSM')
-#hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord='EG', title='GSM')
-#hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord='CG', title='GSM')
-#import ephem
-#Cas_A = ephem.readdb('Cas-A,f|J, 23:23:26.0, 58:48:00,99.00,2000')
-#Cas_A.compute()
-#gal = ephem.Galactic(Cas_A)
-#galvec = [np.cos(gal.lat)*np.cos(gal.lon), np.cos(gal.lat)*np.sin(gal.lon), np.sin(gal.lat)]
-#equvec = [np.cos(Cas_A.a_dec)*np.cos(Cas_A.a_ra), np.cos(Cas_A.a_dec)*np.sin(Cas_A.a_ra), np.sin(Cas_A.a_dec)]
-#print hp.rotator.Rotator(coord='cg').mat.dot(equvec), galvec
-#equatorial_GSM_standard2 = np.zeros(12*nside_standard**2,'float')
-#for i in range(12*nside_standard**2):
-    #ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
-    #equatorial_GSM_standard2[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
-#hpv.mollview(np.log10(equatorial_GSM_standard2), min=0,max=4, coord='CG', title='GSM')
 
-#plt.show()
-#quit()
 sim_data = A.dot(equatorial_GSM_standard[pix_mask]) + np.random.randn(len(data))/Ni**.5
 sim_sol = np.zeros(12*nside**2)
 sim_sol[pix_mask] = AtNiAi.dot(AtNi.dot(sim_data))
+del(A)
+del(AtNi)
 
 #compute S
 
@@ -224,17 +211,24 @@ else:
     print "%f minutes used"%(float(time.time()-timer)/60.)
     S.astype('float32').tofile(S_filename)
 
-#rcondSE = 1e-6
-#SEi_filename = datadir + tag + '_%i_%i.3SEi_%s_%i_%i'%(len(S), len(S), S_type, np.log10(rcondA), np.log10(rcondSE))
-#if os.path.isfile(SEi_filename) and not force_recompute_SEi:
-    #print "Reading Wiener filter component...",
-    #sys.stdout.flush()
-    #SEi = np.fromfile(SEi_filename, dtype = 'float32').reshape((len(S), len(S)))
-#else:
-    #print "Computing Wiener filter component...",
-    #sys.stdout.flush()
-    #SEi = pinv_sym(S + AtNiAi, rcond = rcondSE).astype('float32')
-    #SEi.tofile(SEi_filename)
+#generalized eigenvalue problem
+genSEv_filename = datadir + tag + '_%i_%i.genSEv_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
+genSEvec_filename = datadir + tag + '_%i_%i.genSEvec_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
+print "Computing generalized eigenvalue problem...",
+sys.stdout.flush()
+timer = time.time()
+genSEv, genSEvec = sla.eigh(S, b=AtNiAi)
+print "%f minutes used"%(float(time.time()-timer)/60.)
+genSEv.tofile(genSEv_filename)
+genSEvec.tofile(genSEvec_filename)
+
+genSEvecplot = np.zeros_like(equatorial_GSM_standard)
+for eigs in [-1,-2,1,0]:
+    genSEvecplot[pix_mask] = genSEvec[:,eigs]
+    hpv.mollview(genSEvecplot, coord=plotcoord, title=genSEv[eigs])
+
+plt.show()
+quit()
 
 SEi_filename = datadir + tag + '_%i_%i.2CSEi_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
 if os.path.isfile(SEi_filename) and not force_recompute_SEi:
@@ -267,11 +261,11 @@ if False:
     hpv.mollview(w_sim_sol, min=0,max=5000, coord='CG', title='simulated wiener noisy solution')
 else:
     #hpv.mollview(np.log10(gsm_standard), min=0,max=4, coord='G', title='GSM')
-    hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord='CG', title='GSM')
-    hpv.mollview(np.log10(w_GSM), min=0,max=4, coord='CG', title='wiener GSM')
-    hpv.mollview(np.log10(x), min=0,max=4, coord='CG', title='raw solution')
-    hpv.mollview(np.log10(w_solution), min=0,max=4, coord='CG', title='wiener solution')
-    hpv.mollview(np.log10(np.abs(w_solution)), min=0,max=4, coord='CG', title='abs wiener solution')
-    hpv.mollview(np.log10(sim_sol), min=0,max=4, coord='CG', title='simulated noisy solution')
-    hpv.mollview(np.log10(w_sim_sol), min=0,max=4, coord='CG', title='simulated wiener noisy solution')
+    hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, title='GSM')
+    hpv.mollview(np.log10(w_GSM), min=0,max=4, coord=plotcoord, title='wiener GSM')
+    hpv.mollview(np.log10(x), min=0,max=4, coord=plotcoord, title='raw solution')
+    hpv.mollview(np.log10(w_solution), min=0,max=4, coord=plotcoord, title='wiener solution')
+    hpv.mollview(np.log10(np.abs(w_solution)), min=0,max=4, coord=plotcoord, title='abs wiener solution')
+    hpv.mollview(np.log10(sim_sol), min=0,max=4, coord=plotcoord, title='simulated noisy solution')
+    hpv.mollview(np.log10(w_sim_sol), min=0,max=4, coord=plotcoord, title='simulated wiener noisy solution')
 plt.show()
