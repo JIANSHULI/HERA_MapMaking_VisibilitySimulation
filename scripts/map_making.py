@@ -3,7 +3,7 @@ import simulate_visibilities.simulate_visibilities as sv
 import numpy as np
 import numpy.linalg as la
 import scipy.linalg as sla
-import time, ephem, sys, os
+import time, ephem, sys, os, resource
 import aipy as ap
 import matplotlib.pyplot as plt
 import healpy as hp
@@ -85,14 +85,7 @@ for p in ['x', 'y']:
     ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
     print "%i UBLs to include"%len(ubls)
 
-    #beam
-    beam_healpix = local_beam[p](freq)
-    #hpv.mollview(beam_healpix, title='beam %s'%p)
-    #plt.show()
 
-    vs = sv.Visibility_Simulator()
-    vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
-    beam_heal_equ = np.array(sv.rotate_healpixmap(beam_healpix, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]))
 
 
 
@@ -101,9 +94,19 @@ for p in ['x', 'y']:
 
     if os.path.isfile(A_filename) and not force_recompute:
         print "Reading A matrix from %s"%A_filename
+        sys.stdout.flush()
         A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), 12*nside**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside**2))
     else:
+        #beam
+        beam_healpix = local_beam[p](freq)
+        #hpv.mollview(beam_healpix, title='beam %s'%p)
+        #plt.show()
+
+        vs = sv.Visibility_Simulator()
+        vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
+        beam_heal_equ = np.array(sv.rotate_healpixmap(beam_healpix, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]))
         print "Computing A matrix for %s pol..."%p
+        sys.stdout.flush()
         timer = time.time()
         A[p] = np.empty((len(tlist)*len(ubls), 12*nside**2), dtype='complex64')
         for i in range(12*nside**2):
@@ -115,6 +118,7 @@ for p in ['x', 'y']:
             A[p][:, i] = np.array([vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
 
         print "%f minutes used"%(float(time.time()-timer)/60.)
+        sys.stdout.flush()
         A[p].tofile(A_filename)
         A[p] = A[p].reshape((len(ubls), len(tlist), 12*nside**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside**2))
 
@@ -123,7 +127,8 @@ for p in ['x', 'y']:
     Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose().flatten() * (1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2)))**2)
     data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + datatag
     data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose().flatten()*1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside**2))).conjugate()#there's a conjugate convention difference
-
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 data = np.concatenate((data['x'],data['y']))
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 #plt.plot(Ni['x'][::nt])
@@ -136,7 +141,8 @@ A = np.concatenate((np.real(A), np.imag(A))).astype('float32')
 npix = A.shape[1]
 #compute AtNi
 AtNi = A.transpose() * Ni
-
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 
 #compute AtNiAi
 rcondA = 1.e-5
@@ -153,7 +159,8 @@ else:
     AtNiAi = pinv_sym(AtNi.dot(A), rcond = rcondA)
     print "%f minutes used"%(float(time.time()-timer)/60.)
     AtNiAi.tofile(AtNiAi_filename)
-
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 
 
 #compute raw x
@@ -209,26 +216,30 @@ else:
     else:
         S = ((S*equatorial_GSM_standard[pix_mask]).transpose()*equatorial_GSM_standard[pix_mask]).transpose()
     print "%f minutes used"%(float(time.time()-timer)/60.)
+    sys.stdout.flush()
     S.astype('float32').tofile(S_filename)
-
-#generalized eigenvalue problem
-genSEv_filename = datadir + tag + '_%i_%i.genSEv_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
-genSEvec_filename = datadir + tag + '_%i_%i.genSEvec_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
-print "Computing generalized eigenvalue problem...",
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
-timer = time.time()
-genSEv, genSEvec = sla.eigh(S, b=AtNiAi)
-print "%f minutes used"%(float(time.time()-timer)/60.)
-genSEv.tofile(genSEv_filename)
-genSEvec.tofile(genSEvec_filename)
 
-genSEvecplot = np.zeros_like(equatorial_GSM_standard)
-for eigs in [-1,-2,1,0]:
-    genSEvecplot[pix_mask] = genSEvec[:,eigs]
-    hpv.mollview(genSEvecplot, coord=plotcoord, title=genSEv[eigs])
 
-plt.show()
-quit()
+##generalized eigenvalue problem
+#genSEv_filename = datadir + tag + '_%i_%i.genSEv_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
+#genSEvec_filename = datadir + tag + '_%i_%i.genSEvec_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
+#print "Computing generalized eigenvalue problem...",
+#sys.stdout.flush()
+#timer = time.time()
+#genSEv, genSEvec = sla.eigh(S, b=AtNiAi)
+#print "%f minutes used"%(float(time.time()-timer)/60.)
+#genSEv.tofile(genSEv_filename)
+#genSEvec.tofile(genSEvec_filename)
+
+#genSEvecplot = np.zeros_like(equatorial_GSM_standard)
+#for eigs in [-1,-2,1,0]:
+    #genSEvecplot[pix_mask] = genSEvec[:,eigs]
+    #hpv.mollview(genSEvecplot, coord=plotcoord, title=genSEv[eigs])
+
+#plt.show()
+#quit()
 
 SEi_filename = datadir + tag + '_%i_%i.2CSEi_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
 if os.path.isfile(SEi_filename) and not force_recompute_SEi:
@@ -242,6 +253,8 @@ else:
     SEi = sv.InverseCholeskyMatrix(S + AtNiAi).astype('float32')
     SEi.tofile(SEi_filename)
     print "%f minutes used"%(float(time.time()-timer)/60.)
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 
 print "Applying Wiener filter...",
 sys.stdout.flush()
@@ -251,7 +264,8 @@ w_GSM = np.zeros_like(equatorial_GSM_standard)
 w_GSM[pix_mask] = S.dot(SEi.dotv(equatorial_GSM_standard[pix_mask]))
 w_sim_sol = np.zeros_like(sim_sol)
 w_sim_sol[pix_mask] = S.dot(SEi.dotv(sim_sol[pix_mask]))
-
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 if False:
     hpv.mollview(equatorial_GSM_standard, min=0,max=5000, coord='CG', title='GSM')
     hpv.mollview(w_GSM, min=0,max=5000, coord='CG', title='wiener GSM')
