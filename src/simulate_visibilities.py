@@ -13,6 +13,7 @@ from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
 import os, time, sys
+import ephem as eph
 #some constant
 pi=m.pi
 e=m.e
@@ -65,6 +66,35 @@ def rotate_healpixmap(healpixmap, z1, y1, z2):#the three rotation angles are (fi
     newmapcoords_in_oldcoords = [rotatez(rotatey(rotatez(hpf.pix2ang(nside, i), -z2), -y1), -z1) for i in range(12*nside**2)]
     newmap = [hpf.get_interp_val(healpixmap, coord[0], coord[1]) for coord in newmapcoords_in_oldcoords]
     return newmap
+
+#    
+def epoch_transmatrix(time,stdtime=2000.0):
+
+	coorstd=np.zeros((3,3))
+	coortime=np.zeros((3,3))
+	
+	stars=['Agena','Menkar','Polaris']
+	xs={};ys={};zs={}
+	xt={};yt={};zt={}
+	
+	for starname,i in zip(stars,range(len(stars))):
+		
+		star=eph.star(starname)
+		star.compute('2000',epoch='%f'%stdtime)
+		xs[starname]=np.cos(star.a_dec)*np.cos(star.a_ra)
+		ys[starname]=np.cos(star.a_dec)*np.sin(star.a_ra)
+		zs[starname]=np.sin(star.a_dec)
+		coorstd[i]=[xs[starname],ys[starname],zs[starname]]
+		
+		star.compute('2000',epoch='%f'%time)
+		xt[starname]=np.cos(star.a_dec)*np.cos(star.a_ra)
+		yt[starname]=np.cos(star.a_dec)*np.sin(star.a_ra)
+		zt[starname]=np.sin(star.a_dec)
+		coortime[i]=[xt[starname],yt[starname],zt[starname]]
+	
+
+	return (coortime.T).dot(la.inv(coorstd.T))
+
 #############################################
 #spherical special functions
 ##############################################
