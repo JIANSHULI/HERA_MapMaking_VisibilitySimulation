@@ -67,7 +67,7 @@ def rotate_healpixmap(healpixmap, z1, y1, z2):#the three rotation angles are (fi
     newmap = [hpf.get_interp_val(healpixmap, coord[0], coord[1]) for coord in newmapcoords_in_oldcoords]
     return newmap
 
-#    
+#Given the 'time' and 'stdtime'(default=2000.0), return the 'transformation matrix' which transforms the coordinates of a vector from (xs,ys,zs) in the coordinate-system built on epoch='stdtime' into (xt,yt,zt) in the coordinate-system built on epoch='time'.   
 def epoch_transmatrix(time,stdtime=2000.0):
 
 	coorstd=np.zeros((3,3))
