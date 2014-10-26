@@ -67,7 +67,7 @@ for p in ['x', 'y']:
     tlist = np.real(tflist[:, 0])
     flist = np.imag(tflist[0, :])
     freq = flist[0]
-    #print freq, tlist
+    print freq
 
     #tf mask file, 0 means flagged bad data
     try:
@@ -136,8 +136,11 @@ data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 Ni = np.concatenate((Ni['x'],Ni['y']))
 Ni = np.concatenate((Ni/2, Ni/2))
 pix_mask = np.array([la.norm(col) != 0 for col in A['x'].transpose()])
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 A = np.concatenate((A['x'][:, pix_mask],A['y'][:, pix_mask]))
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 A = np.concatenate((np.real(A), np.imag(A))).astype('float32')
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 npix = A.shape[1]
 #compute AtNi
 AtNi = A.transpose() * Ni
