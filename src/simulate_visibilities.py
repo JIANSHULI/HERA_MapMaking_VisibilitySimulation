@@ -13,7 +13,6 @@ from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
 import os, time, sys
-import ephem as eph
 #some constant
 pi=m.pi
 e=m.e
@@ -67,33 +66,33 @@ def rotate_healpixmap(healpixmap, z1, y1, z2):#the three rotation angles are (fi
     newmap = [hpf.get_interp_val(healpixmap, coord[0], coord[1]) for coord in newmapcoords_in_oldcoords]
     return newmap
 
-#Given the 'time' and 'stdtime'(default=2000.0), return the 'transformation matrix' which transforms the coordinates of a vector from (xs,ys,zs) in the coordinate-system built on epoch='stdtime' into (xt,yt,zt) in the coordinate-system built on epoch='time'.   
+#Given the 'time' and 'stdtime'(default=2000.0), return the 'transformation matrix' which transforms the coordinates of a vector from (xs,ys,zs) in the coordinate-system built on epoch='stdtime' into (xt,yt,zt) in the coordinate-system built on epoch='time'. This function hitchhicks pyephem so it's not super fast if you need to call it a million times.
 def epoch_transmatrix(time,stdtime=2000.0):
+    import ephem as eph
+    coorstd=np.zeros((3,3))
+    coortime=np.zeros((3,3))
 
-	coorstd=np.zeros((3,3))
-	coortime=np.zeros((3,3))
-	
-	stars=['Agena','Menkar','Polaris']
-	xs={};ys={};zs={}
-	xt={};yt={};zt={}
-	
-	for starname,i in zip(stars,range(len(stars))):
-		
-		star=eph.star(starname)
-		star.compute('2000',epoch='%f'%stdtime)
-		xs[starname]=np.cos(star.a_dec)*np.cos(star.a_ra)
-		ys[starname]=np.cos(star.a_dec)*np.sin(star.a_ra)
-		zs[starname]=np.sin(star.a_dec)
-		coorstd[i]=[xs[starname],ys[starname],zs[starname]]
-		
-		star.compute('2000',epoch='%f'%time)
-		xt[starname]=np.cos(star.a_dec)*np.cos(star.a_ra)
-		yt[starname]=np.cos(star.a_dec)*np.sin(star.a_ra)
-		zt[starname]=np.sin(star.a_dec)
-		coortime[i]=[xt[starname],yt[starname],zt[starname]]
-	
+    stars=['Agena','Menkar','Polaris']
+    xs={};ys={};zs={}
+    xt={};yt={};zt={}
 
-	return (coortime.T).dot(la.inv(coorstd.T))
+    for starname,i in zip(stars,range(len(stars))):
+
+        star=eph.star(starname)
+        star.compute('2000',epoch='%f'%stdtime)
+        xs[starname]=np.cos(star.a_dec)*np.cos(star.a_ra)
+        ys[starname]=np.cos(star.a_dec)*np.sin(star.a_ra)
+        zs[starname]=np.sin(star.a_dec)
+        coorstd[i]=[xs[starname],ys[starname],zs[starname]]
+
+        star.compute('2000',epoch='%f'%time)
+        xt[starname]=np.cos(star.a_dec)*np.cos(star.a_ra)
+        yt[starname]=np.cos(star.a_dec)*np.sin(star.a_ra)
+        zt[starname]=np.sin(star.a_dec)
+        coortime[i]=[xt[starname],yt[starname],zt[starname]]
+
+
+    return (coortime.T).dot(la.inv(coorstd.T))
 
 #############################################
 #spherical special functions
