@@ -24,11 +24,10 @@ def ctos(cart):
     [x,y,z] = cart
     if [x,y]==[0,0]:
         return [z,0,0]
-    return np.array([m.sqrt(x**2+y**2+z**2),m.atan2(m.sqrt(x**2+y**2),z),m.atan2(y,x)])
+    return np.array([m.sqrt(x**2+y**2+z**2), m.atan2(m.sqrt(x**2+y**2),z), m.atan2(y,x)])
 
 def stoc(spher):
-    [r,theta,phi]=spher
-    return np.array([r*m.cos(phi)*m.sin(theta),r*m.sin(theta)*m.sin(phi),r*m.cos(theta)])
+    return spher[0] * np.array([m.cos(spher[2])*m.sin(spher[1]), m.sin(spher[1])*m.sin(spher[2]), m.cos(spher[1])])
 
 def rotatez_matrix(t):
     return np.array([[m.cos(t),-m.sin(t),0],[m.sin(t),m.cos(t),0],[0,0,1]])
@@ -66,7 +65,7 @@ def rotate_healpixmap(healpixmap, z1, y1, z2):#the three rotation angles are (fi
     newmap = [hpf.get_interp_val(healpixmap, coord[0], coord[1]) for coord in newmapcoords_in_oldcoords]
     return newmap
 
-#Given the 'time' and 'stdtime'(default=2000.0), return the 'transformation matrix' which transforms the coordinates of a vector from (xs,ys,zs) in the coordinate-system built on epoch='stdtime' into (xt,yt,zt) in the coordinate-system built on epoch='time'. This function hitchhicks pyephem so it's not super fast if you need to call it a million times.
+#Given the 'time' and 'stdtime'(default=2000.0), return the 'transformation matrix' which transforms the coordinates of a vector from (xs,ys,zs) in the coordinate-system built on epoch='stdtime' into (xt,yt,zt) in the coordinate-system built on epoch='time'. This function hitchhicks pyephem so it's not super fast if you need to call it a million times. Precision converting from B2000 to B1950 is tested and appears to be limited by measurement precision. 2 arcsec for CasA and 0.02 arcsec for Crab.
 def epoch_transmatrix(time,stdtime=2000.0):
     import ephem as eph
     coorstd=np.zeros((3,3))
