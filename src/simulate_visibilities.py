@@ -9,7 +9,6 @@ import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
 from boost import spharm, spbessel
 from Bulm import compute_Bulm
-from check_beam import check_beam
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
@@ -109,6 +108,46 @@ def spheh(l,m,theta,phi):
 ############################################
 #other functions
 ################################################
+##########################################
+#get the appropriate nside that has the desired accuracy for a healpix map
+##########################################
+def check_beam(data, precision = None, verbose = False):
+    nside = int((len(data)/12)**0.5)
+    print "Input data nside =", nside
+    nsidelist = []
+    n = 1
+    while n <= nside:
+        nsidelist.append(n)
+        n = 2*n
+
+    truncatemaps = {}
+    for n in nsidelist:
+        beam_alm = hp.sphtfunc.map2alm(data,lmax = 3*n-1,iter=10)
+        truncatemaps[n] = hp.sphtfunc.alm2map(beam_alm,nside,verbose=False)
+
+    error_types = ["RMS diff/RMS data", "RMS diff/max data", "max diff/max data"]
+    errorlist = {}
+    for n in nsidelist:
+        diff = truncatemaps[n] - data
+        errorlist[n] = [la.norm(diff)/la.norm(data),la.norm(diff)/(12*nside**2)**0.5/max(data),max(abs(diff))/max(data)]
+        if verbose:
+            msg =  "nside = %i: "%(n)
+            for i in range(len(error_types)):
+                msg += (error_types[i] + ": ")
+                msg += "%.5f" %errorlist[n][i]
+                msg += "; "
+            print msg
+
+    if type(precision) == float:
+        for n in nsidelist:
+            if errorlist[n][0] < precision and errorlist[n][1] < precision:# and errorlist[n][2] < precision:
+                if verbose:
+                    print 'nside = %.d has the desired precision' %n
+                return n
+        print 'Need larger nside than the input to have the desired precision'
+    return errorlist
+
+
 #claculate alm from a skymap (each element has the form [theta,phi,intensity])
 nside=30                           #increase this for higher accuracy
 def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
