@@ -69,7 +69,7 @@ for p in ['x']:
 
 
     #get Ni (1/variance) and data
-    data_filename = datadir + tag + '_%s%s_%i_%i.dat'%(p, p, nt, nUBL)
+    data_filename = datadir + tag + '_%s%s_%i_%i_seccasa.rad'%(p, p, nt, nUBL)
     data[p] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL)).conjugate()
 
 data = data['x']
