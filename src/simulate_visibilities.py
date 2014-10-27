@@ -9,6 +9,7 @@ import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
 from boost import spharm, spbessel
 from Bulm import compute_Bulm
+from check_beam import check_beam
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
