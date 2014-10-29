@@ -99,17 +99,33 @@ def epoch_transmatrix(time,stdtime=2000.0):
     return (coortime.T).dot(la.inv(coorstd.T))
 
 #For Testing the function:
-#dimension=192;M=np.random.rand(dimension,dimension)-0.5;HM=M.dot(M.T);Nside=4
+#dimension=192;M=np.random.rand(dimension,dimension)-0.5;HM=M.dot(M.T);Nside=4;EigensGUI(HM,Nside)
 
 #This is a function whose two inputs are a 2D_Array OmegaMatrix and a integer scalar Nside.
 #More specificly speaking, OmegaMatrix is the matrix describing the deviation of the target vector x whose dimension equals to the number of pixels of the sky;
 #while Nside is the parameter we set for the pixelization of the sky in HEALPix procedure.
-#The function will give you a functional graphic interface to observe the behavior eigenvalues and eigenvalues.
-#You can arbitrarily select one of the eigenvector and disply it with or without HEALPix, which also depends on whether you check the Healpix box or not.
-#Nearly every element on the screen can be adjusted by selecting regions, left- or right- clicking your mouse on figures, buttons or menus,as well as using keboard.
-#However,when you check the Healpix box some functions in the former frame is invalid, so if you wnat to change the settings in original frame, please do it before the HEALPix procedure. 
+#The function will give you a functional graphic interface to observe the behavior of eigenvalues and eigenvalues, spontanously both wholely and seperately.
+
+
+#Nearly every element on the screen can be adjusted by left- or right- clicking your mouse on figures, buttons or menus,as well as using keboard!
+
+#Selected Instructions for Non-HEALPix Frame:
+#You can arbitrarily select one of the eigenvector by imput the 'Order of Eigenvalues' then ENTER or click the 'Plot' Buttun, then it will be identified in the eigenvalue figure and plotted in Non-HEALPix version.
+#To disply it with HEALPix, please check the HEALPix box; a new frame will appear whenever chechbox is checked from unchecked status.
+#To zoom in, please hold your left-key and repeatedly select target regions in the figure;To zoom out, just repeatedly Ctrl+Z. This will apply both in the Non-HEALPix and HEALPix Frames
+#To change the figure properties(such as styles or sizes of lines and markers, locations, texts or sizes of the labels and legends, colors of each element,etc.) in Non-HEALPix frame, please righ-click on the figure and click 'Configure' button.
+#However,once you check the HEALPix box some functions in the former frame is invalid such as right-click on the figures, so if you wnat to change the settings in Non-HEALPix frame, please do it before the your first HEALPix procedure. 
+
+#Selected Instructions for HEALPix Frame:
+#To change the colormap plan, please choose your preferred in the 'Color Table' radiobox.
+#To enhance the color contrast, just Ctrl+k; double Ctrl+k will cancel enhance contrast effect.
+#To see the HEALPix version eigenvectors with contours for distinguished pixels,please click 'As Contuors' buttun in the 'Options' menu in menu bar of the HEALPix frame. 
+#To choose another eigenvector in HEALPix version, please close the current HEALPix frame and cancel your check in the checkbox of Non-HEALPix frame and then re-imput 'The Order of Eigenvalues' and re-check the HEALPix checkbox.
+#Selecting a new eigenvector without re-checking will merely replot it in Non-HEALPix frame.
+#Intensity of the outer region of the ellipse is always set to be 0.0 so that it can become a good color-reference. 
 
 #Note: This function needs the wxmplot package,so make sure you have already installed it!
+#Now, Enjoy Yourself!
 
 def EigensGUI(OmegaMatrix,Nside):
 	
@@ -121,11 +137,6 @@ def EigensGUI(OmegaMatrix,Nside):
 	component=np.array(range(len(eigenvalues)))+1
 	global choice
 	choice=0
-	
-	pix_x=np.arange(400)
-	pix_y=np.arange(350)
-	pix_x=pix_x/100.0
-	pix_y=pix_y/100.0
 	
 	app=wx.App()
 	
@@ -162,7 +173,6 @@ def EigensGUI(OmegaMatrix,Nside):
 			
 				app_h=wx.App()
 				
-				title_h = 'Eigen values and vectors_pixheal-version'
 				Eigenvector_h=wp.ImageFrame(mode='intensity')
 				eig_h=Eigenvector_h
 		
@@ -191,9 +201,9 @@ def EigensGUI(OmegaMatrix,Nside):
 	Eigenvector.scatterplot(component,[0.0]*len(component),xmin=0,xmax=len(eigenvalues)+1,marker='d',markersize=0,color='blue',framecolor='lightgreen',title='Selected Eigenvector',xlabel='Components',ylabel='Values')
 	
 	if Dimension==12*Nside**2:
-		healpix_checkbox=wx.CheckBox(panel,-1,label='Healpix')
+		healpix_checkbox=wx.CheckBox(panel,-1,label='HEALPix')
 		healpix_checkbox.Bind(wx.EVT_CHECKBOX,on_healpix_checkbox,healpix_checkbox)
-	direct_text=wx.StaticText(panel,label='Order of The Eigenvalues: ')
+	direct_text=wx.StaticText(panel,label='Order of Eigenvalues: ')
 	eigenorder_box=wx.TextCtrl(panel,size=(200,-1),style=wx.TE_PROCESS_ENTER)
 	eigenorder_box.Bind(wx.EVT_TEXT_ENTER,on_text_enter,eigenorder_box)
 	plot_button=wx.Button(panel,-1,"Plot")
