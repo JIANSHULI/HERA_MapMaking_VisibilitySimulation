@@ -1,9 +1,14 @@
 import numpy as np
 import scipy as sp
+import wx
+import matplotlib as mpl
+import wxmplot as wp
 import scipy.sparse as sps
 import scipy.linalg as sla
 import numpy.linalg as la
 import scipy.special as ssp
+from matplotlib import pyplot as ppl
+from wxmplot import plotpanel as pnl
 import math as m
 import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
@@ -92,6 +97,124 @@ def epoch_transmatrix(time,stdtime=2000.0):
 
 
     return (coortime.T).dot(la.inv(coorstd.T))
+
+#For Testing the function:
+#dimension=192;M=np.random.rand(dimension,dimension)-0.5;HM=M.dot(M.T);Nside=4
+
+#This is a function whose two inputs are a 2D_Array OmegaMatrix and a integer scalar Nside.
+#More specificly speaking, OmegaMatrix is the matrix describing the deviation of the target vector x whose dimension equals to the number of pixels of the sky;
+#while Nside is the parameter we set for the pixelization of the sky in HEALPix procedure.
+#The function will give you a functional graphic interface to observe the behavior eigenvalues and eigenvalues.
+#You can arbitrarily select one of the eigenvector and disply it with or without HEALPix, which also depends on whether you check the Healpix box or not.
+#Nearly every element on the screen can be adjusted by selecting regions, left- or right- clicking your mouse on figures, buttons or menus,as well as using keboard.
+#However,when you check the Healpix box some functions in the former frame is invalid, so if you wnat to change the settings in original frame, please do it before the HEALPix procedure. 
+
+#Note: This function needs the wxmplot package,so make sure you have already installed it!
+
+def EigensGUI(OmegaMatrix,Nside):
+	
+	Dimension=len(OmegaMatrix)
+
+	A=OmegaMatrix
+	eigenvalues,eigenvectors=la.eigh(A)
+	order=np.array(range(len(eigenvalues)))+1
+	component=np.array(range(len(eigenvalues)))+1
+	global choice
+	choice=0
+	
+	pix_x=np.arange(400)
+	pix_y=np.arange(350)
+	pix_x=pix_x/100.0
+	pix_y=pix_y/100.0
+	
+	app=wx.App()
+	
+	title = 'Eigen values and vectors'
+	eig=wx.Frame(None,title=title)
+	
+	panel=wx.Panel(eig)
+	
+	SizerV=wx.BoxSizer(wx.VERTICAL)
+	SizerH1=wx.BoxSizer(wx.HORIZONTAL)
+	SizerH2=wx.BoxSizer(wx.HORIZONTAL)
+	
+	def plot_vector(self):
+		inputstr=eigenorder_box.GetValue()
+		global choice
+		choice=int(inputstr)
+		if choice<=0:
+			choice=choice+len(eigenvalues)+1
+		
+		Eigenvector.plot(component,eigenvectors[choice-1],label='Eigenvalue=%f'%eigenvalues[choice-1],linewidth=0.5,marker='o',markersize=2.5,framecolor='lightgreen',title='Selected Eigenvector',xmin=0,xmax=len(eigenvalues)+1,xlabel='Components',ylabel='Values',show_legend=False,lengend_loc='ul',legendfontsize=10)
+		Eigenvalue.plot(order,eigenvalues,linewidth=0,marker='o',markersize=2.5,color='green',framecolor='yellow',label='',xmin=0,xmax=len(eigenvalues)+1,ymin=min(eigenvalues),ymax=max(eigenvalues),title='Sorted Eigenvalues',xlabel='Order',ylabel='Eigenvalues')
+		Eigenvalue.oplot(np.array([choice]*2),[min(eigenvalues),max(eigenvalues)],label='Eigenvalue=%f'%eigenvalues[choice-1],xmin=0,xmax=len(eigenvalues)+1,show_legend=True,legend_loc='ul',legendfontsize=10,marker='D',markersize=9,linewidth=3)
+	
+	
+	def on_text_enter(self):
+		plot_vector(self)
+	
+	def on_plot_button(self):
+		plot_vector(self)
+		
+	def on_healpix_checkbox(event):
+		if event.IsChecked():
+			if choice!=0:
+			
+				app_h=wx.App()
+				
+				title_h = 'Eigen values and vectors_pixheal-version'
+				Eigenvector_h=wp.ImageFrame(mode='intensity')
+				eig_h=Eigenvector_h
+		
+				global choice
+				choice_h=choice
+				
+				if choice_h<=0:
+					choice_h=choice_h+len(eigenvalues)+1
+				
+				eigenvectors_choice_h=hp.mollview(eigenvectors[choice_h-1],coord=['G','E'],hold=True,return_projected_map=True)
+				
+				for row in eigenvectors_choice_h:
+					for col in range(len(row)):
+						if  row[col]==-np.inf:
+							row[col]=0.0
+				
+				Eigenvector_h.display((100.0/min(np.abs(eigenvectors[choice_h-1])))*eigenvectors_choice_h,title='Eigenvalue=%f'%eigenvalues[choice_h-1])
+		
+				eig_h.Show()
+				
+				app_h.MainLoop()
+	
+	Eigenvalue=wp.PlotPanel(panel)
+	Eigenvalue.plot(order,eigenvalues,marker='d',linewidth=0,xmin=0,xmax=len(eigenvalues)+1,markersize=2.5,color='red',framecolor='yellow',title='Sorted Eigenvalues',xlabel='Order',ylabel='Eigenvalues')
+	Eigenvector=wp.PlotPanel(panel)
+	Eigenvector.scatterplot(component,[0.0]*len(component),xmin=0,xmax=len(eigenvalues)+1,marker='d',markersize=0,color='blue',framecolor='lightgreen',title='Selected Eigenvector',xlabel='Components',ylabel='Values')
+	
+	if Dimension==12*Nside**2:
+		healpix_checkbox=wx.CheckBox(panel,-1,label='Healpix')
+		healpix_checkbox.Bind(wx.EVT_CHECKBOX,on_healpix_checkbox,healpix_checkbox)
+	direct_text=wx.StaticText(panel,label='Order of The Eigenvalues: ')
+	eigenorder_box=wx.TextCtrl(panel,size=(200,-1),style=wx.TE_PROCESS_ENTER)
+	eigenorder_box.Bind(wx.EVT_TEXT_ENTER,on_text_enter,eigenorder_box)
+	plot_button=wx.Button(panel,-1,"Plot")
+	plot_button.Bind(wx.EVT_BUTTON,on_plot_button,plot_button)
+	
+	
+	SizerH1.Add(Eigenvalue,1,flag=wx.EXPAND)
+	SizerH1.Add(Eigenvector,1,flag=wx.EXPAND)
+	SizerH2.Add(direct_text,0.4,flag=wx.TOP,border=5.5)
+	SizerH2.Add(eigenorder_box,0.4,flag=wx.BOTTOM|wx.Right,border=2.25)
+	SizerH2.Add(plot_button,0.4,flag=wx.BOTTOM|wx.LEFT,border=5.5)
+	SizerV.Add(SizerH1,1,flag=wx.EXPAND|wx.ALL,border=5)
+	if Dimension==12*Nside**2:
+		SizerV.Add(healpix_checkbox,0.2,flag=wx.ALL,border=5)
+	SizerV.Add(SizerH2,0.2,flag=wx.EXPAND|wx.ALL,border=5)
+	
+	panel.SetSizer(SizerV)
+	eig.Show()
+	
+	app.MainLoop()
+
 
 #############################################
 #spherical special functions
