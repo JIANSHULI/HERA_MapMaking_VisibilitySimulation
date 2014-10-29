@@ -94,48 +94,48 @@ pix_mask = np.fromfile(pixm_filename, dtype = 'bool')
 npix = np.sum(pix_mask)
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 
-##########load A matrix
-#########A_filename = datadir + tag + '_%i_%i.Axyri'%(len(data), npix)
-#########print "Reading A matrix from %s"%A_filename
-#########sys.stdout.flush()
-#########A = np.fromfile(A_filename, dtype='float32').reshape((len(data), npix))
-#########print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+#load A matrix
+A_filename = datadir + tag + '_%i_%i.Axyri'%(len(data), npix)
+print "Reading A matrix from %s"%A_filename
+sys.stdout.flush()
+A = np.fromfile(A_filename, dtype='float32').reshape((len(data), npix))
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 
-##########simulate data using GSM
-#########nside_standard = nside
-#########pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside_standard))
-#########pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside_standard))
-#########pca3 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm3.fits' + str(nside_standard))
-#########gsm_standard = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
-#########equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
-##########rotate sky map
-#########print "Rotating GSM_standard...",
-#########sys.stdout.flush()
-##########print hp.rotator.Rotator(coord='cg').mat
-#########for i in range(12*nside_standard**2):
-    #########ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
-    #########equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
-#########print "done."
-#########sys.stdout.flush()
+#simulate data using GSM
+nside_standard = nside
+pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside_standard))
+pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside_standard))
+pca3 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm3.fits' + str(nside_standard))
+gsm_standard = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)
+equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
+#rotate sky map
+print "Rotating GSM_standard...",
+sys.stdout.flush()
+#print hp.rotator.Rotator(coord='cg').mat
+for i in range(12*nside_standard**2):
+    ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
+    equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
+print "done."
+sys.stdout.flush()
 
-#########print "Simulating GSM data...",
-#########sys.stdout.flush()
-#########sim_data = np.array([A[i].dot(equatorial_GSM_standard[pix_mask]) for i in range(len(A))]) + np.random.randn(len(data))/Ni**.5
-#########print "done."
-#########sys.stdout.flush()
+print "Simulating GSM data...",
+sys.stdout.flush()
+sim_data = np.array([A[i].dot(equatorial_GSM_standard[pix_mask]) for i in range(len(A))]) + np.random.randn(len(data))/Ni**.5
+print "done."
+sys.stdout.flush()
 
-##########compute At.y
-#########print "Computing At.y...",
-#########sys.stdout.flush()
-#########qaz = Ni * data
-#########Atdata = np.array([A[:, i].dot(qaz) for i in range(len(A[0]))])
-#########qaz = Ni * sim_data
-#########Atsim_data = np.array([A[:, i].dot(qaz) for i in range(len(A[0]))])
-#########print "done."
-#########sys.stdout.flush()
-#########del(A)
-#########print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-#########sys.stdout.flush()
+#compute At.y
+print "Computing At.y...",
+sys.stdout.flush()
+qaz = Ni * data
+Atdata = np.array([A[:, i].dot(qaz) for i in range(len(A[0]))])
+qaz = Ni * sim_data
+Atsim_data = np.array([A[:, i].dot(qaz) for i in range(len(A[0]))])
+print "done."
+sys.stdout.flush()
+del(A)
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 
 #load AtNiAi
 rcondA = 1.e-5
@@ -190,7 +190,7 @@ else:
     print "Computing Wiener filter component...",
     sys.stdout.flush()
     timer = time.time()
-    SEi = pinv_sym(SE, verbose=True)#.astype('float32')
+    SEi = sla.inv(SE)#.astype('float32')
     del(SE)
     print "%f minutes used. Saving to disk..."%(float(time.time()-timer)/60.)
     sys.stdout.flush()

@@ -26,7 +26,7 @@ def pinv_sym(M, rcond = 1.e-15, verbose = True):
     return (eigvc*eigvli).dot(eigvc.transpose())
 
 tag = "q3_abscalibrated"
-datatag = '_v2.rad'
+datatag = '_seccasa.rad'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 nt = 440
 nf = 1
