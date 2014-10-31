@@ -24,21 +24,21 @@ def ctos(cart):
     [x,y,z] = cart
     if [x,y]==[0,0]:
         return [z,0,0]
-    return np.array([np.sqrt(x**2+y**2+z**2), np.atan2(np.sqrt(x**2+y**2),z), np.atan2(y,x)])
+    return np.array([np.sqrt(x**2+y**2+z**2), np.arctan2(np.sqrt(x**2+y**2),z), np.arctan2(y,x)])
 
 def stoc(spher):
     return spher[0] * np.array([np.cos(spher[2])*np.sin(spher[1]), np.sin(spher[1])*np.sin(spher[2]), np.cos(spher[1])])
 
 def rotatez_matrix(t):
-    return np.array([[np.cos(t),-np.sin(t),0],[np.sin(t),np.cos(t),0],[0,0,1]])
+    return np.array([[np.cos(t), -np.sin(t), np.zeros_like(t)], [np.sin(t), np.cos(t), np.zeros_like(t)], [np.zeros_like(t), np.zeros_like(t), np.ones_like(t)]])
 
 def rotatez(dirlist,t):
     [theta,phi] = dirlist
-    rm = np.array([[np.cos(t),-np.sin(t),0],[np.sin(t),np.cos(t),0],[0,0,1]])
+    rm = np.array([[np.cos(t),-np.sin(t),np.zeros_like(t)],[np.sin(t),np.cos(t),np.zeros_like(t)],[np.zeros_like(t),np.zeros_like(t),1]])
     return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
 
 def rotatey_matrix(t):
-    return np.array([[np.cos(t),0,np.sin(t)],[0,1,0],[-np.sin(t),0,np.cos(t)]])
+    return np.array([[np.cos(t), np.zeros_like(t), np.sin(t)], [np.zeros_like(t), np.ones_like(t), np.zeros_like(t)], [-np.sin(t), np.zeros_like(t), np.cos(t)]])
 
 def rotatey(dirlist,t):
     [theta,phi] = dirlist

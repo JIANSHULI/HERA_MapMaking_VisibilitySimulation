@@ -52,7 +52,8 @@ thresh = 0.10
 lat_degree = 45.2977
 C = 299.792458
 kB = 1.3806488* 1.e-23
-
+script_dir = os.path.dirname(os.path.realpath(__file__))
+plot_pixelization = False
 force_recompute = False
 ####################################################
 ################data file and load beam##############
@@ -75,10 +76,13 @@ for p in ['x', 'y']:
 A = {}
 for p in ['x', 'y']:
     pol = p+p
+
     #tf file
     tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
     tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
     tlist = np.real(tflist[:, 0])
+    flist = np.imag(tflist[0, :])
+    freq = flist[0]
 
     #tf mask file, 0 means flagged bad data
     try:
@@ -142,10 +146,15 @@ sys.stdout.flush()
 ################################################
 #####################GSM###########################
 #############################################
-pca1 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm1.fits' + str(nside_standard))
-pca2 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm2.fits' + str(nside_standard))
-pca3 = hp.fitsfunc.read_map('/home/omniscope/simulate_visibilities/data/gsm3.fits' + str(nside_standard))
-gsm_standard = 422.952*(0.307706*pca1+-0.281772*pca2+0.0123976*pca3)#hardcode
+pca1 = hp.fitsfunc.read_map(script_dir + '/../data/gsm1.fits' + str(nside_standard))
+pca2 = hp.fitsfunc.read_map(script_dir + '/../data/gsm2.fits' + str(nside_standard))
+pca3 = hp.fitsfunc.read_map(script_dir + '/../data/gsm3.fits' + str(nside_standard))
+components = np.loadtxt(script_dir + '/../data/components.dat')
+scale_loglog = si.interp1d(np.log(components[:,0]), np.log(components[:,1]))
+w1 = si.interp1d(components[:,0], components[:,2])
+w2 = si.interp1d(components[:,0], components[:,3])
+w3 = si.interp1d(components[:,0], components[:,4])
+gsm_standard = np.exp(scale_loglog(np.log(freq))) * (w1(freq)*pca1 + w2(freq)*pca2 + w3(freq)*pca3)
 equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
 #rotate sky map
 print "Rotating GSM_standard...",
@@ -170,25 +179,27 @@ abs_thresh = np.mean(equatorial_GSM_standard * beam_weight) * thresh
 pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standard, nside_start, abs_thresh, final_index, thetas, phis)
 npix = len(thetas)
 fake_solution = equatorial_GSM_standard[hpf.ang2pix(nside_standard, thetas, phis, nest=True)]
-##################################################################
-####################################sanity check########################
-###############################################################
-#npix = 0
-#for i in nside_distribution:
-    #npix += i**2/nside_standard**2
-#print npix, len(thetas)
 
-stds = np.std((equatorial_GSM_standard*beam_weight).reshape(12*nside_standard**2/4,4), axis = 1)
+if plot_pixelization:
+    ##################################################################
+    ####################################sanity check########################
+    ###############################################################
+    #npix = 0
+    #for i in nside_distribution:
+        #npix += i**2/nside_standard**2
+    #print npix, len(thetas)
 
-##################################################################
-####################################plotting########################
-###############################################################
-hpv.mollview(beam_weight, min=0,max=4, coord=plotcoord, title='beam', nest=True)
-hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, title='GSM', nest=True)
-hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min=0,max=4, coord=plotcoord, title='GSM gridded', nest=True)
-hpv.mollview(np.log10(stds/abs_thresh), min=np.log10(thresh)-3, max = 3, coord=plotcoord, title='std', nest=True)
-hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start),max=np.log2(nside_standard), coord=plotcoord, title='count %i %.3f'%(len(thetas), float(len(thetas))/(12*nside_standard**2)), nest=True)
-plt.show()
+    stds = np.std((equatorial_GSM_standard*beam_weight).reshape(12*nside_standard**2/4,4), axis = 1)
+
+    ##################################################################
+    ####################################plotting########################
+    ###############################################################
+    hpv.mollview(beam_weight, min=0,max=4, coord=plotcoord, title='beam', nest=True)
+    hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, title='GSM', nest=True)
+    hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min=0,max=4, coord=plotcoord, title='GSM gridded', nest=True)
+    hpv.mollview(np.log10(stds/abs_thresh), min=np.log10(thresh)-3, max = 3, coord=plotcoord, title='std', nest=True)
+    hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start),max=np.log2(nside_standard), coord=plotcoord, title='count %i %.3f'%(len(thetas), float(len(thetas))/(12*nside_standard**2)), nest=True)
+    plt.show()
 
 
 ##################################################################
