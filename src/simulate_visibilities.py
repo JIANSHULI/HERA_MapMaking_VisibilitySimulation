@@ -24,32 +24,32 @@ def ctos(cart):
     [x,y,z] = cart
     if [x,y]==[0,0]:
         return [z,0,0]
-    return np.array([m.sqrt(x**2+y**2+z**2), m.atan2(m.sqrt(x**2+y**2),z), m.atan2(y,x)])
+    return np.array([np.sqrt(x**2+y**2+z**2), np.atan2(np.sqrt(x**2+y**2),z), np.atan2(y,x)])
 
 def stoc(spher):
-    return spher[0] * np.array([m.cos(spher[2])*m.sin(spher[1]), m.sin(spher[1])*m.sin(spher[2]), m.cos(spher[1])])
+    return spher[0] * np.array([np.cos(spher[2])*np.sin(spher[1]), np.sin(spher[1])*np.sin(spher[2]), np.cos(spher[1])])
 
 def rotatez_matrix(t):
-    return np.array([[m.cos(t),-m.sin(t),0],[m.sin(t),m.cos(t),0],[0,0,1]])
+    return np.array([[np.cos(t),-np.sin(t),0],[np.sin(t),np.cos(t),0],[0,0,1]])
 
 def rotatez(dirlist,t):
     [theta,phi] = dirlist
-    rm = np.array([[m.cos(t),-m.sin(t),0],[m.sin(t),m.cos(t),0],[0,0,1]])
+    rm = np.array([[np.cos(t),-np.sin(t),0],[np.sin(t),np.cos(t),0],[0,0,1]])
     return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
 
 def rotatey_matrix(t):
-    return np.array([[m.cos(t),0,m.sin(t)],[0,1,0],[-m.sin(t),0,m.cos(t)]])
+    return np.array([[np.cos(t),0,np.sin(t)],[0,1,0],[-np.sin(t),0,np.cos(t)]])
 
 def rotatey(dirlist,t):
     [theta,phi] = dirlist
-    rm = np.array([[m.cos(t),0,m.sin(t)],[0,1,0],[-m.sin(t),0,m.cos(t)]])
+    rm = np.array([[np.cos(t),0,np.sin(t)],[0,1,0],[-np.sin(t),0,np.cos(t)]])
     return ctos(rm.dot(stoc([1,theta,phi])))[1:3]
 
 
 def rotationalMatrix(phi,theta,xi):
-    m1=np.array([[m.cos(xi),m.sin(xi),0],[-m.sin(xi),m.cos(xi),0],[0,0,1]])
-    m2=np.array([[1,0,0],[0,m.cos(theta),m.sin(theta)],[0,-m.sin(theta),m.cos(theta)]])
-    m3=np.array([[m.cos(phi),m.sin(phi),0],[-m.sin(phi),m.cos(phi),0],[0,0,1]])
+    m1=np.array([[np.cos(xi),np.sin(xi),0],[-np.sin(xi),np.cos(xi),0],[0,0,1]])
+    m2=np.array([[1,0,0],[0,np.cos(theta),np.sin(theta)],[0,-np.sin(theta),np.cos(theta)]])
+    m3=np.array([[np.cos(phi),np.sin(phi),0],[-np.sin(phi),np.cos(phi),0],[0,0,1]])
     return m1.dot(m2).dot(m3)
 
 
@@ -156,7 +156,7 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
         for mm in range(-l,l+1):
             alm[(l,mm)]=0
             for p in skymap:
-                alm[(l,mm)] += np.conj(spheh(l,mm,p[0],p[1]))*p[2]*dtheta*dphi*m.sin(p[0])
+                alm[(l,mm)] += np.conj(spheh(l,mm,p[0],p[1]))*p[2]*dtheta*dphi*np.sin(p[0])
     return alm
 
 class InverseCholeskyMatrix:#for a positive definite matrix, Cholesky decomposition is M = L.Lt, where L lower triangular. This decomposition helps computing inv(M).v faster, by avoiding calculating inv(M). Once we have L, the product is simply inv(Lt).inv(L).v, and inverse of triangular matrices multiplying a vector is fast. sla.solve_triangular(M, v) = inv(M).v
@@ -307,10 +307,12 @@ class Visibility_Simulator:
         result = np.empty(len(angle_list), dtype='complex64')
         ps_vec = -np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
         ik = 2.j*np.pi*freq/299.792458
-        for i, phi in zip(range(len(angle_list)), angle_list):
-            #print beam_heal_equ.shape, np.pi/2 - dec, ra - phi
-            result[i] = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - phi) * np.exp(ik*rotatez_matrix(phi).dot(d_equ).dot(ps_vec))
-        return result
+        ###for i, phi in zip(range(len(angle_list)), angle_list):
+            ####print beam_heal_equ.shape, np.pi/2 - dec, ra - phi
+            ###result[i] = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - phi) * np.exp(ik*rotatez_matrix(phi).dot(d_equ).dot(ps_vec))
+        ###return result
+        return hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) * np.exp(ik * (rotatez_matrix(angle_list).transpose(2,0,1).dot(d_equ).dot(ps_vec)))
+
     def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):#d in horizontal coord
         if self.initial_zenith.tolist() == [1000, 1000]:
             raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')

@@ -126,11 +126,11 @@ for p in ['x', 'y']:
         print "%f minutes used"%(float(time.time()-timer)/60.)
         sys.stdout.flush()
         A[p].tofile(A_filename)
-        A[p] = A[p].reshape((len(ubls), len(tlist), 12*nside_beamweight**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside**2))
+        A[p] = A[p].reshape((len(ubls), len(tlist), 12*nside_beamweight**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside_beamweight**2))
 
-##############################################
+####################################################
 ###beam weights using an equal pixel A matrix######
-###########################################
+#################################################
 print "Computing beam weight...",
 sys.stdout.flush()
 beam_weight = np.array([(la.norm(A['x'][:,col])**2 + la.norm(A['y'][:,col])**2)**.5 for col in range(len(A['x'][0]))])[hpf.nest2ring(nside_beamweight, range(12*nside_beamweight**2))]
@@ -168,7 +168,7 @@ final_index = np.zeros(12*nside_standard**2)
 thetas, phis = [], []
 abs_thresh = np.mean(equatorial_GSM_standard * beam_weight) * thresh
 pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standard, nside_start, abs_thresh, final_index, thetas, phis)
-
+npix = len(thetas)
 fake_solution = equatorial_GSM_standard[hpf.ang2pix(nside_standard, thetas, phis, nest=True)]
 ##################################################################
 ####################################sanity check########################
@@ -188,5 +188,66 @@ hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, ti
 hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min=0,max=4, coord=plotcoord, title='GSM gridded', nest=True)
 hpv.mollview(np.log10(stds/abs_thresh), min=np.log10(thresh)-3, max = 3, coord=plotcoord, title='std', nest=True)
 hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start),max=np.log2(nside_standard), coord=plotcoord, title='count %i %.3f'%(len(thetas), float(len(thetas))/(12*nside_standard**2)), nest=True)
-
 plt.show()
+
+
+##################################################################
+####################compute A matrix########################
+###############################################################
+
+A = {}
+for p in ['x', 'y']:
+    pol = p+p
+    #tf file
+    tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
+    tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
+    tlist = np.real(tflist[:, 0])
+
+    #tf mask file, 0 means flagged bad data
+    try:
+        tfm_filename = datadir + tag + '_%s%s_%i_%i.tfm'%(p, p, nt, nf)
+        tfmlist = np.fromfile(tfm_filename, dtype='float32').reshape((nt,nf))
+        tmask = np.array(tfmlist[:,0].astype('bool'))
+        #print tmask
+    except:
+        print "No mask file found"
+        tmask = np.zeros_like(tlist).astype(bool)
+    #print freq, tlist
+
+    #ubl file
+    ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
+    ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
+    print "%i UBLs to include"%len(ubls)
+
+    A_filename = datadir + tag + '_%s%s_%i_%i.Ad'%(p, p, len(tlist)*len(ubls), npix)
+
+    if os.path.isfile(A_filename) and not force_recompute:
+        print "Reading A matrix from %s"%A_filename
+        sys.stdout.flush()
+        A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), npix))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), npix))
+    else:
+        #beam
+        beam_healpix = local_beam[p](freq)
+        #hpv.mollview(beam_healpix, title='beam %s'%p)
+        #plt.show()
+
+        vs = sv.Visibility_Simulator()
+        vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
+        beam_heal_equ = np.array(sv.rotate_healpixmap(beam_healpix, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]))
+        print "Computing A matrix for %s pol..."%p
+        sys.stdout.flush()
+        timer = time.time()
+        A[p] = np.empty((len(tlist)*len(ubls), npix), dtype='complex64')
+        for i in range(npix):
+            ra = phis[i]
+            dec = np.pi/2 - thetas[i]
+            print "\r%.1f%% completed, %f minutes left"%(100.*float(i)/(npix), (npix-i)/(i+1)*(float(time.time()-timer)/60.)),
+            sys.stdout.flush()
+
+            A[p][:, i] = np.array([vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
+
+        print "%f minutes used"%(float(time.time()-timer)/60.)
+        sys.stdout.flush()
+        A[p].tofile(A_filename)
+        A[p] = A[p].reshape((len(ubls), len(tlist), npix))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), npix))
+
