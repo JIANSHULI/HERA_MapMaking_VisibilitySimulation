@@ -11,17 +11,17 @@ import healpy.pixelfunc as hpf
 import healpy.visufunc as hpv
 import scipy.interpolate as si
 
-def pixelize(sky, nside_distribution, nside_standard, nside_start, thresh, final_index, thetas, phis):
+def pixelize(sky, nside_distribution, nside_standard, nside_start, thresh, final_index, thetas, phis, sizes):
     #thetas = []
     #phis = []
     for inest in range(12*nside_start**2):
-        pixelize_helper(sky, nside_distribution, nside_standard, nside_start, inest, thresh, final_index, thetas, phis)
+        pixelize_helper(sky, nside_distribution, nside_standard, nside_start, inest, thresh, final_index, thetas, phis, sizes)
         #newt, newp = pixelize_helper(sky, nside_distribution, nside_standard, nside_start, inest, thresh, final_index, thetas, phis)
         #thetas += newt.tolist()
         #phis += newp.tolist()
     #return np.array(thetas), np.array(phis)
 
-def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thresh, final_index, thetas, phis):
+def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thresh, final_index, thetas, phis, sizes):
     #print "visiting ", nside, inest
     starti, endi = inest*nside_standard**2/nside**2, (inest+1)*nside_standard**2/nside**2
     ##local mean###if nside == nside_standard or np.std(sky[starti:endi])/np.mean(sky[starti:endi]) < thresh:
@@ -32,33 +32,44 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
         newt, newp = hp.pix2ang(nside, [inest], nest=True)
         thetas += newt.tolist()
         phis += newp.tolist()
+        #sizes += (np.ones_like(newt) * nside_standard**2 / nside**2).tolist()
+        sizes += (np.ones_like(newt) / nside**2).tolist()
 
     else:
         #thetas = []
         #phis = []
         for jnest in range(inest * 4, (inest + 1) * 4):
-            pixelize_helper(sky, nside_distribution, nside_standard, nside * 2, jnest, thresh, final_index, thetas, phis)
+            pixelize_helper(sky, nside_distribution, nside_standard, nside * 2, jnest, thresh, final_index, thetas, phis, sizes)
             #newt, newp = pixelize_helper(sky, nside_distribution, nside_standard, nside * 2, jnest, thresh)
             #thetas += newt.tolist()
             #phis += newp.tolist()
         #return np.array(thetas), np.array(phis)
 
-nside_start = 4
+nside_start = 16
 nside_beamweight = 16
 nside_standard = 256
 bnside = 8
 plotcoord = 'C'
 thresh = 0.10
+S_scale = 2
+S_thresh = 1000#Kelvin
+S_type = 'gsm%irm%i'%(S_scale,S_thresh)
+
 lat_degree = 45.2977
 C = 299.792458
 kB = 1.3806488* 1.e-23
 script_dir = os.path.dirname(os.path.realpath(__file__))
-plot_pixelization = False
+plot_pixelization = True
 force_recompute = False
+force_recompute_AtNiAi = False
+force_recompute_S = False
+force_recompute_SEi = False
+
 ####################################################
 ################data file and load beam##############
 ####################################################
 tag = "q3_abscalibrated"
+datatag = '_seccasa.rad'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 nt = 440
 nf = 1
@@ -74,6 +85,8 @@ for p in ['x', 'y']:
     local_beam[p] = si.interp1d(freqs, beam_array, axis=0)
 
 A = {}
+data = {}
+Ni = {}
 for p in ['x', 'y']:
     pol = p+p
 
@@ -137,7 +150,7 @@ for p in ['x', 'y']:
 #################################################
 print "Computing beam weight...",
 sys.stdout.flush()
-beam_weight = np.array([(la.norm(A['x'][:,col])**2 + la.norm(A['y'][:,col])**2)**.5 for col in range(len(A['x'][0]))])[hpf.nest2ring(nside_beamweight, range(12*nside_beamweight**2))]
+beam_weight = ((la.norm(A['x'], axis = 0)**2 + la.norm(A['y'], axis = 0)**2)**.5)[hpf.nest2ring(nside_beamweight, range(12*nside_beamweight**2))]
 beam_weight = beam_weight/np.mean(beam_weight)
 beam_weight = np.array([beam_weight for i in range(nside_standard**2/nside_beamweight**2)]).transpose().flatten()
 print "done."
@@ -155,11 +168,11 @@ w1 = si.interp1d(components[:,0], components[:,2])
 w2 = si.interp1d(components[:,0], components[:,3])
 w3 = si.interp1d(components[:,0], components[:,4])
 gsm_standard = np.exp(scale_loglog(np.log(freq))) * (w1(freq)*pca1 + w2(freq)*pca2 + w3(freq)*pca3)
-equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
-#rotate sky map
-print "Rotating GSM_standard...",
-sys.stdout.flush()
 
+#rotate sky map and converts to nest
+equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
+print "Rotating GSM_standard and converts to nest...",
+sys.stdout.flush()
 equ2013_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000,stdtime=2013.8))
 ang0, ang1 =hp.rotator.rotateDirection(equ2013_to_gal_matrix, hpf.pix2ang(nside_standard, range(12*nside_standard**2), nest=True))
 equatorial_GSM_standard = hpf.get_interp_val(gsm_standard, ang0, ang1)
@@ -169,16 +182,16 @@ sys.stdout.flush()
 
 
 ########################################################################
-########################processing#################################
+########################processing dynamic pixelization######################
 ########################################################################
 
 nside_distribution = np.zeros(12*nside_standard**2)
 final_index = np.zeros(12*nside_standard**2)
-thetas, phis = [], []
+thetas, phis, sizes = [], [], []
 abs_thresh = np.mean(equatorial_GSM_standard * beam_weight) * thresh
-pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standard, nside_start, abs_thresh, final_index, thetas, phis)
+pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standard, nside_start, abs_thresh, final_index, thetas, phis, sizes)
 npix = len(thetas)
-fake_solution = equatorial_GSM_standard[hpf.ang2pix(nside_standard, thetas, phis, nest=True)]
+fake_solution = hpf.get_interp_val(equatorial_GSM_standard, thetas, phis, nest=True)
 
 if plot_pixelization:
     ##################################################################
@@ -203,7 +216,7 @@ if plot_pixelization:
 
 
 ##################################################################
-####################compute A matrix########################
+####################compute dynamic A matrix########################
 ###############################################################
 
 A = {}
@@ -230,7 +243,7 @@ for p in ['x', 'y']:
     ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
     print "%i UBLs to include"%len(ubls)
 
-    A_filename = datadir + tag + '_%s%s_%i_%i.Ad'%(p, p, len(tlist)*len(ubls), npix)
+    A_filename = datadir + tag + '_%s%s_%i_%i.Ad%i_%.3f'%(p, p, len(tlist)*len(ubls), npix, nside_standard, thresh)
 
     if os.path.isfile(A_filename) and not force_recompute:
         print "Reading A matrix from %s"%A_filename
@@ -252,7 +265,7 @@ for p in ['x', 'y']:
         for i in range(npix):
             ra = phis[i]
             dec = np.pi/2 - thetas[i]
-            print "\r%.1f%% completed, %f minutes left"%(100.*float(i)/(npix), (npix-i)/(i+1)*(float(time.time()-timer)/60.)),
+            print "\r%.1f%% completed, %f minutes left"%(100.*float(i)/(npix), float(npix-i)/(i+1)*(float(time.time()-timer)/60.)),
             sys.stdout.flush()
 
             A[p][:, i] = np.array([vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
@@ -261,4 +274,97 @@ for p in ['x', 'y']:
         sys.stdout.flush()
         A[p].tofile(A_filename)
         A[p] = A[p].reshape((len(ubls), len(tlist), npix))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), npix))
+    #get Ni (1/variance) and data
+    var_filename = datadir + tag + '_%s%s_%i_%i.var'%(p, p, nt, nUBL)
+    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose().flatten() * (1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside_standard**2)))**2)
+    data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + datatag
+    data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose().flatten()*1.e-26*(C/freq)**2/kB/(4*np.pi/(12*nside_standard**2))).conjugate()#there's a conjugate convention difference
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
+data = np.concatenate((data['x'],data['y']))
+data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
+Ni = np.concatenate((Ni['x'],Ni['y']))
+Ni = np.concatenate((Ni/2, Ni/2))
 
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+A = np.concatenate((A['x'], A['y']))
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+A = np.concatenate((np.real(A), np.imag(A)))
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+
+#simulate visibilities
+
+sim_data = A.dot(fake_solution * sizes * nside_standard**2) + np.random.randn(len(data))/Ni**.5
+#plt.plot(sim_data[:5000], 'g--')
+#plt.plot(data[:5000], 'b--')
+#plt.show()
+#quit()
+
+#compute AtNi and AtNi.y
+AtNi = A.transpose() * Ni
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
+
+AtNi_data = AtNi.dot(data)
+AtNi_sim_data = AtNi.dot(sim_data)
+
+
+#compute AtNiA eigensystems
+eigvl_filename = datadir + tag + '_%i.5AtNiAel'%(npix)
+eigvc_filename = datadir + tag + '_%i_%i.5AtNiAev'%(npix, npix)
+if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename):
+    print "Reading eigen system of AtNiA from %s and %s"%(eigvl_filename, eigvc_filename)
+    del(AtNi)
+    #del(A)
+    eigvl = np.fromfile(eigvl_filename, dtype='float32')
+    eigvc = np.fromfile(eigvc_filename, dtype='float32').reshape((npix, npix))
+else:
+    print "Computing AtNiA eigensystem...",
+    sys.stdout.flush()
+    timer = time.time()
+    eigvl, eigvc = sla.eigh(AtNi.dot(A))
+    print "%f minutes used"%(float(time.time()-timer)/60.)
+    sys.stdout.flush()
+    del(AtNi)
+    #del(A)
+    if la.norm(eigvl) == 0:
+        print "ERROR: Eigensistem calculation failed...matrix %i by %i is probably too large."%(npix, npix)
+    print "%f minutes used"%(float(time.time()-timer)/60.)
+    eigvl.tofile(eigvl_filename)
+    eigvc.tofile(eigvc_filename)
+
+plt.plot(eigvl)
+
+#compute AtNiAi
+rcondA = 1.e-5
+AtNiAi_filename = datadir + tag + '_%i_%i.5AtNiAi%i'%(npix, npix, np.log10(rcondA))
+if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
+    print "Reading AtNiAi matrix from %s"%AtNiAi_filename
+    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((npix, npix))
+
+else:
+    print "Computing AtNiAi matrix...",
+    sys.stdout.flush()
+    timer = time.time()
+    max_eigv = max(eigvl)
+    print "Min eig %.2e"%min(eigvl), "Max eig %.2e"%max_eigv, "Add eig %.2e"%(max_eigv * rcondA)
+    if min(eigvl) < 0 and np.abs(min(eigvl)) > max_eigv * rcondA:
+        print "!WARNING!: negative eigenvalue %.2e is smaller than the added identity %.2e! min rcond %.2e needed."%(min(eigvl), max_eigv * rcondA, np.abs(min(eigvl))/max_eigv)
+    AtNiAi = (eigvc / (max_eigv * rcondA + eigvl)).dot(eigvc.transpose())
+    print "%f minutes used"%(float(time.time()-timer)/60.)
+    sys.stdout.flush()
+    AtNiAi.tofile(AtNiAi_filename)
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
+
+#solve for x
+x = AtNiAi.dot(AtNi_data)
+sim_x = AtNiAi.dot(AtNi_sim_data)
+
+chisq = np.sum(Ni * np.abs((A.dot(x) - data))**2) / float(len(data) - npix)
+chisq_sim = np.sum(Ni * np.abs((A.dot(sim_x) - sim_data))**2) / float(len(sim_data) - npix)
+
+hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min= 0, max =4, coord=plotcoord, title='GSM gridded', nest=True)
+hpv.mollview(np.log10((x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq, nest=True)
+hpv.mollview(np.log10((sim_x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw simulated solution, chi^2=%.2f'%chisq_sim, nest=True)
+plt.show()

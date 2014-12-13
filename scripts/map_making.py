@@ -31,13 +31,15 @@ datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 nt = 440
 nf = 1
 nUBL = 75
-nside = 32
+nside = 64
 S_scale = 2
 S_thresh = 1000#Kelvin
 S_type = 'gsm%irm%i'%(S_scale,S_thresh)
 plotcoord = 'C'
 bnside = 8
 lat_degree = 45.2977
+
+wiener = False
 force_recompute = False
 force_recompute_AtNiAi = False
 force_recompute_S = False
@@ -135,8 +137,12 @@ data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 #plt.show()
 Ni = np.concatenate((Ni['x'],Ni['y']))
 Ni = np.concatenate((Ni/2, Ni/2))
-pix_mask = np.array([la.norm(col) != 0 for col in A['x'].transpose()])
+
+pix_mask_filename = datadir + tag + '_%i.pixm'%(len(A['x'][0]))
+pix_mask = la.norm(A['x'],axis=0) != 0
+pix_mask.astype('float32').tofile(pix_mask_filename)
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+
 A = np.concatenate((A['x'][:, pix_mask],A['y'][:, pix_mask]))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 A = np.concatenate((np.real(A), np.imag(A))).astype('float32')
@@ -147,9 +153,41 @@ AtNi = A.transpose() * Ni
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
+#compute eigen stuff for AtNiAi
+eigvl_filename = datadir + tag + '_%i.4AtNiAel'%(npix)
+eigvc_filename = datadir + tag + '_%i_%i.4AtNiAev'%(npix, npix)
+
+if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename):
+    print "Reading eigen system of AtNiA from %s and %s"%(eigvl_filename, eigvc_filename)
+    #del(AtNi)
+    #del(A)
+    eigvl = np.fromfile(eigvl_filename, dtype='float32')
+    eigvc = np.fromfile(eigvc_filename, dtype='float32').reshape((npix, npix))
+else:
+    print "Computing AtNiA eigensystem...",
+    sys.stdout.flush()
+    timer = time.time()
+    eigvl, eigvc = sla.eigh(AtNi.dot(A))
+    print "%f minutes used"%(float(time.time()-timer)/60.)
+    sys.stdout.flush()
+    #del(AtNi)
+    #del(A)
+    if la.norm(eigvl) == 0:
+        print "ERROR: Eigensistem calculation failed...matrix %i by %i is probably too large."%(npix, npix)
+    print "%f minutes used"%(float(time.time()-timer)/60.)
+    eigvl.tofile(eigvl_filename)
+    eigvc.tofile(eigvc_filename)
+
 #compute AtNiAi
-rcondA = 1.e-5
+rcondA = 1.e-4
 AtNiAi_filename = datadir + tag + '_%i_%i.4AtNiAi%i'%(npix, npix, np.log10(rcondA))
+
+max_eigv = max(eigvl)
+if min(eigvl) < 0 and np.abs(min(eigvl)) > max_eigv * rcondA:
+    print "!WARNING!: negative eigenvalue %.2e is smaller than the added identity %.2e! min rcond %.2e needed."%(min(eigvl), max_eigv * rcondA, np.abs(min(eigvl))/max_eigv)
+eigvli = 1 / (max_eigv * rcondA + eigvl)
+
+
 if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
     print "Reading AtNiAi matrix from %s"%AtNiAi_filename
     AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((npix, npix))
@@ -158,8 +196,8 @@ else:
     print "Computing AtNiAi matrix...",
     sys.stdout.flush()
     timer = time.time()
-    #AtNiAi = la.pinv(AtNi.dot(A), rcond=rcondA)
-    AtNiAi = pinv_sym(AtNi.dot(A), rcond = rcondA)
+    AtNiAi = (eigvc*eigvli).dot(eigvc.transpose())
+    #AtNiAi = pinv_sym(AtNi.dot(A), rcond = rcondA)
     print "%f minutes used"%(float(time.time()-timer)/60.)
     AtNiAi.tofile(AtNiAi_filename)
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
@@ -181,21 +219,45 @@ equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
 #rotate sky map
 print "Rotating GSM_standard...",
 sys.stdout.flush()
-#print hp.rotator.Rotator(coord='cg').mat
-for i in range(12*nside_standard**2):
-    ang = hp.rotator.Rotator(coord='cg')(hpf.pix2ang(nside_standard,i))
-    equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard, ang[0], ang[1])
+equ2013_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000,stdtime=2013.8))
+ang0, ang1 =hp.rotator.rotateDirection(equ2013_to_gal_matrix, hpf.pix2ang(nside_standard, range(12*nside_standard**2)))
+equatorial_GSM_standard = hpf.get_interp_val(gsm_standard, ang0, ang1)
 print "done."
 sys.stdout.flush()
 
 sim_data = A.dot(equatorial_GSM_standard[pix_mask]) + np.random.randn(len(data))/Ni**.5
-sim_sol = np.zeros(12*nside**2)
+sim_sol = np.zeros(12*nside**2, dtype='float32')
 sim_sol[pix_mask] = AtNiAi.dot(AtNi.dot(sim_data))
 del(A)
 del(AtNi)
 
-#compute S
 
+
+if not wiener:
+    #compare measurement and simulation
+    xproj = (np.array(x[pix_mask]).dot(eigvc))[::-1] #eigvl, eigvc = sla.eigh(AtNi.dot(A))
+    simproj = (np.array(sim_sol[pix_mask]).dot(eigvc))[::-1]
+    simproj = simproj * np.average(xproj[:200]/simproj[:200])
+    plt.plot(xproj)
+    plt.plot(simproj)
+    plt.plot(xproj-simproj)
+    plt.plot(eigvli[::-1]**.5)#(1/np.abs(eigvl[::-1])**.5)
+    plt.ylim(-1e4, 1e4)
+    plt.show()
+    hydrid_map = np.zeros_like(equatorial_GSM_standard)
+    hybrid = simproj
+    for cut in [0,100,500,1000,2000,3000,len(eigvl)]:
+        hybrid[:cut] = xproj[:cut]
+        hydrid_map = np.zeros_like(equatorial_GSM_standard)
+        hydrid_map[pix_mask] = eigvc.dot(hybrid[::-1])
+        hpv.mollview(np.log10(hydrid_map), min=0,max=4, coord=plotcoord, title='cut:%i'%cut)
+    dumb_w_filter = (np.abs(xproj[::-1]) / (eigvli**.5 + np.abs(xproj[::-1])))**2
+    hydrid_map[pix_mask] = eigvc.dot(xproj[::-1]* dumb_w_filter)
+    hpv.mollview(np.log10(hydrid_map), min=0,max=4, coord=plotcoord, title='dumb_wiener')
+    plt.show()
+    quit()
+
+#compute S
 S_filename = datadir + tag + '_%i_%i.2S_%s'%(len(AtNiAi), len(AtNiAi), S_type)
 if os.path.isfile(S_filename) and not force_recompute_S:
     print "Reading S matrix %s..."%S_type,
