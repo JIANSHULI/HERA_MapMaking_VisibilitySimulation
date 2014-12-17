@@ -19,7 +19,7 @@ if __name__ == '__main__':
     #check if file exists
     if os.path.isfile(path) == False:
         raise Exception('File does not exist')
-    if path[-3:] == 'bin':
+    if path[-3:] == 'bin' or path[-3:] == 'dat':
         with open(path) as f:
             farray = array('f')
             farray.fromstring(f.read())
@@ -27,6 +27,8 @@ if __name__ == '__main__':
     elif path[-3:] == 'txt':
         with open(path) as f:
             rawdata = np.loadtxt(f)
+    else:
+        raise IOError('unrecognized file extension. Use either .bin or .txt.')
     data = rawdata.flatten()
     sv.check_beam(data,precision,verbose=True)
 

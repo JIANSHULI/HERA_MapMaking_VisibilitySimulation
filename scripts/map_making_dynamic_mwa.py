@@ -45,17 +45,17 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
             #phis += newp.tolist()
         #return np.array(thetas), np.array(phis)
 
-nside_start = 16
+nside_start = 8
 nside_beamweight = 16
 nside_standard = 256
-bnside = 8
+bnside = 128
 plotcoord = 'C'
 thresh = 0.10
 S_scale = 2
 S_thresh = 1000#Kelvin
 S_type = 'gsm%irm%i'%(S_scale,S_thresh)
 
-lat_degree = 45.2977
+lat_degree = -26.703319
 C = 299.792458
 kB = 1.3806488* 1.e-23
 script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -68,26 +68,19 @@ force_recompute_SEi = False
 ####################################################
 ################data file and load beam##############
 ####################################################
-tag = "q3_abscalibrated"
+tag = "mwa_test"
 datatag = '_seccasa.rad'
-datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-nt = 440
+datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/mwa_aug23_eor0_forjeff/'
+nt = 60
 nf = 1
-nUBL = 75
+nUBL = 1222
+pols = ['x']
 
-#deal with beam: create a dictionary for 'x' and 'y' each with a callable function of the form y(freq) in MHz
-local_beam = {}
-for p in ['x', 'y']:
-    freqs = range(150,170,10)
-    beam_array = np.zeros((len(freqs), 12*bnside**2))
-    for f in range(len(freqs)):
-        beam_array[f] = np.fromfile('/home/omniscope/simulate_visibilities/data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s%s.bin'%(bnside, freqs[f], p, p), dtype='float32')
-    local_beam[p] = si.interp1d(freqs, beam_array, axis=0)
 
 A = {}
 data = {}
 Ni = {}
-for p in ['x', 'y']:
+for p in pols:
     pol = p+p
 
     #tf file, t in lst hours
@@ -120,8 +113,12 @@ for p in ['x', 'y']:
         sys.stdout.flush()
         A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), 12*nside_beamweight**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside_beamweight**2))
     else:
-        #beam
-        beam_healpix = local_beam[p](freq)
+        #deal with beam: create a dictionary for 'x' and 'y' each with a callable function of the form y(freq) in MHz
+        local_beam = {}
+        for p in pols:
+            freqs = range(150,170,10)
+
+        beam_healpix = np.fromfile(datadir + 'mwa_curtin_beam_%s_nside%i_freq167.275_zenith_float32.dat'%(p, bnside), dtype='float32')
         #hpv.mollview(beam_healpix, title='beam %s'%p)
         #plt.show()
 
@@ -148,6 +145,8 @@ for p in ['x', 'y']:
 ####################################################
 ###beam weights using an equal pixel A matrix######
 #################################################
+
+
 print "Computing beam weight...",
 sys.stdout.flush()
 beam_weight = ((la.norm(A['x'], axis = 0)**2 + la.norm(A['y'], axis = 0)**2)**.5)[hpf.nest2ring(nside_beamweight, range(12*nside_beamweight**2))]
@@ -220,7 +219,7 @@ if plot_pixelization:
 ###############################################################
 
 A = {}
-for p in ['x', 'y']:
+for p in pols:
     pol = p+p
     #tf file
     tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
