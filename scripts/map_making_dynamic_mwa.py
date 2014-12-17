@@ -113,11 +113,6 @@ for p in pols:
         sys.stdout.flush()
         A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), 12*nside_beamweight**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside_beamweight**2))
     else:
-        #deal with beam: create a dictionary for 'x' and 'y' each with a callable function of the form y(freq) in MHz
-        local_beam = {}
-        for p in pols:
-            freqs = range(150,170,10)
-
         beam_healpix = np.fromfile(datadir + 'mwa_curtin_beam_%s_nside%i_freq167.275_zenith_float32.dat'%(p, bnside), dtype='float32')
         #hpv.mollview(beam_healpix, title='beam %s'%p)
         #plt.show()
@@ -155,6 +150,7 @@ beam_weight = np.array([beam_weight for i in range(nside_standard**2/nside_beamw
 print "done."
 sys.stdout.flush()
 
+quit()
 ################################################
 #####################GSM###########################
 #############################################
