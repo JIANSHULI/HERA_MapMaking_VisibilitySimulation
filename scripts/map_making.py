@@ -234,6 +234,10 @@ noise_sol = np.zeros(12*nside**2, dtype='float32')
 noise_sol[pix_mask] = AtNiAi.dot(AtNi.dot(noise_data))
 sim_sol_clean = np.zeros(12*nside**2, dtype='float32')
 sim_sol_clean[pix_mask] = AtNiAi.dot(AtNi.dot(sim_data_clean))
+
+chisq = np.sum(Ni * np.abs((A.dot(x[pix_mask]) - data))**2) / float(len(data) - npix)
+chisq_sim = np.sum(Ni * np.abs((A.dot(sim_sol[pix_mask]) - sim_data))**2) / float(len(sim_data) - npix)
+
 del(A)
 del(AtNi)
 
@@ -352,10 +356,10 @@ else:
         #hpv.mollview(np.log10(gsm_standard), min=0,max=4, coord='G', title='GSM')
         hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, title='GSM')
         hpv.mollview(np.log10(w_GSM), min=0,max=4, coord=plotcoord, title='wiener GSM')
-        hpv.mollview(np.log10(x), min=0,max=4, coord=plotcoord, title='raw solution')
+        hpv.mollview(np.log10(x), min=0,max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq)
         hpv.mollview(np.log10(w_solution), min=0,max=4, coord=plotcoord, title='wiener solution')
         hpv.mollview(np.log10(w_GSM - w_solution), min=0,max=4, coord=plotcoord, title='wiener GSM - wiener solution')
         hpv.mollview(np.log10(np.abs(w_solution)), min=0,max=4, coord=plotcoord, title='abs wiener solution')
-        hpv.mollview(np.log10(sim_sol), min=0,max=4, coord=plotcoord, title='simulated noisy solution')
+        hpv.mollview(np.log10(sim_sol), min=0,max=4, coord=plotcoord, title='simulated noisy solution, chi^2=%.2f'%chisq_sim)
         hpv.mollview(np.log10(w_sim_sol), min=0,max=4, coord=plotcoord, title='simulated wiener noisy solution')
     plt.show()

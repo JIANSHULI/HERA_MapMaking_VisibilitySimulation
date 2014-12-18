@@ -32,8 +32,8 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
         newt, newp = hp.pix2ang(nside, [inest], nest=True)
         thetas += newt.tolist()
         phis += newp.tolist()
-        #sizes += (np.ones_like(newt) * nside_standard**2 / nside**2).tolist()
-        sizes += (np.ones_like(newt) / nside**2).tolist()
+        sizes += (np.ones_like(newt) * nside_standard**2 / nside**2).tolist()
+        #sizes += (np.ones_like(newt) / nside**2).tolist()
 
     else:
         #thetas = []
@@ -98,7 +98,7 @@ for p in pols:
         #print tmask
     except:
         print "No mask file found"
-        tmask = np.zeros_like(tlist).astype(bool)
+        tmask = np.ones_like(tlist).astype(bool)
     #print freq, tlist
 
     #ubl file
@@ -144,37 +144,30 @@ for p in pols:
 
 print "Computing beam weight...",
 sys.stdout.flush()
-beam_weight = ((la.norm(A['x'], axis = 0)**2 + la.norm(A['y'], axis = 0)**2)**.5)[hpf.nest2ring(nside_beamweight, range(12*nside_beamweight**2))]
+beam_weight = (np.sum([la.norm(A[p], axis = 0)**2  for p in pols], axis = 0)**.5)[hpf.nest2ring(nside_beamweight, range(12*nside_beamweight**2))]
 beam_weight = beam_weight/np.mean(beam_weight)
 beam_weight = np.array([beam_weight for i in range(nside_standard**2/nside_beamweight**2)]).transpose().flatten()
 print "done."
 sys.stdout.flush()
+#hpv.mollview(beam_weight, nest=True)
+#plt.show()
+#quit()
 
-quit()
 ################################################
 #####################GSM###########################
 #############################################
-pca1 = hp.fitsfunc.read_map(script_dir + '/../data/gsm1.fits' + str(nside_standard))
-pca2 = hp.fitsfunc.read_map(script_dir + '/../data/gsm2.fits' + str(nside_standard))
-pca3 = hp.fitsfunc.read_map(script_dir + '/../data/gsm3.fits' + str(nside_standard))
-components = np.loadtxt(script_dir + '/../data/components.dat')
-scale_loglog = si.interp1d(np.log(components[:,0]), np.log(components[:,1]))
-w1 = si.interp1d(components[:,0], components[:,2])
-w2 = si.interp1d(components[:,0], components[:,3])
-w3 = si.interp1d(components[:,0], components[:,4])
-gsm_standard = np.exp(scale_loglog(np.log(freq))) * (w1(freq)*pca1 + w2(freq)*pca2 + w3(freq)*pca3)
-
 #rotate sky map and converts to nest
-equatorial_GSM_standard = np.zeros(12*nside_standard**2,'float')
+equatorial_GSM_standard_2000 = np.fromfile(datadir + 'skymap_mwacs_nside256_float32.dat', dtype='float32')
 print "Rotating GSM_standard and converts to nest...",
 sys.stdout.flush()
-equ2013_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000,stdtime=2013.8))
-ang0, ang1 =hp.rotator.rotateDirection(equ2013_to_gal_matrix, hpf.pix2ang(nside_standard, range(12*nside_standard**2), nest=True))
-equatorial_GSM_standard = hpf.get_interp_val(gsm_standard, ang0, ang1)
+equ2013_to_equ2000_matrix = sv.epoch_transmatrix(2000,stdtime=2013.64)
+ang0, ang1 =hp.rotator.rotateDirection(equ2013_to_equ2000_matrix, hpf.pix2ang(nside_standard, range(12*nside_standard**2), nest=True))
+equatorial_GSM_standard = hpf.get_interp_val(equatorial_GSM_standard_2000, ang0, ang1)
 print "done."
 sys.stdout.flush()
-
-
+#hpv.mollview(np.log10(equatorial_GSM_standard), min=-3.5,max=1.5, coord=plotcoord, title='GSM', nest=True)
+#plt.show()
+#quit()
 
 ########################################################################
 ########################processing dynamic pixelization######################
@@ -202,14 +195,14 @@ if plot_pixelization:
     ##################################################################
     ####################################plotting########################
     ###############################################################
-    hpv.mollview(beam_weight, min=0,max=4, coord=plotcoord, title='beam', nest=True)
-    hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, title='GSM', nest=True)
-    hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min=0,max=4, coord=plotcoord, title='GSM gridded', nest=True)
+    hpv.mollview(beam_weight, min=0,max=10, coord=plotcoord, title='beam', nest=True)
+    hpv.mollview(np.log10(equatorial_GSM_standard), min=-3.5,max=1.5, coord=plotcoord, title='GSM', nest=True)
+    hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min=-3.5,max=1.5, coord=plotcoord, title='GSM gridded', nest=True)
     hpv.mollview(np.log10(stds/abs_thresh), min=np.log10(thresh)-3, max = 3, coord=plotcoord, title='std', nest=True)
     hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start),max=np.log2(nside_standard), coord=plotcoord, title='count %i %.3f'%(len(thetas), float(len(thetas))/(12*nside_standard**2)), nest=True)
     plt.show()
 
-
+quit()
 ##################################################################
 ####################compute dynamic A matrix########################
 ###############################################################
@@ -289,7 +282,7 @@ print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
 #simulate visibilities
 
-sim_data = A.dot(fake_solution * sizes * nside_standard**2) + np.random.randn(len(data))/Ni**.5
+sim_data = A.dot(fake_solution * sizes) + np.random.randn(len(data))/Ni**.5
 #plt.plot(sim_data[:5000], 'g--')
 #plt.plot(data[:5000], 'b--')
 #plt.show()
