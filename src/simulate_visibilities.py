@@ -122,7 +122,7 @@ def check_beam(data, precision = None, verbose = False):
 
     truncatemaps = {}
     for n in nsidelist:
-        beam_alm = hp.sphtfunc.map2alm(data,lmax = 3*n-1,iter=10)
+        beam_alm = hp.sphtfunc.map2alm(data,lmax = 3*n-1,iter=50)
         truncatemaps[n] = hp.sphtfunc.alm2map(beam_alm,nside,verbose=False)
 
     error_types = ["RMS diff/RMS data", "RMS diff/max data", "max diff/max data"]
