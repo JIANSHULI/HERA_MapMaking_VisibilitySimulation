@@ -48,9 +48,9 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
 nside_start = 16
 nside_beamweight = 16
 nside_standard = 128
-bnside = 8
+bnside = 16
 plotcoord = 'C'
-thresh = 0.20
+thresh = 0.2
 #S_scale = 2
 #S_thresh = 1000#Kelvin
 #S_type = 'gsm%irm%i'%(S_scale,S_thresh)
@@ -84,14 +84,10 @@ nt = 440
 nf = 1
 nUBL = 75
 
-#deal with beam: create a dictionary for 'x' and 'y' each with a callable function of the form y(freq) in MHz
-local_beam = {}
-for p in ['x', 'y']:
-    freqs = range(150,170,10)
-    beam_array = np.zeros((len(freqs), 12*bnside**2))
-    for f in range(len(freqs)):
-        beam_array[f] = np.fromfile('/home/omniscope/simulate_visibilities/data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s%s.bin'%(bnside, freqs[f], p, p), dtype='float32')
-    local_beam[p] = si.interp1d(freqs, beam_array, axis=0)
+#deal with beam: create a callable function of the form y(freq) in MHz and returns npix by 4
+freqs = range(110,200,10)
+local_beam = si.interp1d(freqs, np.concatenate([np.fromfile('/home/omniscope/data/mwa_beam/healpix_%i_%s.bin'%(bnside,p), dtype='complex64').reshape((len(freqs),12*bnside**2,2)) for p in ['x', 'y']], axis=-1).transpose(0,2,1), axis=0)
+
 
 A = {}
 data = {}
@@ -201,11 +197,12 @@ abs_thresh = np.mean(equatorial_GSM_standard * beam_weight) * thresh
 pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standard, nside_start, abs_thresh, final_index, thetas, phis, sizes)
 npix = len(thetas)
 fake_solution = hpf.get_interp_val(equatorial_GSM_standard, thetas, phis, nest=True)
-
-final_index_filename = datadir + tag + '_%i.dyind%i_%.3f'%(nside_standard, npix, thresh)
-final_index.astype('float32').tofile(final_index_filename)
-sizes_filename = final_index_filename.replace('dyind', "dysiz")
-np.array(sizes).astype('float32').tofile(sizes_filename)
+fake_solution = np.concatenate((fake_solution, np.zeros_like(fake_solution), np.zeros_like(fake_solution), fake_solution))
+sizes = np.concatenate((sizes, sizes, sizes, sizes))
+#final_index_filename = datadir + tag + '_%i.dyind%i_%.3f'%(nside_standard, npix, thresh)
+#final_index.astype('float32').tofile(final_index_filename)
+#sizes_filename = final_index_filename.replace('dyind', "dysiz")
+#np.array(sizes).astype('float32').tofile(sizes_filename)
 if plot_pixelization:
     ##################################################################
     ####################################sanity check########################
@@ -231,8 +228,77 @@ if plot_pixelization:
 ##################################################################
 ####################compute dynamic A matrix########################
 ###############################################################
+ubls = {}
+for p in ['x', 'y']:
+    ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
+    ubls[p] = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
+common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
+ubl_index = {}#stored index in each pol's ubl for the common ubls
+for p in ['x', 'y']:
+    ubl_index[p] = np.zeros(len(common_ubls), dtype='int')
+    for i, u in enumerate(common_ubls):
+        if u in ubls[p]:
+            ubl_index[p][i] = np.argmin(la.norm(ubls[p] - u, axis=-1)) + 1
+        elif -u in ubls[p]:
+            ubl_index[p][i] = - np.argmin(la.norm(ubls[p] + u, axis=-1)) - 1
+        else:
+            raise Exception('Logical Error')
+#vs = sv.Visibility_Simulator()
+#vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
+#beam_heal_equ = np.array([sv.rotate_healpixmap(beam_healpixi, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]) for beam_healpixi in local_beam(freq)])
+#print vs.calculate_pol_pointsource_visibility(0, .5, ubls[0], freq, beam_heal_equ = beam_heal_equ, tlist = tlist).shape
+#sys.exit(0)
 
-A = {}
+A_filename = datadir + tag + '_%i_%i.Adp%i_%.3f'%(len(tlist)*len(common_ubls), npix, nside_standard, thresh)
+
+if os.path.isfile(A_filename) and not force_recompute:
+    print "Reading A matrix from %s"%A_filename
+    sys.stdout.flush()
+    A = np.fromfile(A_filename, dtype='complex64').reshape((len(common_ubls), 4, len(tlist), 4, npix))
+else:
+    #beam
+    beam_healpix = local_beam(freq)
+    #hpv.mollview(beam_healpix, title='beam %s'%p)
+    #plt.show()
+
+    vs = sv.Visibility_Simulator()
+    vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
+    beam_heal_equ = np.array([sv.rotate_healpixmap(beam_healpixi, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]) for beam_healpixi in local_beam(freq)])
+    print "Computing A matrix..."
+    sys.stdout.flush()
+    timer = time.time()
+    A = np.empty((len(common_ubls), 4 * len(tlist), 4, npix), dtype='complex64')
+    for i in range(npix):
+        ra = phis[i]
+        dec = np.pi/2 - thetas[i]
+        print "\r%.1f%% completed, %f minutes left"%(100.*float(i)/(npix), float(npix-i)/(i+1)*(float(time.time()-timer)/60.)),
+        sys.stdout.flush()
+
+        A[..., i] = vs.calculate_pol_pointsource_visibility(ra, dec, common_ubls, freq, beam_heal_equ = beam_heal_equ, tlist = tlist)
+
+    print "%f minutes used"%(float(time.time()-timer)/60.)
+    sys.stdout.flush()
+    A.tofile(A_filename)
+    A.shape = (len(common_ubls), 4, len(tlist), 4, npix)
+
+
+
+
+
+
+tmask = np.ones_like(tlist).astype(bool)
+for p in ['x', 'y']:
+    #tf mask file, 0 means flagged bad data
+    try:
+        tfm_filename = datadir + tag + '_%s%s_%i_%i.tfm'%(p, p, nt, nf)
+        tfmlist = np.fromfile(tfm_filename, dtype='float32').reshape((nt,nf))
+        tmask = tmask&np.array(tfmlist[:,0].astype('bool'))
+        #print tmask
+    except:
+        print "No mask file found"
+    #print freq, tlist
+
+
 data_shape = {}
 ubl_sort = {}
 for p in ['x', 'y']:
@@ -242,60 +308,21 @@ for p in ['x', 'y']:
     tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
     tlist = np.real(tflist[:, 0])
 
-    #tf mask file, 0 means flagged bad data
-    try:
-        tfm_filename = datadir + tag + '_%s%s_%i_%i.tfm'%(p, p, nt, nf)
-        tfmlist = np.fromfile(tfm_filename, dtype='float32').reshape((nt,nf))
-        tmask = np.array(tfmlist[:,0].astype('bool'))
-        #print tmask
-    except:
-        print "No mask file found"
-        tmask = np.zeros_like(tlist).astype(bool)
-    #print freq, tlist
-
     #ubl file
     ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
     ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
-    print "%i UBLs to include, longest baseline is %i wavelengths"%(len(ubls), np.max(np.linalg.norm(ubls, axis = 1)) / (C/freq))
+    print "%i UBLs to include, longest baseline is %i wavelengths"%(len(common_ubls), np.max(np.linalg.norm(common_ubls, axis = 1)) / (C/freq))
 
-    A_filename = datadir + tag + '_%s%s_%i_%i.Ad%i_%.3f'%(p, p, len(tlist)*len(ubls), npix, nside_standard, thresh)
 
-    if os.path.isfile(A_filename) and not force_recompute:
-        print "Reading A matrix from %s"%A_filename
-        sys.stdout.flush()
-        A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), npix))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), npix))
-    else:
-        #beam
-        beam_healpix = local_beam[p](freq)
-        #hpv.mollview(beam_healpix, title='beam %s'%p)
-        #plt.show()
-
-        vs = sv.Visibility_Simulator()
-        vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
-        beam_heal_equ = np.array(sv.rotate_healpixmap(beam_healpix, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]))
-        print "Computing A matrix for %s pol..."%p
-        sys.stdout.flush()
-        timer = time.time()
-        A[p] = np.empty((len(tlist)*len(ubls), npix), dtype='complex64')
-        for i in range(npix):
-            ra = phis[i]
-            dec = np.pi/2 - thetas[i]
-            print "\r%.1f%% completed, %f minutes left"%(100.*float(i)/(npix), float(npix-i)/(i+1)*(float(time.time()-timer)/60.)),
-            sys.stdout.flush()
-
-            A[p][:, i] = np.array([vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_heal_equ = beam_heal_equ, tlist = tlist) for d in ubls]).flatten()
-
-        print "%f minutes used"%(float(time.time()-timer)/60.)
-        sys.stdout.flush()
-        A[p].tofile(A_filename)
-        A[p] = A[p].reshape((len(ubls), len(tlist), npix))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), npix))
     #get Ni (1/variance) and data
     var_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + vartag + '.var'
-    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose().flatten() * (1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2)))**2)
+    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p])-1].flatten() * (1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2)))**2)
     data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + datatag
-    data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose().flatten()*1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2))).conjugate()#there's a conjugate convention difference
-    data_shape[p] = (nUBL, np.sum(tmask))
-    ubl_sort[p] = np.argsort(la.norm(ubls, axis = 1))
+    data[p] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p])-1]
+    data[p][ubl_index[p] < 0] = data[p][ubl_index[p] < 0].conjugate()
+    data[p] = (data[p].flatten()*1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2))).conjugate()#there's a conjugate convention difference
+    data_shape[p] = (len(common_ubls), np.sum(tmask))
+    ubl_sort[p] = np.argsort(la.norm(common_ubls, axis = 1))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
@@ -304,21 +331,22 @@ data = np.concatenate((data['x'],data['y']))
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 Ni = np.concatenate((Ni['x'],Ni['y']))
 Ni = np.concatenate((Ni/2, Ni/2))
+print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+sys.stdout.flush()
 
 #Merge A
+A = np.concatenate((A[:, 0, tmask], A[:, -1, tmask]), axis = 0).reshape((2*len(common_ubls)*len(tlist[tmask]), 4*npix))
+#A = np.concatenate((A['x'], A['y']))
+A = np.concatenate((np.real(A), np.imag(A)))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-A = np.concatenate((A['x'], A['y']))
-print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-A = np.concatenate((np.real(A), np.imag(A))) / 2 #factor of 2 for polarization: each pol only receives half energy
-print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-
+sys.stdout.flush()
 #simulate visibilities
-sim_data = A.dot(fake_solution * sizes) + np.random.randn(len(data))/Ni**.5
-sys.exit(0)
+clean_sim_data = A.dot(fake_solution * sizes)
 
-vis_normalization = np.median(data / sim_data)
+
+vis_normalization = np.median(data / clean_sim_data)
 print "Normalization from visibilities", vis_normalization
-diff_data = (sim_data * vis_normalization - data).reshape(2, len(data) / 2)
+diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
 diff_data = diff_data[0] + 1j * diff_data[1]
 diff_norm = {}
 diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
@@ -332,11 +360,11 @@ if remove_additive:
     niter = 0
     additive = {'x':0, 'y':0}
     additive_inc = {'x':0, 'y':0}
-    while niter == 0 or (abs(vis_normalization - np.median(data / sim_data)) > 1e-2 and niter < 20):
+    while niter == 0 or (abs(vis_normalization - np.median(data / clean_sim_data)) > 1e-2 and niter < 20):
         niter += 1
-        vis_normalization = np.median(data / sim_data)
+        vis_normalization = np.median(data / clean_sim_data)
         print "Normalization from visibilities", vis_normalization
-        diff_data = (sim_data * vis_normalization - data).reshape(2, len(data) / 2)
+        diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
         diff_data = diff_data[0] + 1j * diff_data[1]
         diff_norm = {}
         diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
@@ -348,9 +376,9 @@ if remove_additive:
         data = data + np.concatenate((np.real(np.concatenate((additive_inc['x'].flatten(), additive_inc['y'].flatten()))), np.imag(np.concatenate((additive_inc['x'].flatten(), additive_inc['y'].flatten())))))
 
 if plot_data_error:
-    vis_normalization = np.median(data / sim_data)
+    vis_normalization = np.median(data / clean_sim_data)
     print "Normalization from visibilities", vis_normalization
-    diff_data = (sim_data * vis_normalization - data).reshape(2, len(data) / 2)
+    diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
     diff_data = diff_data[0] + 1j * diff_data[1]
     diff_norm = {}
     diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
@@ -361,6 +389,50 @@ if plot_data_error:
 
 
 
+#vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
+#print "Normalization from visibilities", vis_normalization
+#diff_data = (clean_sim_data * vis_normalization - data)
+#diff_norm = {}
+#diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
+#diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
+
+#if plot_data_error:
+        #plt.plot(diff_norm['x'][ubl_sort['x']], label='original x error')
+        #plt.plot(diff_norm['y'][ubl_sort['y']], label='original y error')
+
+#if remove_additive:
+    #niter = 0
+    #additive = {'x':0, 'y':0}
+    #additive_inc = {'x':0, 'y':0}
+    #while niter == 0 or (abs(vis_normalization - np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))) > 1e-2 and niter < 20):
+        #niter += 1
+        #vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
+        #print "Normalization from visibilities", vis_normalization
+        #diff_data = clean_sim_data * vis_normalization - data
+        #diff_norm = {}
+        #diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
+        #diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
+        #additive_inc['x'] = np.repeat(np.mean(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1, keepdims = True), data_shape['x'][1], axis = 1)
+        #additive_inc['y'] = np.repeat(np.mean(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1, keepdims = True), data_shape['y'][1], axis = 1)
+        #additive['x'] = additive['x'] + additive_inc['x']
+        #additive['y'] = additive['y'] + additive_inc['y']
+        #data = data + np.concatenate((additive_inc['x'].flatten(), additive_inc['y'].flatten()))
+
+#if plot_data_error:
+    #vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
+    #print "Normalization from visibilities", vis_normalization
+    #diff_data = clean_sim_data * vis_normalization - data
+    #diff_norm = {}
+    #diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
+    #diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
+    #plt.plot(diff_norm['x'][ubl_sort['x']], label='new x error')
+    #plt.plot(diff_norm['y'][ubl_sort['y']], label='new y error')
+    #plt.legend();plt.show()
+
+##renormalize the model
+fake_solution = fake_solution * vis_normalization
+clean_sim_data = clean_sim_data * vis_normalization
+sim_data = clean_sim_data  + np.random.randn(len(data))/Ni**.5
 
 
 #compute AtNi and AtNi.y
@@ -380,7 +452,7 @@ if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename) and not for
     del(AtNi)
     #del(A)
     eigvl = np.fromfile(eigvl_filename, dtype='float32')
-    eigvc = np.fromfile(eigvc_filename, dtype='float32').reshape((npix, npix))
+    eigvc = np.fromfile(eigvc_filename, dtype='float32').reshape((4*npix, 4*npix))
 else:
     print "Computing AtNiA eigensystem...",
     sys.stdout.flush()
@@ -399,7 +471,7 @@ else:
 plt.plot(eigvl)
 
 #compute AtNiAi
-rcondA = 2.e-6
+rcondA = 3.e-6
 max_eigv = max(eigvl)
 print "Min eig %.2e"%min(eigvl), "Max eig %.2e"%max_eigv, "Add eig %.2e"%(max_eigv * rcondA)
 if min(eigvl) < 0 and np.abs(min(eigvl)) > max_eigv * rcondA:
@@ -412,7 +484,7 @@ eigvli = 1. / (max_eigv * rcondA + eigvl)
 AtNiAi_filename = datadir + tag + '_%i_%i%s.AtNiAi%.1f'%(npix, npix, vartag, np.log10(rcondA))
 if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
     print "Reading AtNiAi matrix from %s"%AtNiAi_filename
-    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((npix, npix))
+    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((4*npix, 4*npix))
 
 else:
     print "Computing AtNiAi matrix...",
