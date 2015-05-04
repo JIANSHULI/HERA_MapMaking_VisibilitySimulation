@@ -47,14 +47,14 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
 
 nside_start = 16
 nside_beamweight = 16
-nside_standard = 128
+nside_standard = 256
 bnside = 16
 plotcoord = 'C'
-thresh = 0.2
+thresh = 0.3
 #S_scale = 2
 #S_thresh = 1000#Kelvin
 #S_type = 'gsm%irm%i'%(S_scale,S_thresh)
-S_type = 'dyS' #dynamic S: straight forward diagnal
+S_type = 'dySP' #dynamic S polarized [[.25,0,0,.25], [0,p,0,0], [0,0,p,0], [.25,0,0,.25]]
 remove_additive = True
 
 
@@ -71,7 +71,7 @@ plot_data_error = True
 force_recompute = False
 force_recompute_AtNiAi = False
 force_recompute_S = False
-force_recompute_SEi = False
+force_recompute_SEi = True
 
 ####################################################
 ################data file and load beam##############
@@ -199,6 +199,7 @@ npix = len(thetas)
 fake_solution = hpf.get_interp_val(equatorial_GSM_standard, thetas, phis, nest=True)
 fake_solution = np.concatenate((fake_solution, np.zeros_like(fake_solution), np.zeros_like(fake_solution), fake_solution))
 sizes = np.concatenate((sizes, sizes, sizes, sizes))
+final_index = np.concatenate((final_index, final_index+npix, final_index+npix*2, final_index+npix*3))
 #final_index_filename = datadir + tag + '_%i.dyind%i_%.3f'%(nside_standard, npix, thresh)
 #final_index.astype('float32').tofile(final_index_filename)
 #sizes_filename = final_index_filename.replace('dyind', "dysiz")
@@ -219,7 +220,7 @@ if plot_pixelization:
     ###############################################################
     hpv.mollview(beam_weight, min=0,max=4, coord=plotcoord, title='beam', nest=True)
     hpv.mollview(np.log10(equatorial_GSM_standard), min=0,max=4, coord=plotcoord, title='GSM', nest=True)
-    hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min=0,max=4, coord=plotcoord, title='GSM gridded', nest=True)
+    hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()][:len(equatorial_GSM_standard)]), min=0,max=4, coord=plotcoord, title='GSM gridded', nest=True)
     hpv.mollview(np.log10(stds/abs_thresh), min=np.log10(thresh)-3, max = 3, coord=plotcoord, title='std', nest=True)
     hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start),max=np.log2(nside_standard), coord=plotcoord, title='count %i %.3f'%(len(thetas), float(len(thetas))/(12*nside_standard**2)), nest=True)
     plt.show()
@@ -449,6 +450,7 @@ eigvl_filename = datadir + tag + '_%i%s.AtNiAel'%(npix, vartag)
 eigvc_filename = datadir + tag + '_%i_%i%s.AtNiAev'%(npix, npix, vartag)
 if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename) and not force_recompute_AtNiAi:
     print "Reading eigen system of AtNiA from %s and %s"%(eigvl_filename, eigvc_filename)
+    sys.stdout.flush()
     del(AtNi)
     #del(A)
     eigvl = np.fromfile(eigvl_filename, dtype='float32')
@@ -508,6 +510,11 @@ else:
     chisq = np.sum(Ni * np.abs((A.dot(x) - data))**2) / float(len(data) - npix)
 chisq_sim = np.sum(Ni * np.abs((A.dot(sim_x) - sim_data))**2) / float(len(sim_data) - npix)
 
+#####investigate optimal rcondA
+print "lambda we use is", max_eigv * rcondA
+print "best lambda inferred from data is", (len(data) - np.sum(Ni * np.abs((A.dot(x) - data))**2))/np.sum(x**2)
+print "best lambda inferred from simulated data is", (len(data) - np.sum(Ni * np.abs((A.dot(sim_x) - sim_data))**2))/np.sum(sim_x**2)
+
 #compare measurement and simulation
 if plot_projection:
     xproj = (x.dot(eigvc))[::-1] #eigvl, eigvc = sla.eigh(AtNi.dot(A))
@@ -526,16 +533,21 @@ if plot_projection:
     plt.plot(eigvli[::-1]**.5, 'g')#(1/np.abs(eigvl[::-1])**.5)
     plt.ylim(-3e5, 3e5)
     plt.show()
-    #hybrid = np.copy(simproj)
-    #for cut in [0,100,500,1000,2000,3000,len(eigvl)]:
-        #hybrid[:cut] = xproj[:cut]
-        #hydrid_map = eigvc.dot(hybrid[::-1])
-        #hpv.mollview(np.log10((hydrid_map/sizes)[np.array(final_index).tolist()]), min=0,max=4, coord=plotcoord, title='cut:%i'%cut, nest = True)
-    #plt.show()
+
 
 #compute S
-S = np.diag(sim_x_clean**2.)
+print "computing S...",
+sys.stdout.flush()
+timer = time.time()
 
+pol_frac = .4#assuming QQ=UU=pol_frac*II
+S = np.zeros((len(x), len(x)), dtype='float32')
+for i in range(len(x)/4):
+    S[i::len(x)/4, i::len(x)/4] = np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
+#S = np.diag(sim_x_clean**2.)
+print "Done."
+print "%f minutes used"%(float(time.time()-timer)/60.)
+sys.stdout.flush()
 
 ##generalized eigenvalue problem
 #genSEv_filename = datadir + tag + '_%i_%i.genSEv_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
@@ -581,10 +593,29 @@ w_sim_sol = S.dot(SEi.dotv(sim_x))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
-hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min= 0, max =4, coord=plotcoord, title='GSM gridded', nest=True)
-hpv.mollview(np.log10((x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq, nest=True)
-hpv.mollview(np.log10((sim_x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw simulated solution, chi^2=%.2f'%chisq_sim, nest=True)
-hpv.mollview(np.log10((w_GSM/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered GSM', nest=True)
-hpv.mollview(np.log10((w_solution/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered solution', nest=True)
-hpv.mollview(np.log10((w_sim_sol/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered simulated solution', nest=True)
-plt.show()
+def plot_IQU(solution, final_index, title):
+    Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
+    I = Es[0] + Es[3]
+    Q = Es[0] - Es[3]
+    U = Es[1] + Es[2]
+    plotcoordtmp = 'CG'
+    hpv.mollview(np.log10(I), min=0, max =5.5, coord=plotcoordtmp, title=title, nest=True,sub = (4,1,1))
+    hpv.mollview(np.arcsinh(Q)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4,1,2))
+    hpv.mollview(np.arcsinh(U)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4,1,3))
+    hpv.mollview((Q**2+U**2)**.5/I, min = 0, max = 1, coord=plotcoordtmp, title=title, nest=True,sub = (4,1,4))
+    plt.show()
+
+plot_IQU(fake_solution, final_index, 'GSM gridded')
+plot_IQU(x/sizes, final_index, 'raw solution, chi^2=%.2f'%chisq)
+plot_IQU(sim_x/sizes, final_index, 'raw simulated solution, chi^2=%.2f'%chisq_sim)
+plot_IQU(w_GSM/sizes, final_index, 'wienered GSM')
+plot_IQU(w_solution/sizes, final_index, 'wienered solution')
+plot_IQU(w_sim_sol/sizes, final_index, 'wienered simulated solution')
+
+#hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min= 0, max =4, coord=plotcoord, title='GSM gridded', nest=True)
+#hpv.mollview(np.log10((x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq, nest=True)
+#hpv.mollview(np.log10((sim_x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw simulated solution, chi^2=%.2f'%chisq_sim, nest=True)
+#hpv.mollview(np.log10((w_GSM/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered GSM', nest=True)
+#hpv.mollview(np.log10((w_solution/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered solution', nest=True)
+#hpv.mollview(np.log10((w_sim_sol/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered simulated solution', nest=True)
+#plt.show()
