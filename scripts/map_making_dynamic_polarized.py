@@ -69,9 +69,9 @@ plot_projection = True
 plot_data_error = True
 
 force_recompute = False
-force_recompute_AtNiAi = False
+force_recompute_AtNiAi = True
 force_recompute_S = False
-force_recompute_SEi = True
+force_recompute_SEi = False
 
 ####################################################
 ################data file and load beam##############
@@ -250,7 +250,7 @@ for p in ['x', 'y']:
 #print vs.calculate_pol_pointsource_visibility(0, .5, ubls[0], freq, beam_heal_equ = beam_heal_equ, tlist = tlist).shape
 #sys.exit(0)
 
-A_filename = datadir + tag + '_%i_%i.Adp%i_%.3f'%(len(tlist)*len(common_ubls), npix, nside_standard, thresh)
+A_filename = datadir + tag + '_%i_%i.Adpc%i_%.3f'%(len(tlist)*len(common_ubls), npix, nside_standard, thresh)
 
 if os.path.isfile(A_filename) and not force_recompute:
     print "Reading A matrix from %s"%A_filename
@@ -336,8 +336,8 @@ print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 sys.stdout.flush()
 
 #Merge A
-A = np.concatenate((A[:, 0, tmask], A[:, -1, tmask]), axis = 0).reshape((2*len(common_ubls)*len(tlist[tmask]), 4*npix))
-#A = np.concatenate((A['x'], A['y']))
+#A = np.concatenate((A[:, 0, tmask], A[:, -1, tmask]), axis = 0).reshape((2*len(common_ubls)*len(tlist[tmask]), 4*npix))
+A.shape = (len(common_ubls)*4*len(tlist[tmask]), 4*npix)
 A = np.concatenate((np.real(A), np.imag(A)))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
@@ -593,24 +593,25 @@ w_sim_sol = S.dot(SEi.dotv(sim_x))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
-def plot_IQU(solution, final_index, title):
+def plot_IQU(solution, final_index, title, col, ncol = 6):
     Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
     I = Es[0] + Es[3]
     Q = Es[0] - Es[3]
     U = Es[1] + Es[2]
     plotcoordtmp = 'CG'
-    hpv.mollview(np.log10(I), min=0, max =5.5, coord=plotcoordtmp, title=title, nest=True,sub = (4,1,1))
-    hpv.mollview(np.arcsinh(Q)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4,1,2))
-    hpv.mollview(np.arcsinh(U)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4,1,3))
-    hpv.mollview((Q**2+U**2)**.5/I, min = 0, max = 1, coord=plotcoordtmp, title=title, nest=True,sub = (4,1,4))
-    plt.show()
+    hpv.mollview(np.log10(I), min=0, max =5.5, coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, col))
+    hpv.mollview(np.arcsinh(Q)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, ncol + col))
+    hpv.mollview(np.arcsinh(U)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, 2*ncol + col))
+    hpv.mollview((Q**2+U**2)**.5/I, min = 0, max = 1, coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, 3*ncol + col))
+    if col == ncol:
+        plt.show()
 
-plot_IQU(fake_solution, final_index, 'GSM gridded')
-plot_IQU(x/sizes, final_index, 'raw solution, chi^2=%.2f'%chisq)
-plot_IQU(sim_x/sizes, final_index, 'raw simulated solution, chi^2=%.2f'%chisq_sim)
-plot_IQU(w_GSM/sizes, final_index, 'wienered GSM')
-plot_IQU(w_solution/sizes, final_index, 'wienered solution')
-plot_IQU(w_sim_sol/sizes, final_index, 'wienered simulated solution')
+plot_IQU(fake_solution, final_index, 'GSM gridded', 1)
+plot_IQU(x/sizes, final_index, 'raw solution, chi^2=%.2f'%chisq, 2)
+plot_IQU(sim_x/sizes, final_index, 'raw simulated solution, chi^2=%.2f'%chisq_sim, 3)
+plot_IQU(w_GSM/sizes, final_index, 'wienered GSM', 4)
+plot_IQU(w_solution/sizes, final_index, 'wienered solution', 5)
+plot_IQU(w_sim_sol/sizes, final_index, 'wienered simulated solution', 6)
 
 #hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min= 0, max =4, coord=plotcoord, title='GSM gridded', nest=True)
 #hpv.mollview(np.log10((x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq, nest=True)
