@@ -288,7 +288,7 @@ class Visibility_Simulator:
             sys.stdout.flush()
         return Bulm
 
-    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d in horizontal coord, tlist in lst hours
+    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d in horizontal coord, tlist in lst hours, beam in unites of power
         if self.initial_zenith.tolist() == [1000, 1000]:
             raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
         if tlist is None and nt is None:
@@ -313,7 +313,7 @@ class Visibility_Simulator:
         ###return result
         return hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) * np.exp(ik * (rotatez_matrix(angle_list).transpose(2,0,1).dot(d_equ).dot(ps_vec)))
 
-    def calculate_pol_pointsource_visibility(self, ra, dec, d_in, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d_in in horizontal coord, beam is 4 by npix (xx,xy,yx,yy), tlist in lst hours, return 4 by 4 by nt numbers, where first dim of 4 is received xx xy yx yy, and second is xx xy yx yy on sky
+    def calculate_pol_pointsource_visibility(self, ra, dec, d_in, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d_in in horizontal coord, beam is 4 by npix (xx,xy,yx,yy) in unites of Jones matrix, square root of power, tlist in lst hours, return 4 by 4 by nt numbers, where first dim of 4 is received xx xy yx yy, and second is xx xy yx yy on sky
         if self.initial_zenith.tolist() == [1000, 1000]:
             raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
         if tlist is None and nt is None:

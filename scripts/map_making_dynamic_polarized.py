@@ -55,7 +55,7 @@ thresh = 0.3
 #S_thresh = 1000#Kelvin
 #S_type = 'gsm%irm%i'%(S_scale,S_thresh)
 S_type = 'dySP' #dynamic S polarized [[.25,0,0,.25], [0,p,0,0], [0,0,p,0], [.25,0,0,.25]]
-remove_additive = True
+remove_additive = False
 
 
 lat_degree = 45.2977
@@ -69,20 +69,20 @@ plot_projection = True
 plot_data_error = True
 
 force_recompute = False
-force_recompute_AtNiAi = True
+force_recompute_AtNiAi = False
 force_recompute_S = False
 force_recompute_SEi = False
 
 ####################################################
 ################data file and load beam##############
 ####################################################
-tag = "q3_abscalibrated"
-datatag = '_seccasa_polcor.rad'
-vartag = '_seccasa_polcor'
+tag = "q3A_abscal"
+datatag = '_2015_05_09'
+vartag = '_2015_05_09'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-nt = 440
+nt = 253
 nf = 1
-nUBL = 75
+nUBL = 78
 
 #deal with beam: create a callable function of the form y(freq) in MHz and returns npix by 4
 freqs = range(110,200,10)
@@ -110,7 +110,7 @@ for p in ['x', 'y']:
         #print tmask
     except:
         print "No mask file found"
-        tmask = np.zeros_like(tlist).astype(bool)
+        tmask = np.ones_like(tlist).astype(bool)
     #print freq, tlist
 
     #ubl file
@@ -126,7 +126,10 @@ for p in ['x', 'y']:
         A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), 12*nside_beamweight**2))[:,tmask].reshape((len(ubls)*len(tlist[tmask]), 12*nside_beamweight**2))
     else:
         #beam
-        beam_healpix = local_beam[p](freq)
+        if p == 'x':
+            beam_healpix = abs(local_beam(freq)[0])**2 + abs(local_beam(freq)[1])**2
+        elif p == 'y':
+            beam_healpix = abs(local_beam(freq)[2])**2 + abs(local_beam(freq)[3])**2
         #hpv.mollview(beam_healpix, title='beam %s'%p)
         #plt.show()
 
@@ -197,7 +200,7 @@ abs_thresh = np.mean(equatorial_GSM_standard * beam_weight) * thresh
 pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standard, nside_start, abs_thresh, final_index, thetas, phis, sizes)
 npix = len(thetas)
 fake_solution = hpf.get_interp_val(equatorial_GSM_standard, thetas, phis, nest=True)
-fake_solution = np.concatenate((fake_solution, np.zeros_like(fake_solution), np.zeros_like(fake_solution), fake_solution))
+fake_solution = np.concatenate((fake_solution/2, np.zeros_like(fake_solution), np.zeros_like(fake_solution), fake_solution/2))
 sizes = np.concatenate((sizes, sizes, sizes, sizes))
 final_index = np.concatenate((final_index, final_index+npix, final_index+npix*2, final_index+npix*3))
 #final_index_filename = datadir + tag + '_%i.dyind%i_%.3f'%(nside_standard, npix, thresh)
@@ -303,34 +306,35 @@ for p in ['x', 'y']:
 data_shape = {}
 ubl_sort = {}
 for p in ['x', 'y']:
-    pol = p+p
-    #tf file
-    tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
-    tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
-    tlist = np.real(tflist[:, 0])
+    for p2 in ['x', 'y']:
+        pol = p+p2
+        #tf file
+        tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p2, nt, nf)
+        tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
+        tlist = np.real(tflist[:, 0])
 
-    #ubl file
-    ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
-    ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
-    print "%i UBLs to include, longest baseline is %i wavelengths"%(len(common_ubls), np.max(np.linalg.norm(common_ubls, axis = 1)) / (C/freq))
+        #ubl file
+        ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p2, nUBL, 3)
+        ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
+        print "%i UBLs to include, longest baseline is %i wavelengths"%(len(common_ubls), np.max(np.linalg.norm(common_ubls, axis = 1)) / (C/freq))
 
 
-    #get Ni (1/variance) and data
-    var_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + vartag + '.var'
-    Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p])-1].flatten() * (1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2)))**2)
-    data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + datatag
-    data[p] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p])-1]
-    data[p][ubl_index[p] < 0] = data[p][ubl_index[p] < 0].conjugate()
-    data[p] = (data[p].flatten()*1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2))).conjugate()#there's a conjugate convention difference
-    data_shape[p] = (len(common_ubls), np.sum(tmask))
-    ubl_sort[p] = np.argsort(la.norm(common_ubls, axis = 1))
+        #get Ni (1/variance) and data
+        var_filename = datadir + tag + '_%s%s_%i_%i'%(p, p2, nt, nUBL) + vartag + '.var'
+        Ni[pol] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p])-1].flatten() * (1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2)))**2)
+        data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p2, nt, nUBL) + datatag
+        data[pol] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p])-1]
+        data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
+        data[pol] = (data[pol].flatten()*1.e-26*(C/freq)**2/2/kB/(4*np.pi/(12*nside_standard**2))).conjugate()#there's a conjugate convention difference
+        data_shape[pol] = (len(common_ubls), np.sum(tmask))
+        ubl_sort[p] = np.argsort(la.norm(common_ubls, axis = 1))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
 #Merge data
-data = np.concatenate((data['x'],data['y']))
+data = np.concatenate((data['xx'],data['xy'],data['yx'],data['yy']))
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
-Ni = np.concatenate((Ni['x'],Ni['y']))
+Ni = np.concatenate((Ni['xx'],Ni['xy'],Ni['yx'],Ni['yy']))
 Ni = np.concatenate((Ni/2, Ni/2))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
@@ -350,8 +354,8 @@ print "Normalization from visibilities", vis_normalization
 diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
 diff_data = diff_data[0] + 1j * diff_data[1]
 diff_norm = {}
-diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
-diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
+diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
+diff_norm['y'] = la.norm(-diff_data[data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
 
 if plot_data_error:
         plt.plot(diff_norm['x'][ubl_sort['x']])
@@ -368,25 +372,25 @@ if remove_additive:
         diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
         diff_data = diff_data[0] + 1j * diff_data[1]
         diff_norm = {}
-        diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
-        diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
-        additive_inc['x'] = np.repeat(np.mean(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1, keepdims = True), data_shape['x'][1], axis = 1)
-        additive_inc['y'] = np.repeat(np.mean(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1, keepdims = True), data_shape['y'][1], axis = 1)
+        diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
+        diff_norm['y'] = la.norm(-diff_data[data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
+        additive_inc['x'] = np.repeat(np.mean(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1, keepdims = True), data_shape['xx'][1], axis = 1)
+        additive_inc['yy'] = np.repeat(np.mean(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1, keepdims = True), data_shape['yy'][1], axis = 1)
         additive['x'] = additive['x'] + additive_inc['x']
         additive['y'] = additive['y'] + additive_inc['y']
-        data = data + np.concatenate((np.real(np.concatenate((additive_inc['x'].flatten(), additive_inc['y'].flatten()))), np.imag(np.concatenate((additive_inc['x'].flatten(), additive_inc['y'].flatten())))))
+        data = data + np.concatenate((np.real(np.concatenate((additive_inc['x'].flatten(), np.zeros(len(data)/4,dtype='float32'), additive_inc['y'].flatten()))), np.imag(np.concatenate((additive_inc['x'].flatten(), np.zeros(len(data)/4,dtype='float32'), additive_inc['y'].flatten())))))
 
-if plot_data_error:
-    vis_normalization = np.median(data / clean_sim_data)
-    print "Normalization from visibilities", vis_normalization
-    diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
-    diff_data = diff_data[0] + 1j * diff_data[1]
-    diff_norm = {}
-    diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
-    diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
-    plt.plot(diff_norm['x'][ubl_sort['x']])
-    plt.plot(diff_norm['y'][ubl_sort['y']])
-    plt.show()
+    if plot_data_error:
+        vis_normalization = np.median(data / clean_sim_data)
+        print "Normalization from visibilities", vis_normalization
+        diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
+        diff_data = diff_data[0] + 1j * diff_data[1]
+        diff_norm = {}
+        diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
+        diff_norm['y'] = la.norm(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
+        plt.plot(diff_norm['x'][ubl_sort['x']])
+        plt.plot(diff_norm['y'][ubl_sort['y']])
+plt.show()
 
 
 
