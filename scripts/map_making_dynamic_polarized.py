@@ -47,7 +47,7 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
 
 nside_start = 16
 nside_beamweight = 16
-nside_standard = 256
+nside_standard = 128
 bnside = 16
 plotcoord = 'C'
 thresh = 0.3
@@ -332,9 +332,9 @@ print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 sys.stdout.flush()
 
 #Merge data
-data = np.concatenate((data['xx'],data['xy'],data['yx'],data['yy']))
+data = np.array([data['xx'],data['xy'],data['yx'],data['yy']]).reshape([4]+list(data_shape['xx'])).transpose((1,0,2)).flatten()
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
-Ni = np.concatenate((Ni['xx'],Ni['xy'],Ni['yx'],Ni['yy']))
+Ni = np.concatenate((Ni['xx'],Ni['xy'],Ni['yx'],Ni['yy'])).reshape([4]+list(data_shape['xx'])).transpose((1,0,2)).flatten()
 Ni = np.concatenate((Ni/2, Ni/2))
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
@@ -349,13 +349,13 @@ sys.stdout.flush()
 clean_sim_data = A.dot(fake_solution * sizes)
 
 
-vis_normalization = np.median(data / clean_sim_data)
+vis_normalization = np.median(np.linalg.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[:,:, [0,3]],axis=0) / np.linalg.norm(clean_sim_data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[:,:, [0,3]],axis=0))
 print "Normalization from visibilities", vis_normalization
 diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
 diff_data = diff_data[0] + 1j * diff_data[1]
 diff_norm = {}
 diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
-diff_norm['y'] = la.norm(-diff_data[data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
+diff_norm['y'] = la.norm(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
 
 if plot_data_error:
         plt.plot(diff_norm['x'][ubl_sort['x']])
@@ -373,7 +373,7 @@ if remove_additive:
         diff_data = diff_data[0] + 1j * diff_data[1]
         diff_norm = {}
         diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
-        diff_norm['y'] = la.norm(-diff_data[data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
+        diff_norm['y'] = la.norm(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
         additive_inc['x'] = np.repeat(np.mean(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1, keepdims = True), data_shape['xx'][1], axis = 1)
         additive_inc['yy'] = np.repeat(np.mean(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1, keepdims = True), data_shape['yy'][1], axis = 1)
         additive['x'] = additive['x'] + additive_inc['x']
