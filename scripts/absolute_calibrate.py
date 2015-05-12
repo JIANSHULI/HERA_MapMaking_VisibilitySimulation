@@ -7,9 +7,9 @@ PI = np.pi
 TPI = 2*np.pi
 
 
-Q = 'q3A'#'q2C'#
+Q = 'q3A'#'q2C'#'qC3B'#
 delay_compression = 15
-freqs_dic = {'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),}
+freqs_dic = {'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),}
 freqs = freqs_dic[Q]
 lambdas = 299.792 / freqs
 pick_f = 4
@@ -202,7 +202,10 @@ plt.show()
 
 
 cal_lst_range = [5, 6]
-calibrate_ubl_length = 18.
+if Q[:2] == 'qC':
+    calibrate_ubl_length = 12.
+else:
+    calibrate_ubl_length = 18.
 cal_time_mask = (lsts>cal_lst_range[0]) & (lsts<cal_lst_range[1])#a True/False mask on all good data to get good data in cal time range
 cal_ubl_mask = np.linalg.norm(info['ubl'], axis=1) >= calibrate_ubl_length
 

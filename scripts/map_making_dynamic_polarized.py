@@ -55,7 +55,7 @@ thresh = 0.3
 #S_thresh = 1000#Kelvin
 #S_type = 'gsm%irm%i'%(S_scale,S_thresh)
 S_type = 'dySP' #dynamic S polarized [[.25,0,0,.25], [0,p,0,0], [0,0,p,0], [.25,0,0,.25]]
-remove_additive = False
+remove_additive = True
 
 
 lat_degree = 45.2977
@@ -69,8 +69,9 @@ plot_projection = True
 plot_data_error = True
 
 force_recompute = False
+force_recompute_AtNiAi_eig = False
 force_recompute_AtNiAi = False
-force_recompute_S = False
+force_recompute_S = True
 force_recompute_SEi = False
 
 ####################################################
@@ -90,8 +91,7 @@ local_beam = si.interp1d(freqs, np.concatenate([np.fromfile('/home/omniscope/dat
 
 
 A = {}
-data = {}
-Ni = {}
+
 for p in ['x', 'y']:
     pol = p+p
 
@@ -286,8 +286,25 @@ else:
     A.shape = (len(common_ubls), 4, len(tlist), 4, npix)
 
 
+#Compute autocorr
+beam_healpix = local_beam(freq)
+vs = sv.Visibility_Simulator()
+vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
+beam_heal_equ = np.array([sv.rotate_healpixmap(beam_healpixi, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]) for beam_healpixi in local_beam(freq)])
+print "Computing autocorr..."
+sys.stdout.flush()
+timer = time.time()
+autocorr = np.empty((4 * len(tlist), 4, npix), dtype='complex64')
+for i in range(npix):
+    ra = phis[i]
+    dec = np.pi/2 - thetas[i]
+    print "\r%.1f%% completed, %f minutes left"%(100.*float(i)/(npix), float(npix-i)/(i+1)*(float(time.time()-timer)/60.)),
+    sys.stdout.flush()
 
+    autocorr[..., i] = vs.calculate_pol_pointsource_visibility(ra, dec, [[0,0,0]], freq, beam_heal_equ = beam_heal_equ, tlist = tlist)[0]
 
+print "%f minutes used"%(float(time.time()-timer)/60.)
+sys.stdout.flush()
 
 
 tmask = np.ones_like(tlist).astype(bool)
@@ -302,7 +319,8 @@ for p in ['x', 'y']:
         print "No mask file found"
     #print freq, tlist
 
-
+data = {}
+Ni = {}
 data_shape = {}
 ubl_sort = {}
 for p in ['x', 'y']:
@@ -332,6 +350,7 @@ print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 sys.stdout.flush()
 
 #Merge data
+original_data = np.array([data['xx'],data['xy'],data['yx'],data['yy']]).reshape([4]+list(data_shape['xx'])).transpose((1,0,2))
 data = np.array([data['xx'],data['xy'],data['yx'],data['yy']]).reshape([4]+list(data_shape['xx'])).transpose((1,0,2)).flatten()
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 Ni = np.concatenate((Ni['xx'],Ni['xy'],Ni['yx'],Ni['yy'])).reshape([4]+list(data_shape['xx'])).transpose((1,0,2)).flatten()
@@ -354,13 +373,15 @@ print "Normalization from visibilities", vis_normalization
 diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
 diff_data = diff_data[0] + 1j * diff_data[1]
 diff_norm = {}
-diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
-diff_norm['y'] = la.norm(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
+diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis = 1)
+diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis = 1)
 
 if plot_data_error:
         plt.plot(diff_norm['x'][ubl_sort['x']])
         plt.plot(diff_norm['y'][ubl_sort['y']])
 
+#todo use autocorr rather than constant as removal term
+#todo remove cross-pol terms
 if remove_additive:
     niter = 0
     additive = {'x':0, 'y':0}
@@ -372,13 +393,13 @@ if remove_additive:
         diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
         diff_data = diff_data[0] + 1j * diff_data[1]
         diff_norm = {}
-        diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
-        diff_norm['y'] = la.norm(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
-        additive_inc['x'] = np.repeat(np.mean(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1, keepdims = True), data_shape['xx'][1], axis = 1)
-        additive_inc['yy'] = np.repeat(np.mean(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1, keepdims = True), data_shape['yy'][1], axis = 1)
+        diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis = 1)
+        diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis = 1)
+        additive_inc['x'] = np.repeat(np.mean(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis = 1, keepdims = True), data_shape['xx'][1], axis = 1)
+        additive_inc['y'] = np.repeat(np.mean(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis = 1, keepdims = True), data_shape['yy'][1], axis = 1)
         additive['x'] = additive['x'] + additive_inc['x']
         additive['y'] = additive['y'] + additive_inc['y']
-        data = data + np.concatenate((np.real(np.concatenate((additive_inc['x'].flatten(), np.zeros(len(data)/4,dtype='float32'), additive_inc['y'].flatten()))), np.imag(np.concatenate((additive_inc['x'].flatten(), np.zeros(len(data)/4,dtype='float32'), additive_inc['y'].flatten())))))
+        data = data + np.concatenate((np.real(np.concatenate((additive_inc['x'].flatten(), np.zeros(len(data)/4,dtype='float32'), additive_inc['y'].flatten()))), np.imag(np.concatenate((additive_inc['x'].flatten(), np.zeros(len(data)/4,dtype='float32'), additive_inc['y'].flatten()))))).reshape((2, 4, data_shape['xx'][0], data_shape['xx'][1])).transpose((0, 2, 1, 3)).flatten()
 
     if plot_data_error:
         vis_normalization = np.median(data / clean_sim_data)
@@ -386,12 +407,11 @@ if remove_additive:
         diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
         diff_data = diff_data[0] + 1j * diff_data[1]
         diff_norm = {}
-        diff_norm['x'] = la.norm(diff_data[:data_shape['xx'][0] * data_shape['xx'][1]].reshape(*data_shape['xx']), axis = 1)
-        diff_norm['y'] = la.norm(diff_data[-data_shape['yy'][0] * data_shape['yy'][1]:].reshape(*data_shape['yy']), axis = 1)
+        diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis = 1)
+        diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis = 1)
         plt.plot(diff_norm['x'][ubl_sort['x']])
         plt.plot(diff_norm['y'][ubl_sort['y']])
 plt.show()
-
 
 
 #vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
@@ -452,7 +472,7 @@ AtNi_sim_data = AtNi.dot(sim_data)
 #compute AtNiA eigensystems
 eigvl_filename = datadir + tag + '_%i%s.AtNiAel'%(npix, vartag)
 eigvc_filename = datadir + tag + '_%i_%i%s.AtNiAev'%(npix, npix, vartag)
-if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename) and not force_recompute_AtNiAi:
+if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename) and not force_recompute_AtNiAi_eig:
     print "Reading eigen system of AtNiA from %s and %s"%(eigvl_filename, eigvc_filename)
     sys.stdout.flush()
     del(AtNi)
@@ -477,27 +497,32 @@ else:
 plt.plot(eigvl)
 
 #compute AtNiAi
-rcondA = 3.e-6
+
 max_eigv = max(eigvl)
-print "Min eig %.2e"%min(eigvl), "Max eig %.2e"%max_eigv, "Add eig %.2e"%(max_eigv * rcondA)
-if min(eigvl) < 0 and np.abs(min(eigvl)) > max_eigv * rcondA:
-    print "!WARNING!"
-    print "!WARNING!: negative eigenvalue %.2e is smaller than the added identity %.2e! min rcond %.2e needed."%(min(eigvl), max_eigv * rcondA, np.abs(min(eigvl))/max_eigv)
-    print "!WARNING!"
-eigvli = 1. / (max_eigv * rcondA + eigvl)
+rcondA = (1.e-9) / max_eigv
+#if min(eigvl) <= 0:
+    #rcondA = (1.e-12) / max_eigv#3.e-6 * 256/nside_standard
+#else:
+    #rcondA = 0
+#print "Min eig %.2e"%min(eigvl), "Max eig %.2e"%max_eigv, "Add eig %.2e"%(max_eigv * rcondA)
+#if min(eigvl) < 0 and np.abs(min(eigvl)) > max_eigv * rcondA:
+    #print "!WARNING!"
+    #print "!WARNING!: negative eigenvalue %.2e is smaller than the added identity %.2e! min rcond %.2e needed."%(min(eigvl), max_eigv * rcondA, np.abs(min(eigvl))/max_eigv)
+    #print "!WARNING!"
+eigvli = 1. / (max_eigv * rcondA + np.maximum(eigvl, 0))
 
-
-AtNiAi_filename = datadir + tag + '_%i_%i%s.AtNiAi%.1f'%(npix, npix, vartag, np.log10(rcondA))
+precision = 64
+AtNiAi_filename = datadir + tag + '_%i_%i%s.AtNiAi%i%.1f'%(npix, npix, vartag, precision, np.log10(rcondA))
 if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
     print "Reading AtNiAi matrix from %s"%AtNiAi_filename
-    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float32').reshape((4*npix, 4*npix))
+    AtNiAi = np.fromfile(AtNiAi_filename, dtype='float%i'%precision).reshape((4*npix, 4*npix))
 
 else:
     print "Computing AtNiAi matrix...",
     sys.stdout.flush()
     timer = time.time()
 
-    AtNiAi = (eigvc * eigvli).dot(eigvc.transpose())
+    AtNiAi = (eigvc * eigvli).astype('float%i'%precision).dot(eigvc.transpose().astype('float%i'%precision))
     print "%f minutes used"%(float(time.time()-timer)/60.)
     sys.stdout.flush()
     AtNiAi.tofile(AtNiAi_filename)
@@ -509,7 +534,7 @@ x = AtNiAi.dot(AtNi_data)
 sim_x = AtNiAi.dot(AtNi_sim_data)
 sim_x_clean = fake_solution * sizes
 if remove_additive:
-    chisq = np.sum(Ni * np.abs((A.dot(x) - data))**2) / float(len(data) - npix - data_shape['x'][0] - data_shape['y'][0])
+    chisq = np.sum(Ni * np.abs((A.dot(x) - data))**2) / float(len(data) - npix - data_shape['xx'][0] - data_shape['yy'][0])
 else:
     chisq = np.sum(Ni * np.abs((A.dot(x) - data))**2) / float(len(data) - npix)
 chisq_sim = np.sum(Ni * np.abs((A.dot(sim_x) - sim_data))**2) / float(len(sim_data) - npix)
@@ -573,16 +598,16 @@ sys.stdout.flush()
 #quit()
 
 #####compute wiener filter##############
-SEi_filename = datadir + tag + '_%i_%i%s.CSEi_%s_%.1f'%(len(S), len(S), vartag, S_type, np.log10(rcondA))
+SEi_filename = datadir + tag + '_%i_%i%s.CSEi_%s_%i_%.1f'%(len(S), len(S), vartag, S_type, precision, np.log10(rcondA))
 if os.path.isfile(SEi_filename) and not force_recompute_SEi:
     print "Reading Wiener filter component...",
     sys.stdout.flush()
-    SEi = sv.InverseCholeskyMatrix.fromfile(SEi_filename, len(S), 'float32')
+    SEi = sv.InverseCholeskyMatrix.fromfile(SEi_filename, len(S), 'float%i'%precision)
 else:
     print "Computing Wiener filter component...",
     sys.stdout.flush()
     timer = time.time()
-    SEi = sv.InverseCholeskyMatrix(S + AtNiAi).astype('float32')
+    SEi = sv.InverseCholeskyMatrix(S + AtNiAi).astype('float%i'%precision)
     SEi.tofile(SEi_filename, overwrite = True)
     print "%f minutes used"%(float(time.time()-timer)/60.)
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
@@ -602,10 +627,12 @@ def plot_IQU(solution, final_index, title, col, ncol = 6):
     I = Es[0] + Es[3]
     Q = Es[0] - Es[3]
     U = Es[1] + Es[2]
+    pangle = 180*np.arctan2(Q,U)/2/PI
     plotcoordtmp = 'CG'
     hpv.mollview(np.log10(I), min=0, max =5.5, coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, col))
-    hpv.mollview(np.arcsinh(Q)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, ncol + col))
-    hpv.mollview(np.arcsinh(U)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, 2*ncol + col))
+    #hpv.mollview(np.arcsinh(Q)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, ncol + col))
+    #hpv.mollview(np.arcsinh(U)/np.log(10), min=-np.arcsinh(10.**5.5)/np.log(10), max = np.arcsinh(10.**5.5)/np.log(10), coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, 2*ncol + col))
+    hpv.mollview(pangle, min=-90, max = 90, coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, ncol + col))
     hpv.mollview((Q**2+U**2)**.5/I, min = 0, max = 1, coord=plotcoordtmp, title=title, nest=True,sub = (4, ncol, 3*ncol + col))
     if col == ncol:
         plt.show()
