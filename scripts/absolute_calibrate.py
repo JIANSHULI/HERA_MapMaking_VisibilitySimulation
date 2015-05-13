@@ -7,12 +7,15 @@ PI = np.pi
 TPI = 2*np.pi
 
 
-Q = 'q3A'#'q2C'#'qC3B'#
+Q = 'qC3B'#'q0C'#'q3A'#'q2C'#
+pick_f = 4#-4
+fit_cas = False
+frac_cas = .9
 delay_compression = 15
-freqs_dic = {'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),}
+freqs_dic = {'q0C': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),}
 freqs = freqs_dic[Q]
 lambdas = 299.792 / freqs
-pick_f = 4
+
 print freqs[pick_f]
 
 
@@ -211,41 +214,50 @@ cal_ubl_mask = np.linalg.norm(info['ubl'], axis=1) >= calibrate_ubl_length
 
 
 ##calibrate cas flux and over all calibration amp
+if fit_cas:
+    #first try fitting xx and yy seperately as a jackknife
+    error = {'xx':1.e9, 'yy':1.e9}
+    tmp_result = -1
+    for pol in ['xx','yy']:
+        b = np.abs(rawdata[pol][cal_time_mask][:, cal_ubl_mask].flatten())
+        fracs = {}
+        fracs['cyg'] = 1.
+        for fracs['cas'] in np.arange(.8,1.2,.001):
+            A = np.abs(np.sum([fracs[source]*ps_visibilities[source][pol][cal_time_mask][:, cal_ubl_mask].flatten() for source in cal_sources], axis = 0))
+            if np.linalg.norm(A * A.dot(b)/A.dot(A) - b) < error[pol]:
+                tmp_result = fracs['cas']
+                error[pol] = np.linalg.norm(A * A.dot(b)/A.dot(A) - b)
+        print pol+' CasA fit:', tmp_result
 
-#first try fitting xx and yy seperately as a jackknife
-error = {'xx':1.e9, 'yy':1.e9}
-tmp_result = -1
-for pol in ['xx','yy']:
-    b = np.abs(rawdata[pol][cal_time_mask][:, cal_ubl_mask].flatten())
+    ###fit jointly to get both cas fraction and the amplitude calibrations for xx and yy
+    error = 1.e9
+    tmp_result = -1
+    b = {}
+    A = {}
     fracs = {}
+    ampcals = {} #caldata= data * ampcal
     fracs['cyg'] = 1.
     for fracs['cas'] in np.arange(.8,1.2,.001):
-        A = np.abs(np.sum([fracs[source]*ps_visibilities[source][pol][cal_time_mask][:, cal_ubl_mask].flatten() for source in cal_sources], axis = 0))
-        if np.linalg.norm(A * A.dot(b)/A.dot(A) - b) < error[pol]:
-            tmp_result = fracs['cas']
-            error[pol] = np.linalg.norm(A * A.dot(b)/A.dot(A) - b)
-    print pol+' CasA fit:', tmp_result
+        for pol in ['xx','yy']:
+            b[pol] = np.abs(rawdata[pol][cal_time_mask][:, cal_ubl_mask].flatten())
 
-###fit jointly to get both cas fraction and the amplitude calibrations for xx and yy
-error = 1.e9
-tmp_result = -1
-b = {}
-A = {}
-fracs = {}
-ampcals = {} #caldata= data * ampcal
-fracs['cyg'] = 1.
-for fracs['cas'] in np.arange(.8,1.2,.001):
+            A[pol] = np.abs(np.sum([fracs[source]*ps_visibilities[source][pol][cal_time_mask][:, cal_ubl_mask].flatten() for source in cal_sources], axis = 0))
+        if np.sum([np.linalg.norm(A[pol] * A[pol].dot(b[pol])/A[pol].dot(A[pol]) - b[pol])**2 for pol in ['xx', 'yy']]) < error:
+            error = np.sum([np.linalg.norm(A[pol] * A[pol].dot(b[pol])/A[pol].dot(A[pol]) - b[pol])**2 for pol in ['xx', 'yy']])
+            tmp_result = fracs['cas']
+            for pol in ['xx', 'yy']:
+                ampcals[pol] = 1./(A[pol].dot(b[pol])/A[pol].dot(A[pol]))
+    fracs['cas'] = tmp_result
+    print 'Joint CasA fit:', fracs['cas'], "amp calibrations:", ampcals['xx'], ampcals['yy']
+else:
+    fracs['cas'] = frac_cas
     for pol in ['xx','yy']:
         b[pol] = np.abs(rawdata[pol][cal_time_mask][:, cal_ubl_mask].flatten())
 
         A[pol] = np.abs(np.sum([fracs[source]*ps_visibilities[source][pol][cal_time_mask][:, cal_ubl_mask].flatten() for source in cal_sources], axis = 0))
-    if np.sum([np.linalg.norm(A[pol] * A[pol].dot(b[pol])/A[pol].dot(A[pol]) - b[pol])**2 for pol in ['xx', 'yy']]) < error:
-        error = np.sum([np.linalg.norm(A[pol] * A[pol].dot(b[pol])/A[pol].dot(A[pol]) - b[pol])**2 for pol in ['xx', 'yy']])
-        tmp_result = fracs['cas']
-        for pol in ['xx', 'yy']:
-            ampcals[pol] = 1./(A[pol].dot(b[pol])/A[pol].dot(A[pol]))
-fracs['cas'] = tmp_result
-print 'Joint CasA fit:', fracs['cas'], "amp calibrations:", ampcals['xx'], ampcals['yy']
+    error = np.sum([np.linalg.norm(A[pol] * A[pol].dot(b[pol])/A[pol].dot(A[pol]) - b[pol])**2 for pol in ['xx', 'yy']])
+    for pol in ['xx', 'yy']:
+        ampcals[pol] = 1./(A[pol].dot(b[pol])/A[pol].dot(A[pol]))
 
 ###apply cas fraction and amp cals and plot again
 ampdata = {}
