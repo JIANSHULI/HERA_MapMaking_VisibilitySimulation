@@ -7,12 +7,12 @@ PI = np.pi
 TPI = 2*np.pi
 
 
-Q = 'qC3B'#'q0C'#'q3A'#'q2C'#
+Q = sys.argv[1]#'q3AL'#'q0C'#'q3A'#'q2C'#
 pick_f = 4#-4
-fit_cas = False
+fit_cas = True
 frac_cas = .9
 delay_compression = 15
-freqs_dic = {'q0C': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),}
+freqs_dic = {'q0C': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'q3AL': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),'q2CL':np.arange(145., 157.5, 50./1024/delay_compression*256),}
 freqs = freqs_dic[Q]
 lambdas = 299.792 / freqs
 
@@ -37,10 +37,17 @@ for pol in ['xx', 'yy']:
     flags[pol] = np.concatenate([np.fromfile(fname, dtype = 'bool').reshape((nTimes[i], nFrequencies[i])) for i, fname in enumerate(sorted(glob.glob("/home/omniscope/data/X5/2015calibration/*_%s_*%s.omniflag"%(Q, pol))))], axis=0)
 flag = flags['xx']|flags['yy']
 
-for pol in ['xx', 'xy','yx', 'yy']:
-    omnifits[pol] = np.concatenate([fit[..., 6::2] + 1.j*fit[..., 7::2] for fit in omnifits[pol]], axis=0).transpose((0,2,1))
-    omnifits[pol][flag] = np.nan
 
+
+for p,pol in enumerate(['xx', 'xy','yx', 'yy']):
+    omnifits[pol] = np.concatenate([fit[..., 6::2] + 1.j*fit[..., 7::2] for fit in omnifits[pol]], axis=0).transpose((0,2,1))
+    if pol=='yy':
+        plt.subplot(1,2,1)
+        plt.imshow(np.angle(omnifits[pol][...,0]), aspect=.1, interpolation='none');plt.colorbar();plt.title('Before flagging')
+    omnifits[pol][flag] = np.nan
+plt.subplot(1,2,2)
+plt.imshow(np.angle(omnifits['yy'][...,0]), aspect=.1, interpolation='none');plt.colorbar();plt.title('Flagged')
+plt.show()
 info = omni.read_redundantinfo(glob.glob("/home/omniscope/data/X5/2015calibration/*_%s_*xx.binfo"%Q)[0])
 redundancy_sort = np.argsort(info['ublcount'])
 
@@ -212,7 +219,8 @@ else:
 cal_time_mask = (lsts>cal_lst_range[0]) & (lsts<cal_lst_range[1])#a True/False mask on all good data to get good data in cal time range
 cal_ubl_mask = np.linalg.norm(info['ubl'], axis=1) >= calibrate_ubl_length
 
-
+fracs = {}
+fracs['cyg'] = 1.
 ##calibrate cas flux and over all calibration amp
 if fit_cas:
     #first try fitting xx and yy seperately as a jackknife
@@ -234,9 +242,9 @@ if fit_cas:
     tmp_result = -1
     b = {}
     A = {}
-    fracs = {}
+
     ampcals = {} #caldata= data * ampcal
-    fracs['cyg'] = 1.
+
     for fracs['cas'] in np.arange(.8,1.2,.001):
         for pol in ['xx','yy']:
             b[pol] = np.abs(rawdata[pol][cal_time_mask][:, cal_ubl_mask].flatten())
@@ -303,7 +311,10 @@ for p in range(4):
     compressed2_result = omni.deconvolve_spectra2(compressed_data[p,:,pick_f], ~compr_flag[:, pick_f], (tcompress + 1)/2, correction_weight = 1e-6, var = compr_var[p, :, pick_f, 0])
     compressed2_data[p] = compressed2_result[0] * float(tcompress) / len(jds)
     compressed2_var[p] = (float(tcompress) / len(jds)) ** 2 * np.outer(np.abs([compressed2_result[3][i, i] for i in range(tcompress)]) * info['ublcount'][0], 1./info['ublcount'])
-    compressed2_flag = compressed2_flag | (compressed2_var[p,...,0] > 1.1 * np.nanmedian(compressed2_var[p,...,0]))
+    if 'L' in Q:
+        compressed2_flag = compressed2_flag | (compressed2_var[p,...,0] > 4 * np.nanmin(compressed2_var[p,...,0]))
+    else:
+        compressed2_flag = compressed2_flag | (compressed2_var[p,...,0] > 1.1 * np.nanmedian(compressed2_var[p,...,0]))
 compressed2_jds = np.arange(jds[0], jds[-1], np.mean(jds[1:]-jds[:-1]) * len(jds) / tcompress)
 compressed2_lsts = []
 for jd in compressed2_jds[~compressed2_flag]:

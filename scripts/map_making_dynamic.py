@@ -314,7 +314,7 @@ print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 
 #simulate visibilities
 sim_data = A.dot(fake_solution * sizes) + np.random.randn(len(data))/Ni**.5
-sys.exit(0)
+
 
 vis_normalization = np.median(data / sim_data)
 print "Normalization from visibilities", vis_normalization
