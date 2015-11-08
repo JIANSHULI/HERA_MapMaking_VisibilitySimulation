@@ -12,6 +12,8 @@ from Bulm import compute_Bulm
 from random import random
 import healpy as hp
 import healpy.pixelfunc as hpf
+import healpy.visufunc as hpv
+import healpy.rotator as hpr
 import os, time, sys
 #some constant
 pi=m.pi
@@ -61,8 +63,10 @@ def rotate_healpixmap(healpixmap, z1, y1, z2):#the three rotation angles are (fi
     nside = int((len(healpixmap)/12.)**.5)
     if len(healpixmap)%12 != 0 or 12*(nside**2) != len(healpixmap):
         raise Exception('ERROR: Input healpixmap length %i is not 12*nside**2!'%len(healpixmap))
-    newmapcoords_in_oldcoords = [rotatez(rotatey(rotatez(hpf.pix2ang(nside, i), -z2), -y1), -z1) for i in range(12*nside**2)]
-    newmap = [hpf.get_interp_val(healpixmap, coord[0], coord[1]) for coord in newmapcoords_in_oldcoords]
+    rot_matrix = rotatez_matrix(-z1).dot(rotatey_matrix(-y1).dot(rotatez_matrix(-z2)))
+    new_coords = hpf.pix2ang(nside, range(12*nside**2))
+    old_coords = hpr.rotateDirection(rot_matrix, new_coords)
+    newmap = hpf.get_interp_val(healpixmap, old_coords[0], old_coords[1])
     return newmap
 
 #Given the 'time' and 'stdtime'(default=2000.0), return the 'transformation matrix' which transforms the coordinates of a vector from (xs,ys,zs) in the coordinate-system built on epoch='stdtime' into (xt,yt,zt) in the coordinate-system built on epoch='time'. This function hitchhicks pyephem so it's not super fast if you need to call it a million times. Precision converting from B2000 to B1950 is tested and appears to be limited by measurement precision. 2 arcsec for CasA and 0.02 arcsec for Crab.
@@ -198,6 +202,22 @@ class InverseCholeskyMatrix:#for a positive definite matrix, Cholesky decomposit
         if os.path.isfile(filename) and not overwrite:
             raise IOError("%s file exists!"%filename)
         self.L.tofile(filename)
+
+def plot_jones(beam_heal_equ):
+    import matplotlib.pyplot as plt
+    for i, ibeam_heal_equ in enumerate(beam_heal_equ):
+        hpv.mollview(np.abs(ibeam_heal_equ), sub=(len(beam_heal_equ), 4, 1 + 4 * i))
+        PI = np.pi
+        TPI = np.pi * 2
+        # hpv.mollview((np.angle(ibeam_heal_equ) - np.angle(beam_heal_equ[0]) + PI) % TPI - PI, sub=(len(beam_heal_equ), 2, 2 + 2 * i), min=-PI, max=PI)
+        hpv.mollview((np.angle(ibeam_heal_equ) + PI) % TPI - PI, sub=(len(beam_heal_equ), 4, 2 + 4 * i), min=-PI, max=PI)
+        hpv.mollview(np.real(ibeam_heal_equ), sub=(len(beam_heal_equ), 4, 3 + 4 * i))
+        hpv.mollview(np.imag(ibeam_heal_equ), sub=(len(beam_heal_equ), 4, 4 + 4 * i))
+    plt.show()
+
+    hpv.mollview(np.abs(beam_heal_equ[0])**2 + np.abs(beam_heal_equ[1])**2, sub=(2,1,1))
+    hpv.mollview(np.abs(beam_heal_equ[2])**2 + np.abs(beam_heal_equ[3])**2, sub=(2,1,2))
+    plt.show()
 
 class Visibility_Simulator:
     def __init__(self):
@@ -338,32 +358,57 @@ class Visibility_Simulator:
 
         beamt = np.array([hpf.get_interp_val(ibeam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) for ibeam_heal_equ in beam_heal_equ])
         beamt.shape = (2, 2, len(tlist))
+        if verbose:
+            plot_jones(beam_heal_equ)
+
+            print "J"
+            print beamt
 
         Rut = rotatez_matrix(angle_list).transpose(2,0,1)#rotation matrix for ubl over t
         fringe = np.exp(ik * (Rut.dot(d_equ.transpose()).transpose(2,0,1).dot(ps_vec)))#u by t
 
         local_zenith_vect = Rut.dot([np.cos(self.initial_zenith[1]) * np.cos(self.initial_zenith[0]), np.cos(self.initial_zenith[1]) * np.sin(self.initial_zenith[0]), np.sin(self.initial_zenith[1])])#over t the zenith in local coord expressed in equitorial coord
 
+        #BUGGED CODE
+        # if np.abs(ps_vec[-1]) == 1:
+        #     phi0 = np.array([0, 1, 0])
+        #     alpha0 = np.array([-1, 0, 0])
+        # else:
+        #     phi0 = np.cross([0,0,1], -ps_vec)
+        #     phi0 = phi0/la.norm(phi0)
+        #     alpha0 = np.cross([0,0,1], phi0)
+        #     alpha0 = alpha0/la.norm(alpha0)
+        # phi1t = np.cross(local_zenith_vect, -ps_vec)
+        # if np.min(la.norm(local_zenith_vect-(-ps_vec), axis = -1)) == 0.:
+        #     if la.norm(np.cross([0,0,1], -ps_vec)) != 0:
+        #         phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.cross([0,0,1], -ps_vec)
+        #     else:
+        #         phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.array([0, 1, 0])
+        # phi1t = phi1t / (la.norm(phi1t, axis=-1)[:,None])
+        #
+        # Ranglet = np.arctan2(phi1t.dot(alpha0), phi1t.dot(phi0))#rotation angle for polarization coord over t, from equatotial(phi0,alpha0) to local(phi1,alpha1), around vector -ps_vec
         if np.abs(ps_vec[-1]) == 1:
-            phi0 = np.array([0, 1, 0])
-            alpha0 = np.array([-1, 0, 0])
+            ps_equ_north_plane = np.array([0, 1, 0])
         else:
-            phi0 = np.cross([0,0,1], -ps_vec)
-            phi0 = phi0/la.norm(phi0)
-            alpha0 = np.cross([0,0,1], phi0)
-            alpha0 = alpha0/la.norm(alpha0)
-        phi1t = np.cross(local_zenith_vect, -ps_vec)
-        if np.min(la.norm(local_zenith_vect-(-ps_vec), axis = -1)) == 0.:
-            if np.cross([0,0,1], -ps_vec) != 0:
-                phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.cross([0,0,1], -ps_vec)
-            else:
-                phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.array([0, 1, 0])
-        phi1t = phi1t / (la.norm(phi1t, axis=-1)[:,None])
 
-        Ranglet = np.arctan2(phi1t.dot(alpha0), phi1t.dot(phi0))#rotation angle for polarization coord over t, from equatotial(phi0,alpha0) to local(phi1,alpha1), around vector -ps_vec
+            ps_equ_north_plane = np.cross([0, 0, 1], ps_vec)
+            ps_equ_north_plane /= la.norm(ps_equ_north_plane)#normal vector of the plane defined by point source vec and north vec in equatorial
+
+        ps_local_north_plane_t = np.cross(local_zenith_vect, ps_vec)
+        ps_local_north_plane_t /= la.norm(ps_local_north_plane_t, axis=-1)[:, None]#normal vector of the plane defined by point source vec and north vec in local coord
+        Ranglet = -np.sign(np.cross(ps_local_north_plane_t, ps_equ_north_plane).dot(ps_vec)) * np.arccos(ps_local_north_plane_t.dot(ps_equ_north_plane))
+
+
+
         Ranglet = rotatez_matrix(Ranglet)[:2,:2]#rotation matrix around -ps_vec for polarization coord over t, 3 by 3 by t
 
         BRt = np.array([beamt[..., i].dot(Ranglet[...,i]) for i in range(len(tlist))])
+
+        if verbose:
+            print "R"
+            print Ranglet
+            print "B"
+            print BRt
 
         result = np.empty((len(d_in), 4 * len(tlist), 4), dtype='complex64')#time is fastest changing in 4 by t
         for truen, (truei, truej) in enumerate([[0,0],[0,1],[1,0],[1,1]]):

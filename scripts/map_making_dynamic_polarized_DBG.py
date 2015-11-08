@@ -15,6 +15,7 @@ PI = np.pi
 TPI = np.pi * 2
 
 
+
 def pixelize(sky, nside_distribution, nside_standard, nside_start, thresh, final_index, thetas, phis, sizes):
     # thetas = []
     # phis = []
@@ -31,6 +32,11 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
     # print "visiting ", nside, inest
     starti, endi = inest * nside_standard ** 2 / nside ** 2, (inest + 1) * nside_standard ** 2 / nside ** 2
     ##local mean###if nside == nside_standard or np.std(sky[starti:endi])/np.mean(sky[starti:endi]) < thresh:
+    #if np.mean(sky[starti:endi]) == 0.:
+    #    nside_distribution[starti:endi] = 0
+    #    final_index[starti:endi] = 0
+
+    #el
     if nside == nside_standard or np.std(sky[starti:endi]) < thresh:
         nside_distribution[starti:endi] = nside
         final_index[starti:endi] = len(thetas)  # range(len(thetas), len(thetas) + endi -starti)
@@ -77,11 +83,11 @@ def ATNIA(A, Ni, C, nchunk=10):  # C=AtNiA
 
 nside_start = 32
 nside_beamweight = 16
-nside_standard = 256
-bnside = 256
+nside_standard = 32#//512
+bnside = 512
 plotcoord = 'CG'
-thresh = .5
-valid_pix_thresh = 1e-3
+thresh = 2.0
+valid_pix_thresh = -1#//1e-3
 # S_scale = 2
 # S_thresh = 1000#Kelvin
 # S_type = 'gsm%irm%i'%(S_scale,S_thresh)
@@ -110,16 +116,65 @@ tag = "q3A_abscal"  # L stands for lenient in flagging
 datatag = '_2015_05_09'
 vartag = '_2015_05_09'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-A_version = 0.2
 nt = {"q3A_abscal": 253, "q3AL_abscal": 368}[tag]
 nf = 1
 nUBL = 78
 
 # deal with beam: create a callable function of the form y(freq) in MHz and returns npix by 4
 freqs = range(110, 200, 10)
-local_beam = si.interp1d(freqs, np.concatenate([np.fromfile(
+raw_beam_data = np.concatenate([np.fromfile(
     '/home/omniscope/data/mwa_beam/healpix_%i_%s.bin' % (bnside, p), dtype='complex64').reshape(
-    (len(freqs), 12 * bnside ** 2, 2)) for p in ['x', 'y']], axis=-1).transpose(0, 2, 1), axis=0)
+    (len(freqs), 12 * bnside ** 2, 2)) for p in ['x', 'y']], axis=-1).transpose(0, 2, 1) #freq by 4 by pix
+local_beam = si.interp1d(freqs, raw_beam_data, axis=0)
+
+##debug starts
+theta = PI/2
+ps_vec = sv.stoc([1, theta, PI/2])
+# local_zenith_vect = np.array([sv.stoc([1, theta, 0]), sv.stoc([1, theta, PI])])
+#
+# ps_equ_north_plane = np.cross([0,0,1], ps_vec)
+# ps_equ_north_plane /= la.norm(ps_equ_north_plane)#normal vector of the plane defined by point source vec and north vec in equatorial
+# ps_local_north_plane_t = np.cross(local_zenith_vect, ps_vec)
+# ps_local_north_plane_t /= la.norm(ps_local_north_plane_t, axis = -1)[:, None]#normal vector of the plane defined by point source vec and north vec in local coord
+# print -np.sign(np.cross(ps_local_north_plane_t, ps_equ_north_plane).dot(ps_vec)) * np.arccos(ps_local_north_plane_t.dot(ps_equ_north_plane)) / PI
+# sys.exit(0)
+# phi0 = np.cross([0,0,1], -ps_vec)
+# phi0 = phi0/la.norm(phi0)
+# print "phi0", sv.ctos(phi0)/PI
+# alpha0 = np.cross([0,0,1], phi0)
+# alpha0 = alpha0/la.norm(alpha0)
+# print "alpha0", sv.ctos(alpha0)/PI
+# phi1t = np.cross(local_zenith_vect, -ps_vec)
+#
+# if np.min(la.norm(local_zenith_vect-(-ps_vec), axis = -1)) == 0.:
+#     if la.norm(np.cross([0,0,1], -ps_vec)) != 0:
+#         phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.cross([0,0,1], -ps_vec)
+#     else:
+#         phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.array([0, 1, 0])
+# phi1t = phi1t / (la.norm(phi1t, axis=-1))
+# print "phi1t", sv.ctos(phi1t)/PI
+# Ranglet = np.arctan2(phi1t.dot(alpha0), phi1t.dot(phi0))
+# print "final", Ranglet/PI
+# sys.exit(0)
+
+
+sv.plot_jones(local_beam(160))
+
+vstest = sv.Visibility_Simulator()
+vstest.initial_zenith = np.array([0, 0])
+
+beam_heal_equ = np.array(
+            [sv.rotate_healpixmap(beam_healpixi, 0, np.pi / 2 - vstest.initial_zenith[1], vstest.initial_zenith[0]) for
+             beam_healpixi in local_beam(160)])
+print beam_heal_equ.shape
+
+# ps_xxxyyxyy = [1,0,0,0]
+# plt.subplot(2,1,1)
+# plt.plot(np.abs(vstest.calculate_pol_pointsource_visibility(0, 0, [0,1,0], 160, beam_healpix_hor=local_beam(160), tlist=np.arange(-12,12,.01)%24)[0].dot(ps_xxxyyxyy)).reshape(4,2400).transpose())
+# plt.subplot(2,1,2)
+# plt.plot(np.angle(vstest.calculate_pol_pointsource_visibility(0, 0, [0,1,0], 160, beam_healpix_hor=local_beam(160), tlist=np.arange(-12,12,.01)%24)[0].dot(ps_xxxyyxyy)).reshape(4,2400).transpose())
+# plt.show()
+# sys.exit(0)
 
 A = {}
 
@@ -150,12 +205,12 @@ for p in ['x', 'y']:
     print "%i UBLs to include, longest baseline is %i wavelengths" % (
     len(ubls), np.max(np.linalg.norm(ubls, axis=1)) / (C / freq))
 
-    A_path = datadir + tag + '_%s%s_%i_%i.A' % (p, p, len(tlist) * len(ubls), 12 * nside_beamweight ** 2)
+    A_filename = datadir + tag + '_%s%s_%i_%i.A' % (p, p, len(tlist) * len(ubls), 12 * nside_beamweight ** 2)
 
-    if os.path.isfile(A_path) and not force_recompute:
-        print "Reading A matrix from %s" % A_path
+    if os.path.isfile(A_filename) and not force_recompute:
+        print "Reading A matrix from %s" % A_filename
         sys.stdout.flush()
-        A[p] = np.fromfile(A_path, dtype='complex64').reshape((len(ubls), len(tlist), 12 * nside_beamweight ** 2))[
+        A[p] = np.fromfile(A_filename, dtype='complex64').reshape((len(ubls), len(tlist), 12 * nside_beamweight ** 2))[
                :, tmask].reshape((len(ubls) * len(tlist[tmask]), 12 * nside_beamweight ** 2))
     else:
         # beam
@@ -188,7 +243,7 @@ for p in ['x', 'y']:
 
         print "%f minutes used" % (float(time.time() - timer) / 60.)
         sys.stdout.flush()
-        A[p].tofile(A_path)
+        A[p].tofile(A_filename)
         A[p] = A[p].reshape((len(ubls), len(tlist), 12 * nside_beamweight ** 2))[:, tmask].reshape(
             (len(ubls) * len(tlist[tmask]), 12 * nside_beamweight ** 2))
 
@@ -244,20 +299,17 @@ npix = len(thetas)
 valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > valid_pix_thresh * max(beam_weight)
 valid_npix = np.sum(valid_pix_mask)
 fake_solution = (hpf.get_interp_val(equatorial_GSM_standard, thetas, phis, nest=True) * sizes)[valid_pix_mask]
-fake_solution = np.concatenate((fake_solution, np.zeros_like(fake_solution), np.zeros_like(fake_solution), np.zeros_like(fake_solution)))
-#fake_solution = np.concatenate((fake_solution,
-                                # np.sin(np.array(phis)[valid_pix_mask]**.5 - 1.) * np.cos(np.array(thetas)[valid_pix_mask]**2) * fake_solution / 5.,
-                                # np.sin(np.array(thetas)[valid_pix_mask]**.5 - 2.) * np.cos(np.array(phis)[valid_pix_mask]**2) * fake_solution / 4.,
-                                # np.zeros_like(fake_solution)))
+fake_solution = np.concatenate(
+    (fake_solution, np.zeros_like(fake_solution), np.zeros_like(fake_solution), np.zeros_like(fake_solution)))
 sizes = np.concatenate((np.array(sizes)[valid_pix_mask], np.array(sizes)[valid_pix_mask],
                         np.array(sizes)[valid_pix_mask], np.array(sizes)[valid_pix_mask]))
 
 
-def sol2map(solx):
+def sol2map(solx, renorm=True):
     final_index4 = np.concatenate(
         (final_index, final_index + npix, final_index + npix * 2, final_index + npix * 3)).astype(int)
     full_sol = np.zeros(4 * npix)
-    full_sol[np.concatenate((valid_pix_mask, valid_pix_mask, valid_pix_mask, valid_pix_mask))] = solx / sizes
+    full_sol[np.concatenate((valid_pix_mask, valid_pix_mask, valid_pix_mask, valid_pix_mask))] = solx / (sizes if renorm else 1)
     return full_sol[final_index4]
 
 
@@ -301,38 +353,30 @@ for p in ['x', 'y']:
     ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl' % (p, p, nUBL, 3)
     ubls[p] = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
 common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
-#manually filter UBLs
-used_common_ubls = common_ubls#[np.argsort(la.norm(common_ubls, axis=-1))[10:]]     #remove shorted 10
-
 ubl_index = {}  # stored index in each pol's ubl for the common ubls
 for p in ['x', 'y']:
-    ubl_index[p] = np.zeros(len(used_common_ubls), dtype='int')
-    for i, u in enumerate(used_common_ubls):
+    ubl_index[p] = np.zeros(len(common_ubls), dtype='int')
+    for i, u in enumerate(common_ubls):
         if u in ubls[p]:
             ubl_index[p][i] = np.argmin(la.norm(ubls[p] - u, axis=-1)) + 1
         elif -u in ubls[p]:
             ubl_index[p][i] = - np.argmin(la.norm(ubls[p] + u, axis=-1)) - 1
         else:
             raise Exception('Logical Error')
-
-
-
 # vs = sv.Visibility_Simulator()
 # vs.initial_zenith = np.array([0, lat_degree*np.pi/180])#self.zenithequ
 # beam_heal_equ = np.array([sv.rotate_healpixmap(beam_healpixi, 0, np.pi/2 - vs.initial_zenith[1], vs.initial_zenith[0]) for beam_healpixi in local_beam(freq)])
 # print vs.calculate_pol_pointsource_visibility(0, .5, ubls[0], freq, beam_heal_equ = beam_heal_equ, tlist = tlist).shape
 # sys.exit(0)
 
-A_tag = 'A_dpcIQUV'
-A_filename = A_tag + '_u%i_t%i_p%i_n%i_%i_b%i_%.3f_v%.1f' % (len(used_common_ubls), len(tlist), valid_npix, nside_start, nside_standard, bnside, thresh, A_version)
-A_path = datadir + tag + A_filename
+A_filename = datadir + tag + '_%i_%i.AdpcIQUV%i_%.3f' % (len(tlist) * len(common_ubls), valid_npix, nside_standard, thresh)
 
 
 def get_A():
-    if os.path.isfile(A_path) and not force_recompute:
-        print "Reading A matrix from %s" % A_path
+    if os.path.isfile(A_filename) and not force_recompute:
+        print "Reading A matrix from %s" % A_filename
         sys.stdout.flush()
-        A = np.fromfile(A_path, dtype='complex64').reshape((len(used_common_ubls), 4, len(tlist), 4, valid_npix))
+        A = np.fromfile(A_filename, dtype='complex64').reshape((len(common_ubls), 4, len(tlist), 4, valid_npix))
     else:
         # beam
         beam_healpix = local_beam(freq)
@@ -346,23 +390,21 @@ def get_A():
              beam_healpixi in local_beam(freq)])
         print "Computing A matrix..."
         sys.stdout.flush()
-        A = np.empty((len(used_common_ubls), 4 * len(tlist), 4, valid_npix), dtype='complex64')
+        A = np.empty((len(common_ubls), 4 * len(tlist), 4, valid_npix), dtype='complex64')
         timer = time.time()
         for n, i in enumerate(np.arange(npix)[valid_pix_mask]):
             ra = phis[i]
             dec = np.pi / 2 - thetas[i]
-            print "\r%.1f%% completed, %f minutes left" % (
-            100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.)),
+            print "\r%.1f%% completed, %f minutes left" % (100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.)),
             sys.stdout.flush()
 
-            A[..., n] = vs.calculate_pol_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ,
-                                                                tlist=tlist).dot(
-                [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
+            A[..., n] = vs.calculate_pol_pointsource_visibility(ra, dec, common_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=tlist)\
+                .dot([[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
 
         print "%f minutes used" % (float(time.time() - timer) / 60.)
         sys.stdout.flush()
-        A.tofile(A_path)
-        A.shape = (len(used_common_ubls), 4, len(tlist), 4, valid_npix)
+        A.tofile(A_filename)
+        A.shape = (len(common_ubls), 4, len(tlist), 4, valid_npix)
     tmask = np.ones_like(tlist).astype(bool)
     for p in ['x', 'y']:
         # tf mask file, 0 means flagged bad data
@@ -375,29 +417,29 @@ def get_A():
             print "No mask file found"
             # print freq, tlist
     # Merge A
-    A.shape = (len(used_common_ubls) * 4 * len(tlist[tmask]), 4 * valid_npix)
+    A.shape = (len(common_ubls) * 4 * len(tlist[tmask]), 4 * valid_npix)
     try:
         return np.concatenate((np.real(A), np.imag(A)))
     except MemoryError:
-        print "Not enough memory, concatenating A on disk ", A_path + 'tmpre', A_path + 'tmpim',
+        print "Not enough memory, concatenating A on disk ", A_filename + 'tmpre', A_filename + 'tmpim',
         sys.stdout.flush()
         Ashape = list(A.shape)
         Ashape[0] = Ashape[0] * 2
-        np.real(A).tofile(A_path + 'tmpre')
-        np.imag(A).tofile(A_path + 'tmpim')
+        np.real(A).tofile(A_filename + 'tmpre')
+        np.imag(A).tofile(A_filename + 'tmpim')
         del (A)
-        os.system("cat %s >> %s" % (A_path + 'tmpim', A_path + 'tmpre'))
+        os.system("cat %s >> %s" % (A_filename + 'tmpim', A_filename + 'tmpre'))
 
-        os.system("rm %s" % (A_path + 'tmpim'))
+        os.system("rm %s" % (A_filename + 'tmpim'))
         A = np.fromfile(Ashape, dtype='float32')
-        os.system("rm %s" % (A_path + 'tmpre'))
+        os.system("rm %s" % (A_filename + 'tmpre'))
         print "done."
         sys.stdout.flush()
         return A
 
 
 A = get_A()
-
+exit(0)
 # Compute autocorr
 beam_healpix = local_beam(freq)
 vs = sv.Visibility_Simulator()
@@ -423,7 +465,6 @@ for n, i in enumerate(np.arange(npix)[valid_pix_mask]):
 
 print "%f minutes used" % (float(time.time() - timer) / 60.)
 sys.stdout.flush()
-# todo use autocorr rather than constant as removal term
 autocorr_vis = autocorr.reshape(4 * len(tlist), 4 * valid_npix).dot(fake_solution).reshape(4, len(tlist))
 autocorr_vis = np.ones_like(autocorr_vis)
 
@@ -443,7 +484,7 @@ for p in ['x', 'y']:
         ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl' % (p, p2, nUBL, 3)
         ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
         print "%i UBLs to include, longest baseline is %i wavelengths" % (
-        len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / freq))
+        len(common_ubls), np.max(np.linalg.norm(common_ubls, axis=1)) / (C / freq))
 
 
         # get Ni (1/variance) and data
@@ -457,8 +498,8 @@ for p in ['x', 'y']:
         data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
         data[pol] = (data[pol].flatten() * 1.e-26 * (C / freq) ** 2 / 2 / kB / (
         4 * np.pi / (12 * nside_standard ** 2))).conjugate()  # there's a conjugate convention difference
-        data_shape[pol] = (len(used_common_ubls), np.sum(tmask))
-        ubl_sort[p] = np.argsort(la.norm(used_common_ubls, axis=1))
+        data_shape[pol] = (len(common_ubls), np.sum(tmask))
+        ubl_sort[p] = np.argsort(la.norm(common_ubls, axis=1))
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
@@ -467,15 +508,13 @@ original_data = np.array([data['xx'], data['xy'], data['yx'], data['yy']]).resha
     [4] + list(data_shape['xx'])).transpose((1, 0, 2))
 data = np.array([data['xx'], data['xy'], data['yx'], data['yy']]).reshape([4] + list(data_shape['xx'])).transpose(
     (1, 0, 2)).flatten()
-data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
+data = np.concatenate((np.real(data), np.imag(data))).astype('float32')  #r/i by ubl by pol by time
 Ni = np.concatenate((Ni['xx'], Ni['xy'], Ni['yx'], Ni['yy'])).reshape([4] + list(data_shape['xx'])).transpose(
     (1, 0, 2)).flatten()
 Ni = np.concatenate((Ni / 2, Ni / 2))
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
-print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-sys.stdout.flush()
 # simulate visibilities
 
 # clean_sim_data = np.array([Aiter.dot(fake_solution) for Aiter in A])
@@ -489,6 +528,8 @@ def get_complex_data(flat_real_data, nubl, nt):
     result = flat_real_data[0] + 1.j * flat_real_data[1]
     flat_real_data.shape = 2 * nubl * 4 * nt
     return result
+
+
 
 def get_vis_normalization(data, clean_sim_data):
     a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[:, :, [0, 3]], axis=0).flatten()
@@ -504,21 +545,16 @@ diff_data = diff_data[0] + 1j * diff_data[1]
 diff_norm = {}
 diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis=1)
 diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis=1)
-data_norm = {}
-data_norm['x'] = la.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[0, :, 0] + 1.j * data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[1, :, 0], axis=-1)
-data_norm['y'] = la.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[0, :, 3] + 1.j * data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[1, :, 3], axis=-1)
 
 if plot_data_error:
-    plt.subplot(7, 1, 1)
-    plt.plot((diff_norm['x']/data_norm['x'])[ubl_sort['x']])
-    plt.plot((diff_norm['y']/data_norm['y'])[ubl_sort['y']])
+    plt.plot(diff_norm['x'][ubl_sort['x']])
+    plt.plot(diff_norm['y'][ubl_sort['y']])
 
-
+# todo use autocorr rather than constant as removal term
 if remove_additive:
     niter = 0
 
     additive = 0
-    raw_data = np.copy(data).reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
     while niter == 0 or (abs(vis_normalization - get_vis_normalization(data, clean_sim_data)) > 1e-2 and niter < 20):
         niter += 1
         vis_normalization = get_vis_normalization(data, clean_sim_data)
@@ -550,43 +586,9 @@ if remove_additive:
         diff_norm = {}
         diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis=1)
         diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis=1)
-        plt.plot((diff_norm['x']/data_norm['x'])[ubl_sort['x']])
-        plt.plot((diff_norm['y']/data_norm['y'])[ubl_sort['y']])
-
-if plot_data_error:
-    qaz_model = (clean_sim_data * vis_normalization).reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
-    qaz_data = data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
-    plt.subplot(7, 1, 2)
-    if remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][0], 0])
-    plt.plot(qaz_data[1, ubl_sort['x'][0], 0])
-    plt.plot(qaz_model[1, ubl_sort['x'][0], 0])
-    plt.subplot(7, 1, 3)
-    if remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
-    plt.plot(qaz_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
-    plt.plot(qaz_model[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
-    plt.subplot(7, 1, 4)
-    if remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][-1], 0])
-    plt.plot(qaz_data[1, ubl_sort['x'][-1], 0])
-    plt.plot(qaz_model[1, ubl_sort['x'][-1], 0])
-    plt.subplot(7, 1, 5)
-    if remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][0], 1])
-    plt.plot(qaz_data[1, ubl_sort['x'][0], 1])
-    plt.plot(qaz_model[1, ubl_sort['x'][0], 1])
-    plt.subplot(7, 1, 6)
-    if remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
-    plt.plot(qaz_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
-    plt.plot(qaz_model[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
-    plt.subplot(7, 1, 7)
-    if remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][-1], 1])
-    plt.plot(qaz_data[1, ubl_sort['x'][-1], 1])
-    plt.plot(qaz_model[1, ubl_sort['x'][-1], 1])
-    plt.show()
+        plt.plot(diff_norm['x'][ubl_sort['x']])
+        plt.plot(diff_norm['y'][ubl_sort['y']])
+plt.show()
 
 
 # vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
@@ -649,24 +651,19 @@ AtNi_sim_data = AtNi.dot(sim_data.astype(AtNi.dtype))
 
 precision = 'float64'
 # compute AtNiA eigensystems
-eigvl_tag = 'eigvl'
-eigvc_tag = 'eigvc'
-eig_version = 0.1
-eigvl_filename = eigvl_tag + '_%s_%s_v%.1f' % (vartag, precision, eig_version) + A_filename
-eigvc_filename = eigvc_tag + '_%s_%s_v%.1f' % (vartag, precision, eig_version) + A_filename
-eigvl_path = datadir + tag + eigvl_filename
-eigvc_path = datadir + tag + eigvc_filename
-if os.path.isfile(eigvl_path) and os.path.isfile(eigvc_path) and not force_recompute_AtNiAi_eig:
-    print "Reading eigen system of AtNiA from %s and %s" % (eigvl_path, eigvc_path)
+eigvl_filename = datadir + tag + '_%i%s_IQUV_%s.AtNiAel' % (valid_npix, vartag, precision)
+eigvc_filename = datadir + tag + '_%i_%i%s_IQUV_%s.AtNiAev' % (valid_npix, valid_npix, vartag, precision)
+if os.path.isfile(eigvl_filename) and os.path.isfile(eigvc_filename) and not force_recompute_AtNiAi_eig:
+    print "Reading eigen system of AtNiA from %s and %s" % (eigvl_filename, eigvc_filename)
     sys.stdout.flush()
     del (AtNi)
     del (A)
     if precision != 'longdouble':
-        eigvl = np.fromfile(eigvl_path, dtype=precision)
-        eigvc = np.fromfile(eigvc_path, dtype=precision).reshape((4 * valid_npix, 4 * valid_npix))
+        eigvl = np.fromfile(eigvl_filename, dtype=precision)
+        eigvc = np.fromfile(eigvc_filename, dtype=precision).reshape((4 * valid_npix, 4 * valid_npix))
     else:
-        eigvl = np.fromfile(eigvl_path, dtype='float64')
-        eigvc = np.fromfile(eigvc_path, dtype='float64').reshape((4 * valid_npix, 4 * valid_npix))
+        eigvl = np.fromfile(eigvl_filename, dtype='float64')
+        eigvc = np.fromfile(eigvc_filename, dtype='float64').reshape((4 * valid_npix, 4 * valid_npix))
 else:
     print "Allocating AtNiA..."
     sys.stdout.flush()
@@ -693,8 +690,8 @@ else:
     if la.norm(eigvl) == 0:
         print "ERROR: Eigensistem calculation failed...matrix %i by %i is probably too large." % (
         4 * valid_npix, 4 * valid_npix)
-    eigvl.tofile(eigvl_path)
-    eigvc.tofile(eigvc_path)
+    eigvl.tofile(eigvl_filename)
+    eigvc.tofile(eigvc_filename)
 
 plt.plot(eigvl)
 
@@ -705,20 +702,17 @@ if eigvl.dtype != precision or eigvc.dtype != precision:
     eigvl = eigvl.astype(precision)
     eigvc = eigvc.astype(precision)
 max_eigv = np.max(eigvl)
-lambd = 1e-9#1e-12
+lambd = 1e-12
 rcondA = (lambd) / max_eigv
 eigvli = 1. / (max_eigv * rcondA + np.maximum(eigvl, 0))
 
 
-AtNiAi_tag = 'AtNiAi'
-AtNiAi_version = 0.1
-AtNiAi_filename = AtNiAi_tag + '_rc%.1f_v%.1f'%(np.log10(rcondA), AtNiAi_version) + eigvc_filename
-AtNiAi_path = datadir + tag + AtNiAi_filename
 def get_AtNiAi(rcondA):
-
-    if os.path.isfile(AtNiAi_path) and not force_recompute_AtNiAi:
-        print "Reading AtNiAi matrix from %s" % AtNiAi_path
-        return np.fromfile(AtNiAi_path, dtype=precision).reshape((4 * valid_npix, 4 * valid_npix))
+    AtNiAi_filename = datadir + tag + '_%i_%i%s_IQUV.AtNiAi%s%.1f' % (
+    valid_npix, valid_npix, vartag, precision, np.log10(rcondA))
+    if os.path.isfile(AtNiAi_filename) and not force_recompute_AtNiAi:
+        print "Reading AtNiAi matrix from %s" % AtNiAi_filename
+        return np.fromfile(AtNiAi_filename, dtype=precision).reshape((4 * valid_npix, 4 * valid_npix))
 
     else:
 
@@ -732,7 +726,7 @@ def get_AtNiAi(rcondA):
         ATNIA(eigvc.transpose(), eigvli, AtNiAi)
         print "%f minutes used" % (float(time.time() - timer) / 60.)
         sys.stdout.flush()
-        AtNiAi.tofile(AtNiAi_path)
+        AtNiAi.tofile(AtNiAi_filename)
         return AtNiAi
 
 
@@ -746,29 +740,12 @@ sim_x = AtNiAi.dot(AtNi_sim_data.astype(AtNiAi.dtype))
 sim_x_clean = fake_solution
 del (AtNiAi)
 A = get_A()
-best_fit = A.dot(x.astype(A.dtype))
 if remove_additive:
-    chisq = np.sum(Ni * np.abs((best_fit - data)) ** 2) / float(len(data) - valid_npix - data_shape['xx'][0] - data_shape['yy'][0])
-    default_chisq = np.sum(Ni * np.abs((A.dot(fake_solution.astype(A.dtype)) - data)) ** 2) / float(len(data) - valid_npix - data_shape['xx'][0] - data_shape['yy'][0])
-    print chisq, default_chisq
+    chisq = np.sum(Ni * np.abs((A.dot(x.astype(A.dtype)) - data)) ** 2) / float(
+        len(data) - valid_npix - data_shape['xx'][0] - data_shape['yy'][0])
 else:
-    chisq = np.sum(Ni * np.abs((best_fit - data)) ** 2) / float(len(data) - valid_npix)
-    default_chisq = np.sum(Ni * np.abs((A.dot(fake_solution.astype(A.dtype)) - data)) ** 2) / float(len(data) - valid_npix)
-    print chisq, default_chisq
+    chisq = np.sum(Ni * np.abs((A.dot(x.astype(A.dtype)) - data)) ** 2) / float(len(data) - valid_npix)
 chisq_sim = np.sum(Ni * np.abs((A.dot(sim_x.astype(A.dtype)) - sim_data)) ** 2) / float(len(sim_data) - valid_npix)
-
-if plot_data_error:
-    us = ubl_sort['x'][::len(ubl_sort['x'])/5]
-    best_fit.shape = (2, data_shape['xx'][0], 4, data_shape['xx'][1])
-    for p in range(4):
-        for nu, u in enumerate(us):
-
-            plt.subplot(4, len(us), len(us) * p + nu + 1)
-
-            plt.plot(qaz_data[1, u, p])
-            plt.plot(qaz_model[1, u, p])
-            plt.plot(best_fit[1, u, p])
-    plt.show()
 
 #####investigate optimal rcondA
 print "lambda we use is", max_eigv * rcondA
@@ -803,6 +780,7 @@ if plot_projection:
     plt.plot(range(0, 30000, 100), np.log10(np.mean(np.abs(xproj)[:30000].reshape(300, 100)**2, axis=1)**.5), 'b', label='data solution')
     plt.legend()
     plt.show()
+
 
 
 # compute S
@@ -843,21 +821,19 @@ sys.stdout.flush()
 #####compute wiener filter##############
 # lambd = 1e-12
 # rcondA = (lambd) / max_eigv
-SEi_tag = 'CSEi'
-SEi_version = 0.1
-SEi_filename = SEi_tag + '_S%s_v%.1f'%(S_type, SEi_version) + AtNiAi_filename
-SEi_path = datadir + tag + SEi_filename
-if os.path.isfile(SEi_path) and not force_recompute_SEi:
+SEi_filename = datadir + tag + '_%i_%i%s.CSEi_IQUV_%s_%s_%.1f' % (
+len(S), len(S), vartag, S_type, precision, np.log10(rcondA))
+if os.path.isfile(SEi_filename) and not force_recompute_SEi:
     print "Reading Wiener filter component...",
     sys.stdout.flush()
-    SEi = sv.InverseCholeskyMatrix.fromfile(SEi_path, len(S), precision)
+    SEi = sv.InverseCholeskyMatrix.fromfile(SEi_filename, len(S), precision)
 else:
     print "Computing Wiener filter component...",
     sys.stdout.flush()
     timer = time.time()
     AtNiAi = get_AtNiAi(rcondA)
     SEi = sv.InverseCholeskyMatrix(S + AtNiAi).astype(precision)
-    SEi.tofile(SEi_path, overwrite=True)
+    SEi.tofile(SEi_filename, overwrite=True)
     print "%f minutes used" % (float(time.time() - timer) / 60.)
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
@@ -872,12 +848,12 @@ print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxr
 sys.stdout.flush()
 
 
-def plot_IQU(solution, title, col, ncol=6):
+def plot_IQU(solution, title, col, ncol=6, eigen=False, eigrange=0.03):
     # Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
     # I = Es[0] + Es[3]
     # Q = Es[0] - Es[3]
     # U = Es[1] + Es[2]
-    IQUV = sol2map(solution)
+    IQUV = sol2map(solution, renorm=(not eigen))
     IQUV.shape = (4, IQUV.shape[0] / 4)
     I = IQUV[0]
     Q = IQUV[1]
@@ -885,17 +861,28 @@ def plot_IQU(solution, title, col, ncol=6):
     V = IQUV[3]
     pangle = 180 * np.arctan2(Q, U) / 2 / PI
     plotcoordtmp = 'C'
-    hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, col))
+    if eigen:
+        hpv.mollview(I, min=-eigrange, max=eigrange, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, col))
+    else:
+        hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, col))
 
-    hpv.mollview((Q ** 2 + U ** 2) ** .5 / I, min=0, max=1, coord=plotcoordtmp, title=title, nest=True,
-                 sub=(4, ncol, ncol + col))
-    from matplotlib import cm
-    cool_cmap = cm.hsv
-    cool_cmap.set_under("w")  # sets background to white
-    hpv.mollview(pangle, min=-90, max=90, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, 2 * ncol + col),
-                 cmap=cool_cmap)
+    if eigen:
+        hpv.mollview(Q, min=-eigrange, max=eigrange, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, ncol + col))
+        hpv.mollview(U, min=-eigrange, max=eigrange, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, 2 * ncol + col))
+    else:
+        hpv.mollview((Q ** 2 + U ** 2) ** .5 / I, min=0, max=1, coord=plotcoordtmp, title=title, nest=True,
+                     sub=(4, ncol, ncol + col))
+        from matplotlib import cm
+        cool_cmap = cm.hsv
+        cool_cmap.set_under("w")  # sets background to white
+        hpv.mollview(pangle, min=-90, max=90, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, 2 * ncol + col),
+                     cmap=cool_cmap)
 
-    hpv.mollview(np.arcsinh(V) / np.log(10), min=-np.arcsinh(10. ** 4) / np.log(10),
+    if eigen:
+        hpv.mollview(V, min=-eigrange, max=eigrange, coord=plotcoordtmp, title=title, nest=True,
+                 sub=(4, ncol, 3 * ncol + col))
+    else:
+        hpv.mollview(np.arcsinh(V) / np.log(10), min=-np.arcsinh(10. ** 4) / np.log(10),
                  max=np.arcsinh(10. ** 4) / np.log(10), coord=plotcoordtmp, title=title, nest=True,
                  sub=(4, ncol, 3 * ncol + col))
     if col == ncol:
@@ -916,3 +903,44 @@ plot_IQU(w_sim_sol, 'wienered simulated solution', 6)
 # hpv.mollview(np.log10((w_solution/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered solution', nest=True)
 # hpv.mollview(np.log10((w_sim_sol/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered simulated solution', nest=True)
 # plt.show()
+
+#gradually replace GSM model projections by data solution projections and see when it starts to look bad
+partial_sols = np.zeros((6, len(x)))
+for i in range(len(partial_sols)):
+    n_replace = i * 2000
+    tmp_proj = np.copy(cleanproj)
+    tmp_proj[:n_replace] = xproj[:n_replace]
+    partial_sols[i] = tmp_proj[::-1].dot(np.transpose(eigvc))
+    plot_IQU(partial_sols[i], str(n_replace), i + 1, ncol=len(partial_sols))
+
+#plot 2000 sections of model projection and solution projection and see if any section looks particularly bad
+partial_sols = np.zeros((6, len(x)))
+for i in range(len(partial_sols)):
+    n_replace = i * 2000
+    tmp_proj = np.zeros_like(x)
+    tmp_proj[n_replace:(n_replace + 2000)] = xproj[n_replace:(n_replace + 2000)]
+    partial_sols[i] = tmp_proj[::-1].dot(np.transpose(eigvc))
+    plot_IQU(partial_sols[i], str(n_replace) + '-' + str(n_replace + 2000), i + 1, ncol=len(partial_sols))
+
+partial_sols = np.zeros((6, len(x)))
+for i in range(len(partial_sols)):
+    n_replace = i * 2000
+    tmp_proj = np.zeros_like(x)
+    tmp_proj[n_replace:(n_replace + 2000)] = cleanproj[n_replace:(n_replace + 2000)]
+    partial_sols[i] = tmp_proj[::-1].dot(np.transpose(eigvc))
+    plot_IQU(partial_sols[i], str(n_replace) + '-' + str(n_replace + 2000), i + 1, ncol=len(partial_sols))
+
+#Plot the polarization factors of the first few eigen modes
+prange = 40
+for i in range(4):
+    plt.subplot(5, 1, i+1)
+    plt.plot(la.norm(eigvc[i*len(eigvc)/4:(i+1)*len(eigvc)/4, ::-1], axis=0)[:prange]**2)
+plt.subplot(5, 1, 5)
+plt.plot(np.abs(xproj[:prange]))
+plt.plot(np.abs(cleanproj[:prange]))
+plt.show()
+
+#plot the first few eigen modes
+for i in range(10):
+    plot_IQU(eigvc[:, -i-1], str(i), i+1, ncol=10, eigen=True, eigrange=0.03)
+
