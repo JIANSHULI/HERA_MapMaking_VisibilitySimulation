@@ -188,6 +188,7 @@ smoothing_fwhm = 3. * np.pi / 180.
 edge_width = 1. * np.pi / 180.
 remove_cmb = True
 
+data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
 
 ###########################
 ###parkes 85 and 150mhz
@@ -248,11 +249,14 @@ drao_elisa_iqu_syn[1.42] = stockert
 if plot_individual:
     plot_dataset(drao_elisa_iqu_syn)
 
-all_1400 = {1.41: np.array([
-    stockert, #merge_map([chipass, stockert], verbose=True, renormalize=True),
-    reich_q, #merge_map([drao[1], elisa[1]]),
-    reich_u, #merge_map([drao[2], elisa[2]]),
-]) / 1.e3}
+all_1400 = {
+    1.42:
+        np.array([
+            stockert, #merge_map([chipass, stockert], verbose=True, renormalize=True),
+            reich_q, #merge_map([drao[1], elisa[1]]),
+            reich_u, #merge_map([drao[2], elisa[2]]),
+        ]) / 1.e3,
+    1.3945: chipass / 1.e3}
 
 if plot_individual:
     plot_dataset(all_1400)
@@ -349,57 +353,56 @@ if plot_individual:
 #plt.imshow(np.log10(fit.read("/home/omniscope/data/polarized foregrounds/PMN+87GB.fits")[0,0]));plt.show()
 
 
-new_mother = {}
+#########################
+###Create new mother#########################
+#########################
 
-mother_npix = hpf.nside2npix(mother_nside)
-for dict in [
-    motherfile,
-    all_1400,
-    haslam,
-    wmap_iqu,
-    planck_iqu,
-    #parkes,
-    #iras,
-    ]:
-    for f, data in dict.iteritems():
-        print f
-        sys.stdout.flush()
+if os.path.isfile(data_file_name):
+    data_file = np.load(data_file_name)
+    freqs = data_file['freqs']
+    idata = data_file['idata']
+    qdata = data_file['qdata']
+    udata = data_file['udata']
 
+else:
+    new_mother = {}
+    mother_npix = hpf.nside2npix(mother_nside)
+    for dict in [
+        motherfile,
+        all_1400,
+        haslam,
+        wmap_iqu,
+        planck_iqu,
+        #parkes,
+        #iras,
+        ]:
+        for f, data in dict.iteritems():
+            print f
+            sys.stdout.flush()
+
+            if data.ndim == 2:
+                new_mother[f] = np.array([preprocess(d, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width) for d in data])
+            else:
+                new_mother[f] = preprocess(data, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width)
+    plot_dataset(new_mother)
+
+
+    freqs = np.array(sorted(new_mother.keys()))
+    idata = np.zeros((len(freqs), mother_npix))
+    qdata = np.zeros((len(freqs), mother_npix))
+    udata = np.zeros((len(freqs), mother_npix))
+    for f, freq in enumerate(freqs):
+        data = new_mother[freq]
         if data.ndim == 2:
-            # new_mother[f] = np.array([ud_grade(smoothing(d, smoothing_fwhm), mother_nside, nside_edge=nside_edge) for d in data])
-            new_mother[f] = np.array([preprocess(d, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width) for d in data])
+            idata[f] = data[0]
+            qdata[f] = data[1]
+            udata[f] = data[2]
         else:
-            # new_mother[f] = np.array(ud_grade(smoothing(data, smoothing_fwhm), mother_nside, nside_edge=nside_edge))
-            new_mother[f] = preprocess(data, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width)
-plot_dataset(new_mother)
+            idata[f] = data
+            qdata[f] += np.nan
+            udata[f] += np.nan
 
-
-##############################################
-##############################################
-##############################################
-##############################################
-##############################################
-##############################################
-##############################################
-##############################################
-##############################################
-##############################################
-
-freqs = np.array(sorted(new_mother.keys()))
-idata = np.zeros((len(freqs), mother_npix))
-qdata = np.zeros((len(freqs), mother_npix))
-udata = np.zeros((len(freqs), mother_npix))
-for f, freq in enumerate(freqs):
-    data = new_mother[freq]
-    if data.ndim == 2:
-        idata[f] = data[0]
-        qdata[f] = data[1]
-        udata[f] = data[2]
-    else:
-        idata[f] = data
-        qdata[f] += np.nan
-        udata[f] += np.nan
-
+    np.savez(data_file_name, freqs=freqs, idata=idata, qdata=qdata, udata=udata)
 
 ##############################################
 ##############################################
@@ -418,20 +421,21 @@ for n_reg in range(max_n_region):
     fill_mask = np.array([bool(int(c)) for c in bin(n_reg)[2:].zfill(n_incomplete)])
     matching_mask = np.ones(mother_npix, dtype=bool)
     for i, f in enumerate(incomplete_fs):
-        matching_mask = matching_mask & ((~np.isnan(idata[f])) == fill_mask[i])
+        matching_mask = matching_mask & (np.isnan(idata[f]) == fill_mask[i])
     if np.sum(matching_mask) != 0:
         region_mask_list.append(matching_mask)
-        region_indices_list.append(sorted(np.concatenate((incomplete_fs[fill_mask], complete_fs))))
+        region_indices_list.append(sorted(np.concatenate((incomplete_fs[~fill_mask], complete_fs))))
 
 region_illustration = np.empty(mother_npix)
 for i, mask in enumerate(region_mask_list):
-    region_illustration[mask] = i
+    region_illustration[mask] = len(region_mask_list) - i
 hpv.mollview(region_illustration, nest=True)
 plt.show()
 
 ####get eigen systems##
 evs = []#np.zeros((len(region_mask_list), len(freqs)))
 ecs = []#np.zeros((len(region_mask_list), len(freqs), len(freqs)))
+i_covs = []
 normalizations = []
 pix_normalization = np.zeros(mother_npix)
 for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
@@ -443,37 +447,90 @@ for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
 
     i_cov = np.einsum('ik,jk->ij', normalized_data, normalized_data) / len(fs)
     ev, ec = np.linalg.eig(i_cov)
-    ec *= np.sign(ec[-1])
+
+    #flip signs of eigenvectors: use first region, which i assume have all freqs, as template, and demand following eigenvectors to pick the sign that make it agree better with the template
+    if i > 0:
+        same_sign_norm = np.linalg.norm(ecs[0][fs, :len(fs)] - ec, axis=0)
+        diff_sign_norm = np.linalg.norm(ecs[0][fs, :len(fs)] + ec, axis=0)
+        ec *= (((same_sign_norm < diff_sign_norm) - .5) * 2)[None, :]
+
 
     evs.append(ev)
     ecs.append(ec)
+    i_covs.append(i_cov)
     normalizations.append(normalization)
 
-[plt.plot(ev) for ev in evs]; plt.show()
-for i in range(4):
-    plt.subplot(4, 1, i+1)
+[plt.plot(ev) for ev in evs]
+plt.show()
+for i in range(5):
+    plt.subplot(5, 1, i+1)
     for fs, ec in zip(region_indices_list, ecs):
-        plt.plot(fs, ec[:, i])
-        plt.ylim([-1, 1])
+        plot_data = np.copy(ec[:, i])
+        plot_data *= plot_data.dot(ecs[0][fs, i]) / plot_data.dot(plot_data)
+        # plt.plot(np.log10(freqs[fs]), plot_data)
+        plt.plot(fs, plot_data)
+        plt.ylim([-.7, .7])
 plt.show()
 
 ###get principal maps
 n_principal = 5
-principal_matrix = ecs[-1][:, :n_principal]
+principal_matrix = ecs[0][:, :n_principal]
 principal_maps = np.zeros((n_principal, mother_npix))
 for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
     A = principal_matrix[fs]
-    Ninv = np.linalg.inv(i_cov[fs][:, fs])
-    principal_maps[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(idata[fs][:, mask] / normalizations[-1][fs, None])))
+    Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
+    principal_maps[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(idata[fs][:, mask] / normalizations[0][fs, None])))
 principal_fits = principal_matrix.dot(principal_maps)
 
+
+###################################
+####################################
+#######Numerical Fitting################
+############################################
+####################################
+w_nf = np.copy(np.transpose(ecs[0][:, :n_principal]))
+xbar_ni = np.copy(principal_maps)
+x_fi = idata / normalizations[0][:, None]
+errors = []
+current_error = 1#placeholder
+error = 2#placeholder
+niter = 0
+while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
+    niter += 1
+    print niter,
+    sys.stdout.flush()
+    current_error = error
+    #for w
+    w_nf_ideal = np.zeros_like(w_nf)
+    for f in range(len(freqs)):
+        valid_mask = ~np.isnan(x_fi[f])
+        A = np.transpose(xbar_ni)[valid_mask]
+        b = x_fi[f, valid_mask]
+        w_nf_ideal[:, f] = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A).dot(b))
+    w_nf = w_nf_ideal
+
+    #for map:
+    xbar_ni_ideal = np.zeros_like(xbar_ni)
+    for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
+        A = np.transpose(w_nf)[fs]
+        Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
+        xbar_ni_ideal[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(x_fi[fs][:, mask])))
+    xbar_ni = xbar_ni_ideal
+
+    x_fit = np.transpose(w_nf).dot(xbar_ni)
+    error = np.nansum((x_fit - x_fi).flatten()**2)
+    errors.append(error)
+
+plt.plot(errors)
+plt.show()
+
 for i in range(n_principal):
-    hpv.mollview(principal_maps[i], nest=True, sub=(2, n_principal, i + 1), min=np.percentile(principal_maps[i], 3), max=np.percentile(principal_maps[i], 97))
+    hpv.mollview(xbar_ni[i], nest=True, sub=(2, n_principal, i + 1), min=np.percentile(principal_maps[i], 3), max=np.percentile(principal_maps[i], 97))
     plt.subplot(2, n_principal, i + 1 + n_principal)
-    plt.plot(np.log10(freqs), principal_matrix[:, i])
+    plt.plot(np.log10(freqs), w_nf[i])
     plt.ylim([-1, 1])
 plt.show()
 
-for i, data in enumerate(idata / normalizations[-1][:, None]):
-    hpv.mollview(np.abs(principal_fits[i] - data) / data, nest=True, title='%.3fGHz'%freqs[i], sub=(4, (len(freqs) - 1) / 4. + 1, i + 1), max=1, min=0)
+for f in range(len(freqs)):
+    hpv.mollview(np.abs(x_fit[f] - x_fi[f]) / x_fi[f], nest=True, title='%.3fGHz'%freqs[f], sub=(4, (len(freqs) - 1) / 4. + 1, f + 1), max=1, min=0)
 plt.show()
