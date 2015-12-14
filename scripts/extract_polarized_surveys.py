@@ -7,8 +7,10 @@ import healpy.visufunc as hpv
 import healpy.pixelfunc as hpf
 import healpy.sphtfunc as hps
 import matplotlib.pyplot as plt
+import matplotlib
 from matplotlib import cm
-import sys
+import sys, time, os
+import simulate_visibilities.simulate_visibilities as sv
 
 def pol_frac(I, Q, U, V=0):
     return (Q**2 + U**2 + V**2)**.5 / I
@@ -123,8 +125,8 @@ def preprocess(m, final_nside, nest=True, fwhm=0, edge_width=0, smooth_thresh=1e
     bad_mask = np.isnan(result) | (result == 0) | np.isinf(result)
 
     #expand mask to push out edge by edge_width
-    smooth_bad_mask = smoothing(bad_mask, fwhm=edge_width, nest=nest) > .25
-    bad_mask = bad_mask | smooth_bad_mask
+    edge_expand_bad_mask = smoothing(bad_mask, fwhm=edge_width, nest=nest) > .25
+    bad_mask = bad_mask | edge_expand_bad_mask
 
     #smooth
     result[bad_mask] = 0
@@ -283,11 +285,11 @@ if plot_individual:
 
 #####wmap
 wmap_iqu = {}
-wmap_iqu[22.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_K_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']])
-wmap_iqu[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Ka_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']])
-wmap_iqu[40.7] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Q_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']])
-wmap_iqu[60.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_V_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']])
-wmap_iqu[93.5] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_W_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']])
+wmap_iqu[22.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_K_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+wmap_iqu[33.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Ka_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+wmap_iqu[40.7] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Q_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+wmap_iqu[60.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_V_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+wmap_iqu[93.5] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_W_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
 if plot_individual:
     plot_dataset(wmap_iqu)
 
@@ -432,6 +434,7 @@ for i, mask in enumerate(region_mask_list):
 hpv.mollview(region_illustration, nest=True)
 plt.show()
 
+####PCA to get rough estimates
 ####get eigen systems##
 evs = []#np.zeros((len(region_mask_list), len(freqs)))
 ecs = []#np.zeros((len(region_mask_list), len(freqs), len(freqs)))
@@ -472,65 +475,128 @@ for i in range(5):
         plt.ylim([-.7, .7])
 plt.show()
 
+
+
+
+#global minimization##
 ###get principal maps
-n_principal = 5
-principal_matrix = ecs[0][:, :n_principal]
-principal_maps = np.zeros((n_principal, mother_npix))
-for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
-    A = principal_matrix[fs]
-    Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
-    principal_maps[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(idata[fs][:, mask] / normalizations[0][fs, None])))
-principal_fits = principal_matrix.dot(principal_maps)
-
-
-###################################
-####################################
-#######Numerical Fitting################
-############################################
-####################################
-w_nf = np.copy(np.transpose(ecs[0][:, :n_principal]))
-xbar_ni = np.copy(principal_maps)
-x_fi = idata / normalizations[0][:, None]
-errors = []
-current_error = 1#placeholder
-error = 2#placeholder
-niter = 0
-while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
-    niter += 1
-    print niter,
-    sys.stdout.flush()
-    current_error = error
-    #for w
-    w_nf_ideal = np.zeros_like(w_nf)
-    for f in range(len(freqs)):
-        valid_mask = ~np.isnan(x_fi[f])
-        A = np.transpose(xbar_ni)[valid_mask]
-        b = x_fi[f, valid_mask]
-        w_nf_ideal[:, f] = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A).dot(b))
-    w_nf = w_nf_ideal
-
-    #for map:
-    xbar_ni_ideal = np.zeros_like(xbar_ni)
+show_plots = False
+for n_principal in range(3, 8):
+    principal_matrix = ecs[0][:, :n_principal]
+    principal_maps = np.zeros((n_principal, mother_npix))
     for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
-        A = np.transpose(w_nf)[fs]
+        A = principal_matrix[fs]
         Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
-        xbar_ni_ideal[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(x_fi[fs][:, mask])))
-    xbar_ni = xbar_ni_ideal
+        principal_maps[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(idata[fs][:, mask] / normalizations[0][fs, None])))
+    principal_fits = principal_matrix.dot(principal_maps)
 
+
+    ###################################
+    ####################################
+    #######Numerical Fitting################
+    ############################################
+    ####################################
+    normalization = np.copy(normalizations[0])
+    w_nf = np.copy(np.transpose(ecs[0][:, :n_principal]))
+    xbar_ni = np.copy(principal_maps)
     x_fit = np.transpose(w_nf).dot(xbar_ni)
-    error = np.nansum((x_fit - x_fi).flatten()**2)
-    errors.append(error)
 
-plt.plot(errors)
-plt.show()
+    errors = []
+    current_error = 1#placeholder
+    error = 2#placeholder
+    niter = 0
+    while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
+        niter += 1
+        print niter,
+        sys.stdout.flush()
+        current_error = error
 
-for i in range(n_principal):
-    hpv.mollview(xbar_ni[i], nest=True, sub=(2, n_principal, i + 1), min=np.percentile(principal_maps[i], 3), max=np.percentile(principal_maps[i], 97))
-    plt.subplot(2, n_principal, i + 1 + n_principal)
-    plt.plot(np.log10(freqs), w_nf[i])
-    plt.ylim([-1, 1])
-plt.show()
+        normalization *= np.linalg.norm(x_fit, axis=1) / np.mean(np.linalg.norm(x_fit, axis=1))
+        x_fi = idata / normalization[:, None]
 
-for f in range(len(freqs)):
-    hpv.mollview(np.abs(x_fit[f] - x_fi[f]) / x_fi[f], nest=True, title='%.3fGHz'%freqs[f], sub=(4, (len(freqs) - 1) / 4. + 1, f + 1), max=1, min=0)
-plt.show()
+        #for w
+        w_nf_ideal = np.zeros_like(w_nf)
+        for f in range(len(freqs)):
+            valid_mask = ~np.isnan(x_fi[f])
+            A = np.transpose(xbar_ni)[valid_mask]
+            b = x_fi[f, valid_mask]
+            w_nf_ideal[:, f] = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A).dot(b))
+        w_nf = w_nf_ideal
+
+        print '.',
+        sys.stdout.flush()
+
+        #for map:
+        xbar_ni_ideal = np.zeros_like(xbar_ni)
+        for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
+            tm = time.time()
+            A = np.transpose(w_nf)[fs]
+            # print time.time() - tm,
+            # tm = time.time(); sys.stdout.flush()
+            Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
+            # print time.time() - tm,
+            # tm = time.time(); sys.stdout.flush()
+            xbar_ni_ideal[:, mask] = np.linalg.inv(np.transpose(A).dot(Ninv.dot(A))).dot(np.transpose(A).dot(Ninv.dot(x_fi[fs][:, mask])))
+            # print time.time() - tm,
+            # tm = time.time(); sys.stdout.flush()
+        xbar_ni = xbar_ni_ideal
+
+        x_fit = np.transpose(w_nf).dot(xbar_ni)
+        error = np.nansum((x_fit - x_fi).flatten()**2)
+        errors.append(error)
+
+    fig = plt.Figure(figsize=(200, 100))
+    fig.set_canvas(plt.gcf().canvas)
+    plt.subplot(3, 1, 1)
+    plt.plot(errors)
+    plt.subplot(3, 1, 2)
+    plt.plot(np.nanmean((x_fit-x_fi)**2, axis=1))
+    hpv.mollview(np.log10(np.nanmean((x_fit-x_fi)**2, axis=0)), nest=True, sub=(3,1,3))
+    fig.savefig(data_file_name.replace('.npz', '_principal_%i_error_plot.png'%n_principal), dpi=1000)
+    if show_plots:
+        plt.show()
+    fig.clear()
+    plt.gcf().clear()
+
+    matplotlib.rcParams.update({'font.size': 6})
+    fig = plt.Figure(figsize=(200, 100))
+    fig.set_canvas(plt.gcf().canvas)
+    for i in range(n_principal):
+        cmap = cm.gist_rainbow_r
+        cmap.set_under('w')
+        cmap.set_bad('gray')
+        plot_data = xbar_ni[i] * np.sign(xbar_ni[i, hpf.vec2pix(mother_nside, 1, 0, 0, nest=True)])
+        # if i == 0:
+        #     plot_data = np.log10(plot_data)
+        # else:
+        plot_data = np.arcsinh(plot_data) / np.log(10.)
+
+        hpv.mollview(plot_data, nest=True, sub=(3, n_principal, i + 1), min=np.percentile(plot_data, 2), max=np.percentile(plot_data, 98), cmap=cmap)
+
+        plt.subplot(3, n_principal, i + 1 + n_principal)
+        plt.plot(np.log10(freqs), w_nf[i], 'r+')
+        interp_x = np.arange(np.log10(freqs[0]), np.log10(freqs[-1]), .01)
+        interp_y = si.interp1d(np.log10(freqs), w_nf[i], kind='slinear')(interp_x)
+        plt.plot(interp_x, interp_y, 'b-')
+        plt.ylim([-1.5, 1.5])
+
+        plt.subplot(3, n_principal, i + 1 + 2 * n_principal)
+        plt.plot(np.log10(freqs), np.log10(w_nf[i] * normalization), '+')
+        plt.xlim([np.log10(freqs[0]), np.log10(freqs[-1])])
+        plt.ylim(-5, 8)
+    fig.savefig(data_file_name.replace('.npz', '_principal_%i_result_plot.png'%n_principal), dpi=1000)
+    if show_plots:
+        plt.show()
+    fig.clear()
+    plt.gcf().clear()
+
+    fig = plt.Figure(figsize=(200, 100))
+    fig.set_canvas(plt.gcf().canvas)
+    for f in range(len(freqs)):
+        hpv.mollview(np.log10(np.abs(x_fit[f] - x_fi[f])), nest=True, title='%.3fGHz'%freqs[f], sub=(4, (len(freqs) - 1) / 4 + 1, f + 1), min=-5, max=-2)
+    fig.savefig(data_file_name.replace('.npz', '_principal_%i_error_plot2.png'%n_principal), dpi=1000)
+    if show_plots:
+        plt.show()
+    fig.clear()
+    plt.gcf().clear()
+
