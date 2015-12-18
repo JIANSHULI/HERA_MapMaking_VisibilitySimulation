@@ -6,6 +6,7 @@ import fitsio as fit
 import healpy.visufunc as hpv
 import healpy.pixelfunc as hpf
 import healpy.sphtfunc as hps
+import healpy.rotator as hpr
 import matplotlib.pyplot as plt
 import matplotlib
 from matplotlib import cm
@@ -176,6 +177,27 @@ def merge_map(maps, nside=None, nest=True, verbose=False, renormalize=False):
 
     return result
 
+def find_regions(nan_mask):
+    nf = nan_mask.shape[0]
+    mother_npix = nan_mask.shape[1]
+    incomplete_fs = np.arange(nf)[nan_mask.any(axis=1)]
+    complete_fs = np.arange(nf)[~nan_mask.any(axis=1)]
+    n_incomplete = len(incomplete_fs)#number of incomplete maps
+    max_n_region = 2**n_incomplete #maximum number of possible regions
+    region_mask_list = []
+    region_indices_list = []
+
+    region_sum = np.zeros(mother_npix)
+    for n, f in enumerate(incomplete_fs):
+        region_sum += nan_mask[f] * 2**n
+
+    for n_reg in range(max_n_region):
+        fill_mask = np.array([not bool(int(c)) for c in bin(n_reg)[2:].zfill(n_incomplete)])[::-1]
+        matching_mask = (region_sum == n_reg)
+        if matching_mask.any():
+            region_mask_list.append(matching_mask)
+            region_indices_list.append(sorted(np.concatenate((incomplete_fs[fill_mask], complete_fs))))
+    return region_indices_list, region_mask_list
 
 plot_individual = False
 
@@ -186,178 +208,13 @@ plot_individual = False
 ###########################
 ###########################
 mother_nside = 512
+mother_npix = hpf.nside2npix(mother_nside)
 smoothing_fwhm = 3. * np.pi / 180.
 edge_width = 1. * np.pi / 180.
 remove_cmb = True
 
 data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
 
-###########################
-###parkes 85 and 150mhz
-#########################
-
-parkes_85 = fit.read("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin")[0]
-parkes_85[:, :-1] = np.roll(parkes_85[:, :-1], 180, axis=1)[:, ::-1]
-parkes_85[:, -1] = parkes_85[:, 0]
-parkes_85[parkes_85 > 1.4e4] = -1e-9
-parkes_85[parkes_85 <= 0] = -1e-9
-parkes_85 = equirectangular2heapix(parkes_85, mother_nside)
-parkes_85[parkes_85 <= 0] = np.nan
-
-parkes_150 = fit.read("/home/omniscope/data/polarized foregrounds/parkes_150mhz.bin")[0]
-parkes_150[:, :-1] = np.roll(parkes_150[:, :-1], 180, axis=1)[:, ::-1]
-parkes_150[:, -1] = parkes_150[:, 0]
-parkes_150[parkes_150 > 7.e3] = -1e-9
-parkes_150[parkes_150 <= 0] = -1e-9
-parkes_150 = equirectangular2heapix(parkes_150, mother_nside)
-parkes_150[parkes_150 <= 0] = np.nan
-
-parkes = {.085: parkes_85,
-          .15: parkes_150,
-          }
-if plot_individual:
-    plot_dataset(parkes)
-###########################
-###1.4G: DRAO+villa Elisa+CHIPASS+LAB
-###########################
-
-drao_elisa_iqu_syn = {}
-
-chipass = fit.read("/home/omniscope/data/polarized foregrounds/lambda_chipass_healpix_r10.fits")['TEMPERATURE']
-chipass[chipass <= 0] = np.nan
-# lab = fit.read("/home/omniscope/data/polarized foregrounds/LAB_fullvel.fits")['TEMPERATURE'].flatten()
-# lab = lab[hpf.nest2ring(int((len(lab)/12)**.5), range(len(lab)))]
-
-stockert = fit.read("/home/omniscope/data/polarized foregrounds/stocker_villa_elisa.bin")[0]
-stockert[:, :-1] = np.roll(stockert[:, :-1], 720, axis=1)[:, ::-1]
-stockert[:, -1] = stockert[:, 0]
-stockert = equirectangular2heapix(stockert, mother_nside)
-
-elisa = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/Elisa_POL_%s.bin"%key)[0], mother_nside) for key in ['I', 'Q', 'U']])
-elisa[elisa > 1000] = np.nan
-
-drao = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/DRAO_POL_%s.bin"%key)[0], mother_nside) for key in ['I', 'Q', 'U']])
-drao[drao > 1000] = np.nan
-
-reich_q = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.q.lb.fits")[0], mother_nside)
-reich_u = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.u.lb.fits")[0], mother_nside)
-
-drao_elisa_iqu_syn[1.3945] = chipass
-drao_elisa_iqu_syn[1.435] = elisa
-drao_elisa_iqu_syn[1.41] = drao
-drao_elisa_iqu_syn[1.42] = stockert
-# drao_elisa_iqu_syn[1.4276] = lab
-
-if plot_individual:
-    plot_dataset(drao_elisa_iqu_syn)
-
-all_1400 = {
-    1.42:
-        np.array([
-            stockert, #merge_map([chipass, stockert], verbose=True, renormalize=True),
-            reich_q, #merge_map([drao[1], elisa[1]]),
-            reich_u, #merge_map([drao[2], elisa[2]]),
-        ]) / 1.e3,
-    1.3945: chipass / 1.e3}
-
-if plot_individual:
-    plot_dataset(all_1400)
-
-###########################
-###CMB######
-###############
-T_CMB = 2.725 * (1 - remove_cmb) #if remove cmb, dont add cmb temp into wmap/planck
-dipole_correction = {'I_Stokes': T_CMB, 'Q_Stokes': 0, 'U_Stokes': 0, 'I_STOKES': T_CMB, 'Q_STOKES': 0, 'U_STOKES': 0, 'TEMPERATURE': T_CMB, 'Q_POLARISATION': 0, 'U_POLARISATION': 0}
-
-####planck
-planck_iqu = {}
-planck_iqu[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_030_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
-planck_iqu[44.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_044_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
-planck_iqu[70.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_070_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
-planck_iqu[100.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_100_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[143.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_143_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[217.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_217_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[353.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_353_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[545.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_545_2048_R2.02_full.fits")['I_STOKES']
-planck_iqu[857.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_857_2048_R2.02_full.fits")['I_STOKES']
-if plot_individual:
-    plot_dataset(planck_iqu)
-
-#####wmap
-wmap_iqu = {}
-wmap_iqu[22.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_K_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[33.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Ka_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[40.7] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Q_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[60.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_V_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[93.5] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_W_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-if plot_individual:
-    plot_dataset(wmap_iqu)
-
-# ###WMAP POL 22G
-# cmb_iqu_syn = {}
-# cmb_iqu_syn[22.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_mcmc_base_k_synch_%s_9yr_v5.fits"%key)['BESTFIT'] for key in ['temp', 'stk_q', 'stk_u']])
-#
-# ###PLANCK POL 30G
-# cmb_iqu_syn[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_Synchrotron-commander_0256_R2.00.fits")['I_ML']]
-#                                 + [fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_SynchrotronPol-commander_0256_R2.00.fits")[key] for key in ['Q_ML_FULL', 'U_ML_FULL']])
-# plot_dataset(cmb_iqu_syn)
-
-#########################
-###mother file#########################
-#########################
-# motherfile = {}
-# motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
-# for i in range(motherfile_data.shape[1]):
-#     motherfile[i] = motherfile_data[:, i]
-# plot_dataset(motherfile)
-
-motherfile = {}
-motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
-motherfile[.045] = motherfile_data[:, -9]
-motherfile[2.33] = motherfile_data[:, -1]
-# motherfile[.0345] = motherfile_data[:, -11]
-# motherfile[.408] = motherfile_data[:, -3]
-motherfile[.022] = motherfile_data[:, -13]
-motherfile[.82] = motherfile_data[:, -2]
-motherfile[.010] = motherfile_data[:, -16]
-if plot_individual:
-    plot_dataset(motherfile)
-
-###########################
-###iras high freq
-#########################
-iras = {}
-for freq in [3, 5]:#, 12]:
-    d = np.zeros((5401, 10801)) - 1e9
-    d[(5401-3)/2:(5401-3)/2+301] = fit.read("/home/omniscope/data/polarized foregrounds/iras_%ithz.bin"%freq)[0]
-    d[:, :-1] = np.roll(d[:, :-1], 5400, axis=1)[:, ::-1]
-    d[:, -1] = d[:, 0]
-    d[d > np.nanmax(d) * .8] = -1e9
-    d[d <= 0] = -1e9
-    d = equirectangular2heapix(d, mother_nside)
-    d[d <= 0] = np.nan
-    iras[freq * 1.e3] = d
-
-
-if plot_individual:
-    plot_dataset(iras)
-
-#########################
-###Haslam#########################
-#########################
-haslam = fit.read("/home/omniscope/data/polarized foregrounds/haslam408_dsds_Remazeilles2014.fits")['TEMPERATURE'].flatten()
-haslam = {.408: haslam[hpf.nest2ring(int((len(haslam)/12)**.5), range(len(haslam)))]}
-if plot_individual:
-    plot_dataset(haslam)
-
-
-####PNM+87GB
-#plt.imshow(np.log10(fit.read("/home/omniscope/data/polarized foregrounds/PMN+87GB.fits")[0,0]));plt.show()
-
-
-#########################
-###Create new mother#########################
-#########################
 
 if os.path.isfile(data_file_name):
     data_file = np.load(data_file_name)
@@ -367,8 +224,213 @@ if os.path.isfile(data_file_name):
     udata = data_file['udata']
 
 else:
+    ###########################
+    ###parkes 85 and 150mhz
+    #########################
+
+    parkes_85 = fit.read("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin")[0]
+    parkes_85[:, :-1] = np.roll(parkes_85[:, :-1], 180, axis=1)[:, ::-1]
+    parkes_85[:, -1] = parkes_85[:, 0]
+    parkes_85[parkes_85 > 1.4e4] = -1e-9
+    parkes_85[parkes_85 <= 0] = -1e-9
+    parkes_85 = equirectangular2heapix(parkes_85, mother_nside)
+    parkes_85[parkes_85 <= 0] = np.nan
+
+    parkes_150 = fit.read("/home/omniscope/data/polarized foregrounds/parkes_150mhz.bin")[0]
+    parkes_150[:, :-1] = np.roll(parkes_150[:, :-1], 180, axis=1)[:, ::-1]
+    parkes_150[:, -1] = parkes_150[:, 0]
+    parkes_150[parkes_150 > 7.e3] = -1e-9
+    parkes_150[parkes_150 <= 0] = -1e-9
+    parkes_150 = equirectangular2heapix(parkes_150, mother_nside)
+    parkes_150[parkes_150 <= 0] = np.nan
+
+    parkes = {.085: parkes_85,
+              .15: parkes_150,
+              }
+    if plot_individual:
+        plot_dataset(parkes)
+    ###########################
+    ###1.4G: DRAO+villa Elisa+CHIPASS+LAB
+    ###########################
+
+    drao_elisa_iqu_syn = {}
+
+    chipass = fit.read("/home/omniscope/data/polarized foregrounds/lambda_chipass_healpix_r10.fits")['TEMPERATURE']
+    chipass[chipass <= 0] = np.nan
+    # lab = fit.read("/home/omniscope/data/polarized foregrounds/LAB_fullvel.fits")['TEMPERATURE'].flatten()
+    # lab = lab[hpf.nest2ring(int((len(lab)/12)**.5), range(len(lab)))]
+
+    stockert = fit.read("/home/omniscope/data/polarized foregrounds/stocker_villa_elisa.bin")[0]
+    stockert[:, :-1] = np.roll(stockert[:, :-1], 720, axis=1)[:, ::-1]
+    stockert[:, -1] = stockert[:, 0]
+    stockert = equirectangular2heapix(stockert, mother_nside)
+
+    elisa = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/Elisa_POL_%s.bin"%key)[0], mother_nside) for key in ['I', 'Q', 'U']])
+    elisa[elisa > 1000] = np.nan
+
+    drao = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/DRAO_POL_%s.bin"%key)[0], mother_nside) for key in ['I', 'Q', 'U']])
+    drao[drao > 1000] = np.nan
+
+    reich_q = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.q.lb.fits")[0], mother_nside)
+    reich_u = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.u.lb.fits")[0], mother_nside)
+
+    drao_elisa_iqu_syn[1.3945] = chipass
+    drao_elisa_iqu_syn[1.435] = elisa
+    drao_elisa_iqu_syn[1.41] = drao
+    drao_elisa_iqu_syn[1.42] = stockert
+    # drao_elisa_iqu_syn[1.4276] = lab
+
+    if plot_individual:
+        plot_dataset(drao_elisa_iqu_syn)
+
+    all_1400 = {
+        1.42:
+            np.array([
+                stockert, #merge_map([chipass, stockert], verbose=True, renormalize=True),
+                reich_q, #merge_map([drao[1], elisa[1]]),
+                reich_u, #merge_map([drao[2], elisa[2]]),
+            ]) / 1.e3,
+        1.3945: chipass / 1.e3}
+
+    if plot_individual:
+        plot_dataset(all_1400)
+
+    ###########################
+    ###CMB######
+    ###############
+    T_CMB = 2.725 * (1 - remove_cmb) #if remove cmb, dont add cmb temp into wmap/planck
+    dipole_correction = {'I_Stokes': T_CMB, 'Q_Stokes': 0, 'U_Stokes': 0, 'I_STOKES': T_CMB, 'Q_STOKES': 0, 'U_STOKES': 0, 'TEMPERATURE': T_CMB, 'Q_POLARISATION': 0, 'U_POLARISATION': 0}
+
+    ####planck
+    planck_iqu = {}
+    planck_iqu[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_030_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
+    planck_iqu[44.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_044_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
+    planck_iqu[70.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_070_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
+    planck_iqu[100.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_100_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
+    planck_iqu[143.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_143_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
+    planck_iqu[217.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_217_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
+    planck_iqu[353.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_353_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
+    planck_iqu[545.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_545_2048_R2.02_full.fits")['I_STOKES']
+    planck_iqu[857.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_857_2048_R2.02_full.fits")['I_STOKES']
+    if plot_individual:
+        plot_dataset(planck_iqu)
+
+    #####wmap
+    wmap_iqu = {}
+    wmap_iqu[22.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_K_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+    wmap_iqu[33.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Ka_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+    wmap_iqu[40.7] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Q_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+    wmap_iqu[60.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_V_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+    wmap_iqu[93.5] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_W_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+    if plot_individual:
+        plot_dataset(wmap_iqu)
+
+    # ###WMAP POL 22G
+    # cmb_iqu_syn = {}
+    # cmb_iqu_syn[22.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_mcmc_base_k_synch_%s_9yr_v5.fits"%key)['BESTFIT'] for key in ['temp', 'stk_q', 'stk_u']])
+    #
+    # ###PLANCK POL 30G
+    # cmb_iqu_syn[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_Synchrotron-commander_0256_R2.00.fits")['I_ML']]
+    #                                 + [fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_SynchrotronPol-commander_0256_R2.00.fits")[key] for key in ['Q_ML_FULL', 'U_ML_FULL']])
+    # plot_dataset(cmb_iqu_syn)
+
+    #########################
+    ###mother file#########################
+    #########################
+    # motherfile = {}
+    # motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
+    # for i in range(motherfile_data.shape[1]):
+    #     motherfile[i] = motherfile_data[:, i]
+    # plot_dataset(motherfile)
+
+    motherfile = {}
+    motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
+    motherfile[.045] = motherfile_data[:, -9]
+    motherfile[2.33] = motherfile_data[:, -1]
+    # motherfile[.0345] = motherfile_data[:, -11]
+    # motherfile[.408] = motherfile_data[:, -3]
+    motherfile[.022] = motherfile_data[:, -13]
+    motherfile[.82] = motherfile_data[:, -2]
+    motherfile[.010] = motherfile_data[:, -16]
+    if plot_individual:
+        plot_dataset(motherfile)
+
+    ###########################
+    ###high freq THz
+    #########################
+    # iras = {}
+    # for freq in [3, 5]:#, 12]:
+    #     d = np.zeros((5401, 10801)) - 1e9
+    #     d[(5401-3)/2:(5401-3)/2+301] = fit.read("/home/omniscope/data/polarized foregrounds/iras_%ithz.bin"%freq)[0]
+    #     d[:, :-1] = np.roll(d[:, :-1], 5400, axis=1)[:, ::-1]
+    #     d[:, -1] = d[:, 0]
+    #     d[d > np.nanmax(d) * .8] = -1e9
+    #     d[d <= 0] = -1e9
+    #     d = equirectangular2heapix(d, mother_nside)
+    #     d[d <= 0] = np.nan
+    #     iras[freq * 1.e3] = d
+    #
+    #
+    # if plot_individual:
+    #     plot_dataset(iras)
+
+    ############
+    ###iris####
+    ############
+    iris = {}
+    for i, freq in enumerate([3.e3, 5.e3, 12.e3, 25.e3]):
+        iris[freq] = fit.read("/home/omniscope/data/polarized foregrounds/IRIS_nohole_%i_1024.fits"%(4-i))['f0'].flatten()[hpf.nest2ring(1024, range(hpf.nside2npix(1024)))]
+
+    theta_g, phi_g = hpf.pix2ang(1024, range(12*1024**2), nest=True)
+    theta_e, phi_e = hpr.Rotator(coord='ge')(theta_g, phi_g)
+    iris_zodiacal_mask_widths = [0, .2, .7, .7]
+    for i, freq in enumerate([3.e3, 5.e3, 12.e3, 25.e3]):
+        iris[freq][np.abs(theta_e-np.pi/2) <= iris_zodiacal_mask_widths[i]] = np.nan
+
+    if plot_individual:
+        plot_dataset(iris)
+
+    ############
+    ####akari####
+    ############
+    akari = {}
+    for i, freq in enumerate([3.e5/160, 3.e5/140, 3.e5/90]):#, 3.e5/65]):
+        akari[freq] = fit.read("/home/omniscope/data/polarized foregrounds/akari_%s_1_4096.fits"%(['160', 'WideL', 'WideS', '65'][i]))['UNKNOWN1'].flatten()
+        akari[freq][akari[freq] == 0] = np.nan
+    ###common mask for akari scan patterns
+    common_akari_mask = np.zeros(len(akari[akari.keys()[0]]), dtype='bool')
+    for freq, data in akari.iteritems():
+        common_akari_mask = common_akari_mask|np.isnan(data)
+    for freq in akari.keys():
+        akari[freq][common_akari_mask] = np.nan
+    ###remove zodiacal light contaminated region for 90um (and 65um, but it's excluded anyways)
+    theta_g, phi_g = hpf.pix2ang(4096, range(12*4096**2), nest=True)
+    theta_e, phi_e = hpr.Rotator(coord='ge')(theta_g, phi_g)
+    # theta_z, phi_z = hpr.Rotator(rot=(0, 0, 90))(theta_e, phi_e)
+    akari_zodiacal_mask = np.abs(theta_e-np.pi/2) <= .45
+    akari[3.e5/90][akari_zodiacal_mask] = np.nan
+
+    if plot_individual:
+        plot_dataset(akari)
+    #########################
+    ###Haslam#########################
+    #########################
+    haslam = fit.read("/home/omniscope/data/polarized foregrounds/haslam408_dsds_Remazeilles2014.fits")['TEMPERATURE'].flatten()
+    haslam = {.408: haslam[hpf.nest2ring(int((len(haslam)/12)**.5), range(len(haslam)))]}
+    if plot_individual:
+        plot_dataset(haslam)
+
+
+    ####PNM+87GB
+    #plt.imshow(np.log10(fit.read("/home/omniscope/data/polarized foregrounds/PMN+87GB.fits")[0,0]));plt.show()
+
+
+    #########################
+    ###Create new mother#########################
+    #########################
+
+
     new_mother = {}
-    mother_npix = hpf.nside2npix(mother_nside)
     for dict in [
         motherfile,
         all_1400,
@@ -406,27 +468,41 @@ else:
 
     np.savez(data_file_name, freqs=freqs, idata=idata, qdata=qdata, udata=udata)
 
+
+
 ##############################################
 ##############################################
-####start I data processing
+####start I data processing method 1
 ##############################################
 ##############################################
+####kick small coverage frequencies until there are regions that contain all frequencies
+coverage_order = np.argsort(np.sum(~np.isnan(idata), axis=1))
+low_coverage_data = {}
+kick_candidate = 0#just increases from 0 to 1 to 2...
+removed_mask = np.zeros(len(freqs), dtype='bool')
+while np.sum(~np.isnan(idata[~removed_mask]).any(axis=0)) < mother_npix / 10:#when no region contains all frequencies
+    kick_f = coverage_order[kick_candidate]
+    # kick_freq = freqs[kick_f]
+    # low_coverage_data[kick_freq] = new_mother.pop(kick_freq)
+    removed_mask[kick_f] = True
+
+    kick_candidate += 1
+
+
+
+###put kicked data into add_on, and awkwardly change idata etc to smaller set, will merge back later. doing this awkward back and forth due to unfortunate coding order...
+addon_freqs = freqs[removed_mask]
+addon_idata = idata[removed_mask]
+addon_qdata = qdata[removed_mask]
+addon_udata = udata[removed_mask]
+
+freqs = freqs[~removed_mask]
+idata = idata[~removed_mask]
+qdata = qdata[~removed_mask]
+udata = udata[~removed_mask]
 
 ####seperate regions##
-incomplete_fs = np.arange(len(freqs))[np.isnan(np.sum(idata, axis=1))]
-complete_fs = np.arange(len(freqs))[~np.isnan(np.sum(idata, axis=1))]
-n_incomplete = np.sum(np.isnan(np.sum(idata, axis=1)))#number of incomplete maps
-max_n_region = 2**n_incomplete #maximum number of possible regions
-region_mask_list = []
-region_indices_list = []
-for n_reg in range(max_n_region):
-    fill_mask = np.array([bool(int(c)) for c in bin(n_reg)[2:].zfill(n_incomplete)])
-    matching_mask = np.ones(mother_npix, dtype=bool)
-    for i, f in enumerate(incomplete_fs):
-        matching_mask = matching_mask & (np.isnan(idata[f]) == fill_mask[i])
-    if np.sum(matching_mask) != 0:
-        region_mask_list.append(matching_mask)
-        region_indices_list.append(sorted(np.concatenate((incomplete_fs[~fill_mask], complete_fs))))
+region_indices_list, region_mask_list = find_regions(np.isnan(idata))
 
 region_illustration = np.empty(mother_npix)
 for i, mask in enumerate(region_mask_list):
@@ -440,13 +516,13 @@ evs = []#np.zeros((len(region_mask_list), len(freqs)))
 ecs = []#np.zeros((len(region_mask_list), len(freqs), len(freqs)))
 i_covs = []
 normalizations = []
-pix_normalization = np.zeros(mother_npix)
-for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
+# pix_normalization = np.zeros(mother_npix)
+for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)[:10]):
 
     normalization = np.linalg.norm(idata[fs][:, mask], axis=1)
     normalized_data = idata[fs][:, mask] / normalization[:, None]
 
-    pix_normalization[mask] = np.linalg.norm(normalized_data, axis=0) / len(normalized_data)**.5
+    # pix_normalization[mask] = np.linalg.norm(normalized_data, axis=0) / len(normalized_data)**.5
 
     i_cov = np.einsum('ik,jk->ij', normalized_data, normalized_data) / len(fs)
     ev, ec = np.linalg.eig(i_cov)
@@ -476,12 +552,21 @@ for i in range(5):
 plt.show()
 
 
+#merge data (i know this is awkward)
+all_freqs = sorted(np.concatenate((freqs, addon_freqs)))
+addon_freqs_mask = np.array([freq in addon_freqs for freq in all_freqs])
 
+all_idata = np.zeros((len(all_freqs), mother_npix))
+all_idata[addon_freqs_mask] = addon_idata
+all_idata[~addon_freqs_mask] = idata
 
-#global minimization##
-###get principal maps
+all_region_indices_list, all_region_mask_list = find_regions(np.isnan(all_idata))
+
+###iterate through different choices of n_principal
 show_plots = False
-for n_principal in range(3, 8):
+step_size = 1.
+for n_principal in range(6, 7):
+    ###get starting point principal maps
     principal_matrix = ecs[0][:, :n_principal]
     principal_maps = np.zeros((n_principal, mother_npix))
     for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
@@ -490,20 +575,33 @@ for n_principal in range(3, 8):
         principal_maps[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(idata[fs][:, mask] / normalizations[0][fs, None])))
     principal_fits = principal_matrix.dot(principal_maps)
 
+    #use starting point principal maps to get weights for add-on maps
+    addon_weights = np.zeros((len(addon_freqs), n_principal))
+    for f, freq in enumerate(addon_freqs):
+        addon_mask = ~np.isnan(addon_idata[f])
+        A = np.transpose(principal_maps[:, addon_mask])
+        addon_weights[f] = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A).dot(addon_idata[f][addon_mask]))
+    addon_normalization = np.linalg.norm(addon_weights.dot(principal_maps), axis=1) / np.linalg.norm(principal_fits[-1])
+    addon_weights /= addon_normalization[:, None]
 
-    ###################################
-    ####################################
-    #######Numerical Fitting################
-    ############################################
-    ####################################
-    normalization = np.copy(normalizations[0])
-    w_nf = np.copy(np.transpose(ecs[0][:, :n_principal]))
+    ########################################
+    ############Numerical Fitting###########
+    ##########################################
+    normalization = np.zeros(len(all_freqs))
+    normalization[addon_freqs_mask] = addon_normalization
+    normalization[~addon_freqs_mask] = normalizations[0]
+
+    w_nf = np.zeros((n_principal, len(all_freqs)))
+    w_nf[:, addon_freqs_mask] = np.transpose(addon_weights)
+    w_nf[:, ~addon_freqs_mask] = np.transpose(ecs[0][:, :n_principal])
+
     xbar_ni = np.copy(principal_maps)
+
     x_fit = np.transpose(w_nf).dot(xbar_ni)
 
     errors = []
     current_error = 1#placeholder
-    error = 2#placeholder
+    error = 1e12#placeholder
     niter = 0
     while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
         niter += 1
@@ -512,23 +610,23 @@ for n_principal in range(3, 8):
         current_error = error
 
         normalization *= np.linalg.norm(x_fit, axis=1) / np.mean(np.linalg.norm(x_fit, axis=1))
-        x_fi = idata / normalization[:, None]
+        x_fi = all_idata / normalization[:, None]
 
         #for w
         w_nf_ideal = np.zeros_like(w_nf)
-        for f in range(len(freqs)):
+        for f in range(len(all_freqs)):
             valid_mask = ~np.isnan(x_fi[f])
             A = np.transpose(xbar_ni)[valid_mask]
             b = x_fi[f, valid_mask]
-            w_nf_ideal[:, f] = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A).dot(b))
-        w_nf = w_nf_ideal
+            w_nf_ideal[:, f] = np.linalg.inv(np.einsum('ki,kj->ij', A, A)).dot(np.transpose(A).dot(b))
+        w_nf = w_nf_ideal * step_size + w_nf * (1 - step_size)
 
         print '.',
         sys.stdout.flush()
 
         #for map:
         xbar_ni_ideal = np.zeros_like(xbar_ni)
-        for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
+        for i, (mask, fs) in enumerate(zip(all_region_mask_list, all_region_indices_list)):
             tm = time.time()
             A = np.transpose(w_nf)[fs]
             # print time.time() - tm,
@@ -536,14 +634,20 @@ for n_principal in range(3, 8):
             Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
             # print time.time() - tm,
             # tm = time.time(); sys.stdout.flush()
-            xbar_ni_ideal[:, mask] = np.linalg.inv(np.transpose(A).dot(Ninv.dot(A))).dot(np.transpose(A).dot(Ninv.dot(x_fi[fs][:, mask])))
+            xbar_ni_ideal[:, mask] = np.linalg.inv(np.einsum('ki,kj->ij', A, Ninv.dot(A))).dot(np.transpose(A).dot(Ninv.dot(x_fi[:, mask][fs])))
             # print time.time() - tm,
             # tm = time.time(); sys.stdout.flush()
-        xbar_ni = xbar_ni_ideal
+        xbar_ni = xbar_ni_ideal * step_size + xbar_ni * (1 - step_size)
 
         x_fit = np.transpose(w_nf).dot(xbar_ni)
         error = np.nansum((x_fit - x_fi).flatten()**2)
         errors.append(error)
+    re_norm = np.linalg.norm(w_nf, axis=1)
+    w_nf /= re_norm[:, None]
+    xbar_ni *= re_norm[:, None]
+
+
+    matplotlib.rcParams.update({'font.size': 6})
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
@@ -552,39 +656,38 @@ for n_principal in range(3, 8):
     plt.subplot(3, 1, 2)
     plt.plot(np.nanmean((x_fit-x_fi)**2, axis=1))
     hpv.mollview(np.log10(np.nanmean((x_fit-x_fi)**2, axis=0)), nest=True, sub=(3,1,3))
-    fig.savefig(data_file_name.replace('.npz', '_principal_%i_error_plot.png'%n_principal), dpi=1000)
+    fig.savefig(data_file_name.replace('data_', 'plot_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_error_plot.png'%(n_principal, step_size)), dpi=1000)
     if show_plots:
         plt.show()
     fig.clear()
     plt.gcf().clear()
 
-    matplotlib.rcParams.update({'font.size': 6})
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
     for i in range(n_principal):
         cmap = cm.gist_rainbow_r
         cmap.set_under('w')
         cmap.set_bad('gray')
-        plot_data = xbar_ni[i] * np.sign(xbar_ni[i, hpf.vec2pix(mother_nside, 1, 0, 0, nest=True)])
+        plot_data_lin = xbar_ni[i] * np.sign(xbar_ni[i, hpf.vec2pix(mother_nside, 1, 0, 0, nest=True)])
         # if i == 0:
         #     plot_data = np.log10(plot_data)
         # else:
-        plot_data = np.arcsinh(plot_data) / np.log(10.)
+        plot_data = np.arcsinh(plot_data_lin) / np.log(10.)
 
-        hpv.mollview(plot_data, nest=True, sub=(3, n_principal, i + 1), min=np.percentile(plot_data, 2), max=np.percentile(plot_data, 98), cmap=cmap)
+        hpv.mollview(plot_data, nest=True, sub=(3, n_principal, i + 1), min=np.percentile(plot_data, 2), max=np.percentile(plot_data, 98), cmap=cmap, title='%.3e'%np.linalg.norm(plot_data_lin))
 
         plt.subplot(3, n_principal, i + 1 + n_principal)
-        plt.plot(np.log10(freqs), w_nf[i], 'r+')
-        interp_x = np.arange(np.log10(freqs[0]), np.log10(freqs[-1]), .01)
-        interp_y = si.interp1d(np.log10(freqs), w_nf[i], kind='slinear')(interp_x)
+        plt.plot(np.log10(all_freqs), w_nf[i], 'r+')
+        interp_x = np.arange(np.log10(all_freqs[0]), np.log10(all_freqs[-1]), .01)
+        interp_y = si.interp1d(np.log10(all_freqs), w_nf[i], kind='slinear')(interp_x)
         plt.plot(interp_x, interp_y, 'b-')
         plt.ylim([-1.5, 1.5])
 
         plt.subplot(3, n_principal, i + 1 + 2 * n_principal)
-        plt.plot(np.log10(freqs), np.log10(w_nf[i] * normalization), '+')
-        plt.xlim([np.log10(freqs[0]), np.log10(freqs[-1])])
+        plt.plot(np.log10(all_freqs), np.log10(w_nf[i] * normalization), '+')
+        plt.xlim([np.log10(all_freqs[0]), np.log10(all_freqs[-1])])
         plt.ylim(-5, 8)
-    fig.savefig(data_file_name.replace('.npz', '_principal_%i_result_plot.png'%n_principal), dpi=1000)
+    fig.savefig(data_file_name.replace('data_', 'plot_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_result_plot.png'%(n_principal, step_size)), dpi=1000)
     if show_plots:
         plt.show()
     fig.clear()
@@ -592,11 +695,26 @@ for n_principal in range(3, 8):
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
-    for f in range(len(freqs)):
-        hpv.mollview(np.log10(np.abs(x_fit[f] - x_fi[f])), nest=True, title='%.3fGHz'%freqs[f], sub=(4, (len(freqs) - 1) / 4 + 1, f + 1), min=-5, max=-2)
-    fig.savefig(data_file_name.replace('.npz', '_principal_%i_error_plot2.png'%n_principal), dpi=1000)
+    for f in range(len(all_freqs)):
+        hpv.mollview(np.log10(np.abs(x_fit[f] - x_fi[f])), nest=True, title='%.3fGHz'%all_freqs[f], sub=(4, (len(all_freqs) - 1) / 4 + 1, f + 1), min=-5, max=-2)
+    fig.savefig(data_file_name.replace('data_', 'plot_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_error_plot2.png'%(n_principal, step_size)), dpi=1000)
     if show_plots:
         plt.show()
     fig.clear()
     plt.gcf().clear()
 
+    ##########################################
+    ###put in interferometer measurements#####
+    ##########################################
+
+
+# ##############################################
+# ##############################################
+# ####start I data processing method 2
+# ##############################################
+# ##############################################
+# D = all_idata / normalization[:, None]
+# D[np.isnan(D)] = 0.
+# DD = np.einsum('ik,jk->ij', D, D)
+# CC = np.einsum('ik,jk->ij', np.array(D!=0, dtype='float32'), np.array(D!=0, dtype='float32'))
+# ev2, ec2 = np.linalg.eigh(DD / CC)
