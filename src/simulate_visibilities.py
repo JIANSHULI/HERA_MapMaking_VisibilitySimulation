@@ -165,8 +165,8 @@ def get_alm(skymap,lmax=4,dtheta=pi/nside,dphi=2*pi/nside):
 
 class InverseCholeskyMatrix:#for a positive definite matrix, Cholesky decomposition is M = L.Lt, where L lower triangular. This decomposition helps computing inv(M).v faster, by avoiding calculating inv(M). Once we have L, the product is simply inv(Lt).inv(L).v, and inverse of triangular matrices multiplying a vector is fast. sla.solve_triangular(M, v) = inv(M).v
     def __init__(self, matrix):
-        if type(matrix).__module__ != np.__name__ or len(matrix.shape) != 2:
-            raise TypeError("matrix must be a 2D numpy array");
+        if (np.__name__ not in type(matrix).__module__) or len(matrix.shape) != 2:
+            raise TypeError("matrix must be a 2D numpy array")
         try:
             self.L = la.cholesky(matrix)#L.dot(L.conjugate().transpose()) = matrix, L lower triangular
             self.Lt = self.L.conjugate().transpose()
