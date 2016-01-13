@@ -12,6 +12,7 @@ import matplotlib
 from matplotlib import cm
 import sys, time, os
 import simulate_visibilities.simulate_visibilities as sv
+from sklearn.decomposition import FastICA
 
 
 def find_regions(nan_mask):
@@ -43,261 +44,120 @@ def find_regions(nan_mask):
 ###OVER ALL PARAMETERS
 ###########################
 ###########################
-mother_nside = 512
+mother_nside = 32
 mother_npix = hpf.nside2npix(mother_nside)
 smoothing_fwhm = 3. * np.pi / 180.
 edge_width = 1. * np.pi / 180.
+mask_name = 'plane15deg'
+pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > np.pi/12
+step = .2
 remove_cmb = True
+show_plots = False
 
 data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
 
+exclude_freqs = [60.8, 70, 93.5]
 
 data_file = np.load(data_file_name)
 freqs = data_file['freqs']
-idata = data_file['idata']
+qudata = data_file['qdata'] + 1.j * data_file['udata']
+
+bad_freqs_mask = np.isnan(qudata).any(axis=1)
+freqs = freqs[~bad_freqs_mask]
+nf = len(freqs)
+qudata = qudata[~bad_freqs_mask]
+
+matplotlib.rcParams.update({'font.size': 6})
+for n, qud in enumerate(qudata):
+    hpv.mollview(np.log10(np.abs(qud)), nest=True, sub=(2, len(qudata), n + 1), title=freqs[n])
+    hpv.mollview(np.angle(qud) / 2, nest=True, sub=(2, len(qudata), len(qudata) + n + 1), cmap=cm.hsv)
+plt.show()
+exclude_freqs_mask = np.array([freq in exclude_freqs for freq in freqs])
+
+freqs = freqs[~exclude_freqs_mask]
+nf = len(freqs)
+qudata = qudata[~exclude_freqs_mask] * pixel_mask[None, :]
+
+normalization = np.linalg.norm(qudata, axis=1)
+D = qudata / normalization[:, None]
 
 
-##############################################
-##############################################
-####start I data processing method 1
-##############################################
-##############################################
-####kick small coverage frequencies until there are regions that contain all frequencies
-coverage_order = np.argsort(np.sum(~np.isnan(idata), axis=1))
-low_coverage_data = {}
-kick_candidate = 0#just increases from 0 to 1 to 2...
-removed_mask = np.zeros(len(freqs), dtype='bool')
-while np.sum(~np.isnan(idata[~removed_mask]).any(axis=0)) < mother_npix / 10:#when no region contains all frequencies
-    kick_f = coverage_order[kick_candidate]
-    # kick_freq = freqs[kick_f]
-    # low_coverage_data[kick_freq] = new_mother.pop(kick_freq)
-    removed_mask[kick_f] = True
 
-    kick_candidate += 1
+cov = np.einsum('ik,jk->ij', np.conjugate(D), D)
 
+ev, ec = np.linalg.eigh(cov)
+principal_maps = np.linalg.inv(np.transpose(np.conjugate(ec)).dot(ec)).dot(np.transpose(np.conjugate(ec)).dot(D))
 
-
-###put kicked data into add_on, and awkwardly change idata etc to smaller set, will merge back later. doing this awkward back and forth due to unfortunate coding order...
-addon_freqs = freqs[removed_mask]
-addon_idata = idata[removed_mask]
-
-freqs = freqs[~removed_mask]
-idata = idata[~removed_mask]
-
-####seperate regions##
-region_indices_list, region_mask_list = find_regions(np.isnan(idata))
-
-region_illustration = np.empty(mother_npix)
-for i, mask in enumerate(region_mask_list):
-    region_illustration[mask] = len(region_mask_list) - i
-hpv.mollview(region_illustration, nest=True)
+for n in range(nf):
+    hpv.mollview(np.log10(np.abs(principal_maps[n])), nest=True, sub=(4, nf, n + 1), title=ev[n])
+    hpv.mollview(np.angle(principal_maps[n]) / 2, nest=True, sub=(4, nf, nf + n + 1), cmap=cm.hsv)
+    plt.subplot(4, nf, nf * 2 + n + 1)
+    plt.plot(np.abs(ec)[:, n])
+    plt.ylim(-1, 1)
+    plt.subplot(4, nf, nf * 3 + n + 1)
+    plt.plot(np.angle(ec)[:, n])
 plt.show()
 
-####PCA to get rough estimates
-####get eigen systems##
-evs = []#np.zeros((len(region_mask_list), len(freqs)))
-ecs = []#np.zeros((len(region_mask_list), len(freqs), len(freqs)))
-i_covs = []
-normalizations = []
-# pix_normalization = np.zeros(mother_npix)
-for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)[:10]):
+for n_principal in range(2, 6):
+    w_fn = np.copy(ec[:, -1:-n_principal-1:-1])
+    x_ni = np.copy(principal_maps[-1:-n_principal-1:-1])
+    errors = [np.linalg.norm(D - np.einsum('fn,ni->fi', w_fn, x_ni))]
 
-    normalization = np.linalg.norm(idata[fs][:, mask], axis=1)
-    normalized_data = idata[fs][:, mask] / normalization[:, None]
-
-    # pix_normalization[mask] = np.linalg.norm(normalized_data, axis=0) / len(normalized_data)**.5
-
-    i_cov = np.einsum('ik,jk->ij', normalized_data, normalized_data) / len(fs)
-    ev, ec = np.linalg.eig(i_cov)
-
-    #flip signs of eigenvectors: use first region, which i assume have all freqs, as template, and demand following eigenvectors to pick the sign that make it agree better with the template
-    if i > 0:
-        same_sign_norm = np.linalg.norm(ecs[0][fs, :len(fs)] - ec, axis=0)
-        diff_sign_norm = np.linalg.norm(ecs[0][fs, :len(fs)] + ec, axis=0)
-        ec *= (((same_sign_norm < diff_sign_norm) - .5) * 2)[None, :]
-
-
-    evs.append(ev)
-    ecs.append(ec)
-    i_covs.append(i_cov)
-    normalizations.append(normalization)
-
-[plt.plot(ev) for ev in evs]
-plt.show()
-for i in range(5):
-    plt.subplot(5, 1, i+1)
-    for fs, ec in zip(region_indices_list, ecs):
-        plot_data = np.copy(ec[:, i])
-        plot_data *= plot_data.dot(ecs[0][fs, i]) / plot_data.dot(plot_data)
-        # plt.plot(np.log10(freqs[fs]), plot_data)
-        plt.plot(fs, plot_data)
-        plt.ylim([-.7, .7])
-plt.show()
-
-
-#merge data (i know this is awkward)
-all_freqs = sorted(np.concatenate((freqs, addon_freqs)))
-addon_freqs_mask = np.array([freq in addon_freqs for freq in all_freqs])
-
-all_idata = np.zeros((len(all_freqs), mother_npix))
-all_idata[addon_freqs_mask] = addon_idata
-all_idata[~addon_freqs_mask] = idata
-
-all_region_indices_list, all_region_mask_list = find_regions(np.isnan(all_idata))
-
-###iterate through different choices of n_principal
-show_plots = False
-step_size = 1.
-for n_principal in range(6, 7):
-    ###get starting point principal maps
-    principal_matrix = ecs[0][:, :n_principal]
-    principal_maps = np.zeros((n_principal, mother_npix))
-    for i, (mask, fs) in enumerate(zip(region_mask_list, region_indices_list)):
-        A = principal_matrix[fs]
-        Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
-        principal_maps[:, mask] = np.linalg.inv(A.transpose().dot(Ninv.dot(A))).dot(A.transpose().dot(Ninv.dot(idata[fs][:, mask] / normalizations[0][fs, None])))
-    principal_fits = principal_matrix.dot(principal_maps)
-
-    #use starting point principal maps to get weights for add-on maps
-    addon_weights = np.zeros((len(addon_freqs), n_principal))
-    for f, freq in enumerate(addon_freqs):
-        addon_mask = ~np.isnan(addon_idata[f])
-        A = np.transpose(principal_maps[:, addon_mask])
-        addon_weights[f] = np.linalg.inv(np.transpose(A).dot(A)).dot(np.transpose(A).dot(addon_idata[f][addon_mask]))
-    addon_normalization = np.linalg.norm(addon_weights.dot(principal_maps), axis=1) / np.linalg.norm(principal_fits[-1])
-    addon_weights /= addon_normalization[:, None]
-
-    ########################################
-    ############Numerical Fitting###########
-    ##########################################
-    normalization = np.zeros(len(all_freqs))
-    normalization[addon_freqs_mask] = addon_normalization
-    normalization[~addon_freqs_mask] = normalizations[0]
-
-    w_nf = np.zeros((n_principal, len(all_freqs)))
-    w_nf[:, addon_freqs_mask] = np.transpose(addon_weights)
-    w_nf[:, ~addon_freqs_mask] = np.transpose(ecs[0][:, :n_principal])
-
-    xbar_ni = np.copy(principal_maps)
-
-    x_fit = np.transpose(w_nf).dot(xbar_ni)
-
-    errors = []
-    current_error = 1#placeholder
-    error = 1e12#placeholder
     niter = 0
-    while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
+    while niter < 1000 and (len(errors) == 1 or errors[-2] - errors[-1] > 1.e-4 * errors[-2]):
         niter += 1
         print niter,
         sys.stdout.flush()
-        current_error = error
 
-        normalization *= np.linalg.norm(x_fit, axis=1) / np.mean(np.linalg.norm(x_fit, axis=1))
-        x_fi = all_idata / normalization[:, None]
+        new_x_ni = np.einsum('mn,fn,fi->mi', np.linalg.inv(np.einsum('fn,fm->nm', np.conjugate(w_fn), w_fn)), np.conjugate(w_fn), D)
+        # new_x_ni = np.linalg.inv(np.einsum('fn,fm->nm', np.conjugate(w_fn), w_fn)).dot(np.einsum('fn,fi->ni', np.conjugate(w_fn), D))
+        x_ni = step * new_x_ni + (1 - step) * x_ni
 
-        #for w
-        w_nf_ideal = np.zeros_like(w_nf)
-        for f in range(len(all_freqs)):
-            valid_mask = ~np.isnan(x_fi[f])
-            A = np.transpose(xbar_ni)[valid_mask]
-            b = x_fi[f, valid_mask]
-            w_nf_ideal[:, f] = np.linalg.inv(np.einsum('ki,kj->ij', A, A)).dot(np.transpose(A).dot(b))
-        w_nf = w_nf_ideal * step_size + w_nf * (1 - step_size)
+        new_w_fn = np.einsum('mn,ni,fi->fm', np.linalg.inv(np.einsum('ni,mi->nm', np.conjugate(x_ni), x_ni)), np.conjugate(x_ni), D)
+        w_fn = step * new_w_fn + (1 - step) * w_fn
 
-        print '.',
-        sys.stdout.flush()
+        re_norm = np.linalg.norm(w_fn, axis=0)
+        w_fn /= re_norm[None, :]
+        x_ni *= re_norm[:, None]
 
-        #for map:
-        xbar_ni_ideal = np.zeros_like(xbar_ni)
-        for i, (mask, fs) in enumerate(zip(all_region_mask_list, all_region_indices_list)):
-            tm = time.time()
-            A = np.transpose(w_nf)[fs]
-            # print time.time() - tm,
-            # tm = time.time(); sys.stdout.flush()
-            Ninv = np.eye(len(fs))#np.linalg.inv(i_covs[0][fs][:, fs])
-            # print time.time() - tm,
-            # tm = time.time(); sys.stdout.flush()
-            xbar_ni_ideal[:, mask] = np.linalg.inv(np.einsum('ki,kj->ij', A, Ninv.dot(A))).dot(np.transpose(A).dot(Ninv.dot(x_fi[:, mask][fs])))
-            # print time.time() - tm,
-            # tm = time.time(); sys.stdout.flush()
-        xbar_ni = xbar_ni_ideal * step_size + xbar_ni * (1 - step_size)
-
-        x_fit = np.transpose(w_nf).dot(xbar_ni)
-        error = np.nansum((x_fit - x_fi).flatten()**2)
-        errors.append(error)
-    re_norm = np.linalg.norm(w_nf, axis=1)
-    w_nf /= re_norm[:, None]
-    xbar_ni *= re_norm[:, None]
+        D_error = D - np.einsum('fn,ni->fi', w_fn, x_ni)
+        errors.append(np.linalg.norm(D_error))
 
 
     matplotlib.rcParams.update({'font.size': 6})
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
-    plt.subplot(3, 1, 1)
+    for n in range(n_principal):
+        hpv.mollview(np.log10(np.abs(x_ni[n])), nest=True, sub=(4, n_principal, n + 1), title=np.linalg.norm(x_ni[n]))
+        hpv.mollview(np.angle(x_ni[n]) / 2, nest=True, sub=(4, n_principal, n_principal + n + 1), cmap=cm.hsv)
+        plt.subplot(4, n_principal, n_principal * 2 + n + 1)
+        plt.plot(np.log10(freqs), np.abs(w_fn)[:, n], 'g+')
+        plt.plot(np.log10(freqs), np.abs(w_fn)[:, n], 'b-')
+        plt.ylim(0, 2)
+        plt.subplot(4, n_principal, n_principal * 3 + n + 1)
+        phase_data = np.angle(w_fn)[:, n]
+        for i in range(1, len(phase_data)):
+            phase_data[i] = (phase_data[i] - (phase_data[i-1] - np.pi)) % (2 * np.pi) + (phase_data[i-1] - np.pi)
+        phase_data -= int(np.mean(phase_data) / (np.pi * 2)) * (np.pi * 2)
+        plt.plot(np.log10(freqs), phase_data, 'g+')
+        plt.plot(np.log10(freqs), phase_data, 'b-')
+        # plt.ylim(-np.pi, np.pi)
+    fig.savefig(data_file_name.replace('data_', 'plot_QU_%i_'%len(qudata)).replace('.npz', '_' + mask_name + '_principal_%i_step_%.2f_result_plot.png'%(n_principal, step)), dpi=1000)
+    if show_plots:
+        plt.show()
+    fig.clear()
+    plt.gcf().clear()
+
+    fig = plt.Figure(figsize=(200, 100))
+    fig.set_canvas(plt.gcf().canvas)
+    for f in range(nf):
+        hpv.mollview(np.log10(np.abs(D_error[f])), nest=True, sub=(3, 5, f + 1), title=np.linalg.norm(D_error[f]), min=-4, max=-1.5)
+    plt.subplot(3, 5, nf + 2)
     plt.plot(errors)
-    plt.subplot(3, 1, 2)
-    plt.plot(np.nanmean((x_fit-x_fi)**2, axis=1))
-    hpv.mollview(np.log10(np.nanmean((x_fit-x_fi)**2, axis=0)), nest=True, sub=(3,1,3))
-    fig.savefig(data_file_name.replace('data_', 'plot_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_error_plot.png'%(n_principal, step_size)), dpi=1000)
+    fig.savefig(data_file_name.replace('data_', 'plot_QU_%i_'%len(qudata)).replace('.npz', '_' + mask_name + '_principal_%i_step_%.2f_error_plot.png'%(n_principal, step)), dpi=1000)
     if show_plots:
         plt.show()
     fig.clear()
     plt.gcf().clear()
 
-    fig = plt.Figure(figsize=(200, 100))
-    fig.set_canvas(plt.gcf().canvas)
-    for i in range(n_principal):
-        cmap = cm.gist_rainbow_r
-        cmap.set_under('w')
-        cmap.set_bad('gray')
-        plot_data_lin = xbar_ni[i] * np.sign(xbar_ni[i, hpf.vec2pix(mother_nside, 1, 0, 0, nest=True)])
-        # if i == 0:
-        #     plot_data = np.log10(plot_data)
-        # else:
-        plot_data = np.arcsinh(plot_data_lin) / np.log(10.)
-
-        hpv.mollview(plot_data, nest=True, sub=(3, n_principal, i + 1), min=np.percentile(plot_data, 2), max=np.percentile(plot_data, 98), cmap=cmap, title='%.3e'%np.linalg.norm(plot_data_lin))
-
-        plt.subplot(3, n_principal, i + 1 + n_principal)
-        plt.plot(np.log10(all_freqs), w_nf[i], 'r+')
-        interp_x = np.arange(np.log10(all_freqs[0]), np.log10(all_freqs[-1]), .01)
-        interp_y = si.interp1d(np.log10(all_freqs), w_nf[i], kind='slinear')(interp_x)
-        plt.plot(interp_x, interp_y, 'b-')
-        plt.ylim([-1.5, 1.5])
-
-        plt.subplot(3, n_principal, i + 1 + 2 * n_principal)
-        plt.plot(np.log10(all_freqs), np.log10(w_nf[i] * normalization), '+')
-        plt.xlim([np.log10(all_freqs[0]), np.log10(all_freqs[-1])])
-        plt.ylim(-5, 8)
-    fig.savefig(data_file_name.replace('data_', 'plot_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_result_plot.png'%(n_principal, step_size)), dpi=1000)
-    if show_plots:
-        plt.show()
-    fig.clear()
-    plt.gcf().clear()
-
-    fig = plt.Figure(figsize=(200, 100))
-    fig.set_canvas(plt.gcf().canvas)
-    for f in range(len(all_freqs)):
-        hpv.mollview(np.log10(np.abs(x_fit[f] - x_fi[f])), nest=True, title='%.3fGHz'%all_freqs[f], sub=(4, (len(all_freqs) - 1) / 4 + 1, f + 1), min=-5, max=-2)
-    fig.savefig(data_file_name.replace('data_', 'plot_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_error_plot2.png'%(n_principal, step_size)), dpi=1000)
-    if show_plots:
-        plt.show()
-    fig.clear()
-    plt.gcf().clear()
-
-    ##########################################
-    ###put in interferometer measurements#####
-    ##########################################
-
-
-# ##############################################
-# ##############################################
-# ####start I data processing method 2
-# ##############################################
-# ##############################################
-# D = all_idata / normalization[:, None]
-# D[np.isnan(D)] = 0.
-# DD = np.einsum('ik,jk->ij', D, D)
-# CC = np.einsum('ik,jk->ij', np.array(D!=0, dtype='float32'), np.array(D!=0, dtype='float32'))
-# ev2, ec2 = np.linalg.eigh(DD / CC)

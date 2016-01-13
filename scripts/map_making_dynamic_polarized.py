@@ -389,7 +389,7 @@ def get_A():
         os.system("cat %s >> %s" % (A_path + 'tmpim', A_path + 'tmpre'))
 
         os.system("rm %s" % (A_path + 'tmpim'))
-        A = np.fromfile(Ashape, dtype='float32')
+        A = np.fromfile(A_path + 'tmpre', dtype='float32').reshape(Ashape)
         os.system("rm %s" % (A_path + 'tmpre'))
         print "done."
         sys.stdout.flush()

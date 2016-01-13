@@ -32,7 +32,7 @@ datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 nt = 440
 nf = 1
 nUBL = 75
-nside = 64
+nside = 32
 S_scale = 2
 S_thresh = 1000#Kelvin
 S_type = 'gsm%irm%i'%(S_scale,S_thresh)
@@ -91,9 +91,6 @@ for p in ['x', 'y']:
     ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
     ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
     print "%i UBLs to include"%len(ubls)
-
-
-
 
 
     #compute A matrix
