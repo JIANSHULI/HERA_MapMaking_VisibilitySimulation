@@ -8,11 +8,19 @@ TPI = 2*np.pi
 
 
 Q = sys.argv[1]#'q3AL'#'q0C'#'q3A'#'q2C'#
-pick_f = 4#-4
+pick_f = int(sys.argv[2])#-4
 fit_cas = True
 frac_cas = .9
 delay_compression = 15
-freqs_dic = {'q0C': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'q3AL': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),'q2CL':np.arange(145., 157.5, 50./1024/delay_compression*256),}
+freqs_dic = {
+    'q0C': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
+    'q1A': np.arange(146., 133.5, -50./1024/delay_compression*256)[::-1],
+    'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),
+    'q3AL': np.arange(156., 168.5, 50./1024/delay_compression*256),
+    'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),
+    'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),
+    'q2C':np.arange(145., 157.5, 50./1024/delay_compression*256),
+    'q2CL':np.arange(145., 157.5, 50./1024/delay_compression*256),}
 freqs = freqs_dic[Q]
 lambdas = 299.792 / freqs
 

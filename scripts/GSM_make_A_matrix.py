@@ -3,7 +3,7 @@ import simulate_visibilities.simulate_visibilities as sv
 import numpy as np
 import numpy.linalg as la
 import scipy.linalg as sla
-import time, ephem, sys, os, resource
+import time, ephem, sys, os, resource, glob
 import aipy as ap
 import matplotlib.pyplot as plt
 import healpy.rotator as hpr
@@ -25,15 +25,24 @@ def pinv_sym(M, rcond = 1.e-15, verbose = True):
             #eigvli[i] = 1/eigvl[i]
     return (eigvc*eigvli).dot(eigvc.transpose())
 
-tag = "q3_abscalibrated"
-datatag = '_seccasa_polcor.rad'
-vartag = '_seccasa_polcor'
+# tag = "q3_abscalibrated"
+# datatag = '_seccasa_polcor.rad'
+# vartag = '_seccasa_polcor'
+# datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
+# nt = 440
+# nf = 1
+# nUBL = 75
+
+tag = "q2C_abscal"  # L stands for lenient in flagging
+datatag = '_2015_05_09'
+vartag = '_2015_05_09'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-nt = 440
+# nt = {"q3A_abscal": 253, "q3AL_abscal": 368}[tag]
 nf = 1
-nUBL = 75
-nside = 128
-bnside = 8
+
+
+nside = 64
+bnside = 16
 lat_degree = 45.2977
 
 plot_data_error = True
@@ -48,28 +57,35 @@ C = 299.792458
 kB = 1.3806488* 1.e-23
 
 #deal with beam: create a dictionary for 'x' and 'y' each with a callable function of the form y(freq) in MHz
+# local_beam = {}
+# for p in ['x', 'y']:
+#     freqs = range(150,170,10)
+#     beam_array = np.zeros((len(freqs), 12*bnside**2))
+#     for f in range(len(freqs)):
+#         beam_array[f] = np.fromfile('/home/omniscope/simulate_visibilities/data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s%s.bin'%(bnside, freqs[f], p, p), dtype='float32')
+#     local_beam[p] = si.interp1d(freqs, beam_array, axis=0)
+
 local_beam = {}
+freqs = range(110, 200, 10)
 for p in ['x', 'y']:
-    freqs = range(150,170,10)
-    beam_array = np.zeros((len(freqs), 12*bnside**2))
-    for f in range(len(freqs)):
-        beam_array[f] = np.fromfile('/home/omniscope/simulate_visibilities/data/MWA_beam_in_healpix_horizontal_coor/nside=%i_freq=%i_%s%s.bin'%(bnside, freqs[f], p, p), dtype='float32')
-    local_beam[p] = si.interp1d(freqs, beam_array, axis=0)
+    local_beam[p] = si.interp1d(freqs, np.linalg.norm(np.fromfile('/home/omniscope/data/mwa_beam/healpix_%i_%s.bin'%(bnside, p), dtype='complex64').reshape((len(freqs), 12 * bnside ** 2, 2)), axis=-1)**2, axis=0)
 
 A = {}
 for p in ['x', 'y']:
     pol = p+p
 
     #tf file
-    tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
-    tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
+    tf_filename = glob.glob(datadir + tag + '_%s%s_*_%i.tf'%(p, p, nf))[0]
+    nt = len(np.fromfile(tf_filename, dtype='complex64')) / nf
+    tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt, nf))
     tlist = np.real(tflist[:, 0])
     flist = np.imag(tflist[0, :])
     freq = flist[0]
     print freq
 
     #ubl file
-    ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
+    ubl_filename = glob.glob(datadir + tag + '_%s%s_*_%i.ubl'%(p, p, 3))[0]
+    nUBL = len(np.fromfile(ubl_filename, dtype='float32')) / 3
     ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
     print "%i UBLs to include"%len(ubls)
 
