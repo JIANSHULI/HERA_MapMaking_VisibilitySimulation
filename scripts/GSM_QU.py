@@ -46,10 +46,10 @@ def find_regions(nan_mask):
 ###########################
 mother_nside = 32
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 3. * np.pi / 180.
-edge_width = 1. * np.pi / 180.
-mask_name = 'plane15deg'
-pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > np.pi/12
+smoothing_fwhm = 10. * np.pi / 180.
+edge_width = 10. * np.pi / 180.
+mask_name = 'plane10deg'
+pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > np.pi/18
 step = .2
 remove_cmb = True
 show_plots = False
@@ -95,10 +95,10 @@ for n in range(nf):
     plt.plot(np.abs(ec)[:, n])
     plt.ylim(-1, 1)
     plt.subplot(4, nf, nf * 3 + n + 1)
-    plt.plot(np.angle(ec)[:, n])
+    plt.plot(np.angle(ec)[:, n] / 2)
 plt.show()
 
-for n_principal in range(2, 6):
+for n_principal in range(1, 6):
     w_fn = np.copy(ec[:, -1:-n_principal-1:-1])
     x_ni = np.copy(principal_maps[-1:-n_principal-1:-1])
     errors = [np.linalg.norm(D - np.einsum('fn,ni->fi', w_fn, x_ni))]
@@ -136,13 +136,13 @@ for n_principal in range(2, 6):
         plt.plot(np.log10(freqs), np.abs(w_fn)[:, n], 'b-')
         plt.ylim(0, 2)
         plt.subplot(4, n_principal, n_principal * 3 + n + 1)
-        phase_data = np.angle(w_fn)[:, n]
+        phase_data = np.angle(w_fn)[:, n] / 2
         for i in range(1, len(phase_data)):
-            phase_data[i] = (phase_data[i] - (phase_data[i-1] - np.pi)) % (2 * np.pi) + (phase_data[i-1] - np.pi)
-        phase_data -= int(np.mean(phase_data) / (np.pi * 2)) * (np.pi * 2)
+            phase_data[i] = (phase_data[i] - (phase_data[i-1] - np.pi / 2)) % np.pi + (phase_data[i-1] - np.pi / 2)
+        phase_data -= int(np.mean(phase_data) / np.pi) * np.pi
         plt.plot(np.log10(freqs), phase_data, 'g+')
         plt.plot(np.log10(freqs), phase_data, 'b-')
-        # plt.ylim(-np.pi, np.pi)
+        plt.ylim(-np.pi / 2 + np.mean(phase_data), np.pi / 2 + np.mean(phase_data))
     fig.savefig(data_file_name.replace('data_', 'plot_QU_%i_'%len(qudata)).replace('.npz', '_' + mask_name + '_principal_%i_step_%.2f_result_plot.png'%(n_principal, step)), dpi=1000)
     if show_plots:
         plt.show()

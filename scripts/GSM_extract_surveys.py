@@ -59,7 +59,7 @@ def plot_dataset(data_set):
             raise ValueError("Shape problem.")
     plt.show()
 
-def equirectangular2heapix(data, nside, data_x=None, data_y=None, nest=True):
+def equirectangular2heapix(data, nside, data_x=None, data_y=None, nest=True, manual_phi_correction=0):
     if data_x is None:
         delx = 2*np.pi / (data.shape[1] - 1)
         data_x = np.arange(0, 2*np.pi+delx/100., delx)
@@ -68,7 +68,7 @@ def equirectangular2heapix(data, nside, data_x=None, data_y=None, nest=True):
         data_y = np.arange(np.pi, -dely/100., -dely)
     if data.shape != (len(data_y), len(data_x)):
         raise ValueError("Input shape mismatch between %s and (%i, %i)"%(data.shape, len(data_y), len(data_x)))
-    inter_f = si.interp2d(data_x, data_y, data)
+    inter_f = si.interp2d(sorted(data_x), sorted(data_y), data[np.ix_(np.argsort(data_y), np.argsort(data_x))])
 
     result = np.empty(12*nside**2, dtype=data.dtype)
 
@@ -79,7 +79,7 @@ def equirectangular2heapix(data, nside, data_x=None, data_y=None, nest=True):
         theta_mask = heal_thetas == heal_theta
 
         #doing some complicated juggling bc interp function automatically sort the list input and output according to that implicitly re-arranged inuput list
-        qaz_phis = heal_phis[theta_mask] % (np.pi*2)
+        qaz_phis = (heal_phis[theta_mask] + manual_phi_correction) % (np.pi*2)
         qaz = np.zeros_like(heal_phis[theta_mask])
         qaz[np.argsort(qaz_phis)] = inter_f(np.sort(qaz_phis), heal_theta).flatten()
 
@@ -188,10 +188,10 @@ plot_individual = False
 ###########################
 ###########################
 extract_nside = 512
-mother_nside = 512
+mother_nside = 32
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 0#3. * np.pi / 180.
-edge_width = 2. * np.pi / 180.
+smoothing_fwhm = 10. * np.pi / 180.
+edge_width = 10. * np.pi / 180.
 remove_cmb = True
 
 #it's a pretty bad crime to not diffretiate file name based on what data set are included...
@@ -261,8 +261,8 @@ elisa[elisa > 1000] = np.nan
 drao = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/DRAO_POL_%s.bin"%key)[0], extract_nside) for key in ['I', 'Q', 'U']])
 drao[drao > 1000] = np.nan
 
-reich_q = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.q.lb.fits")[0], extract_nside)
-reich_u = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.u.lb.fits")[0], extract_nside)
+reich_q = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.q.lb.fits")[0], extract_nside, data_x=(np.pi+np.arange(np.pi * 2 + 1e-9, 0, -np.pi/720))%(np.pi*2+1e-9))
+reich_u = -equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.u.lb.fits")[0], extract_nside, data_x=(np.pi+np.arange(np.pi * 2 + 1e-9, 0, -np.pi/720))%(np.pi*2+1e-9))#reich is in IAU convention whose U is minus sign the CMB healpix convention
 
 drao_elisa_iqu_syn[1.3945] = chipass
 drao_elisa_iqu_syn[1.435] = elisa

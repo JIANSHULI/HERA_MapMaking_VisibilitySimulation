@@ -40,9 +40,10 @@ def find_regions(nan_mask):
             region_indices_list.append(sorted(np.concatenate((incomplete_fs[fill_mask], complete_fs))))
     return region_indices_list, region_mask_list
 
-def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, n_principal, mother_nside, show_plots):
+def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, n_principal, show_plots, vis_freqs=None, vis_ws=None, vis_norms=None):
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
+    plt.gcf().set_size_inches(w=10, h=5)
     for i in range(n_principal):
         cmap = cm.gist_rainbow_r
         cmap.set_under('w')
@@ -54,7 +55,7 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
         # if i == 0:
         #     plot_data = np.log10(plot_data)
         # else:
-        plot_data = np.arcsinh(plot_data_lin) / np.log(10.)
+        plot_data = np.arcsinh(plot_data_lin * 1 / (np.median(np.abs(plot_data_lin)))) #/ np.log(10.)
 
         hpv.mollview(plot_data, nest=True, sub=(3, n_principal, i + 1), min=np.percentile(plot_data, 2), max=np.percentile(plot_data, 98), cmap=cmap, title='%.3e'%la.norm(plot_data_lin))
 
@@ -63,10 +64,14 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
         interp_x = np.arange(np.log10(all_freqs[0]), np.log10(all_freqs[-1]), .01)
         interp_y = w_estimates[i](interp_x)
         plt.plot(interp_x, interp_y * sign_flip, 'b-')
+        if vis_freqs is not None:
+            plt.plot(np.log10(vis_freqs), vis_ws[:, i] * sign_flip, 'g+')
         plt.ylim([-1.5, 1.5])
 
         plt.subplot(3, n_principal, i + 1 + 2 * n_principal)
         plt.plot(np.log10(all_freqs), np.log10(w_nf[i] * normalization * sign_flip), '+')
+        if vis_freqs is not None:
+            plt.plot(np.log10(vis_freqs), np.log10(vis_ws[:, i] * vis_norms * sign_flip), 'g+')
         plt.xlim([np.log10(all_freqs[0]), np.log10(all_freqs[-1])])
         plt.ylim(-5, 8)
     fig.savefig(plot_filename_base + tag + '.png', dpi=1000)
@@ -227,49 +232,54 @@ for n_principal in n_principal_range:
 
     x_fit = np.transpose(w_nf).dot(xbar_ni)
 
-    errors = []
-    current_error = 1#placeholder
-    error = 1e12#placeholder
-    niter = 0
-    while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
-        niter += 1
-        print niter,
-        sys.stdout.flush()
-        current_error = error
+    for trial in range(1):#when trial goes to 1 we remove worst fitting pixels to remove point sources such as cyg and cas
+        if trial == 1:
+            previous_error_map = np.nanmean((x_fit-x_fi)**2, axis=0)
+            all_idata[:, previous_error_map >= np.percentile(previous_error_map, 95)] = 0
+            xbar_ni[:, previous_error_map >= np.percentile(previous_error_map, 95)] = 0
+        errors = []
+        current_error = 1#placeholder
+        error = 1e12#placeholder
+        niter = 0
+        while abs((error - current_error)/current_error) > 1e-4 and niter <= 50:
+            niter += 1
+            print niter,
+            sys.stdout.flush()
+            current_error = error
 
-        normalization *= la.norm(x_fit, axis=1) / np.mean(la.norm(x_fit, axis=1))
-        x_fi = all_idata / normalization[:, None]
+            normalization *= la.norm(x_fit, axis=1) / np.mean(la.norm(x_fit, axis=1))
+            x_fi = all_idata / normalization[:, None]
 
-        #for w
-        w_nf_ideal = np.zeros_like(w_nf)
-        for f in range(len(all_freqs)):
-            valid_mask = ~np.isnan(x_fi[f])
-            A = np.transpose(xbar_ni)[valid_mask]
-            b = x_fi[f, valid_mask]
-            w_nf_ideal[:, f] = la.inv(np.einsum('ki,kj->ij', A, A)).dot(np.transpose(A).dot(b))
-        w_nf = w_nf_ideal * step_size + w_nf * (1 - step_size)
+            #for w
+            w_nf_ideal = np.zeros_like(w_nf)
+            for f in range(len(all_freqs)):
+                valid_mask = ~np.isnan(x_fi[f])
+                A = np.transpose(xbar_ni)[valid_mask]
+                b = x_fi[f, valid_mask]
+                w_nf_ideal[:, f] = la.inv(np.einsum('ki,kj->ij', A, A)).dot(np.transpose(A).dot(b))
+            w_nf = w_nf_ideal * step_size + w_nf * (1 - step_size)
 
-        print '.',
-        sys.stdout.flush()
+            print '.',
+            sys.stdout.flush()
 
-        #for map:
-        xbar_ni_ideal = np.zeros_like(xbar_ni)
-        for i, (mask, fs) in enumerate(zip(all_region_mask_list, all_region_indices_list)):
-            tm = time.time()
-            A = np.transpose(w_nf)[fs]
-            # print time.time() - tm,
-            # tm = time.time(); sys.stdout.flush()
-            Ninv = np.eye(len(fs))#la.inv(i_covs[0][fs][:, fs])
-            # print time.time() - tm,
-            # tm = time.time(); sys.stdout.flush()
-            xbar_ni_ideal[:, mask] = la.inv(np.transpose(A).dot(Ninv.dot(A))).dot(np.transpose(A).dot(Ninv)).dot(x_fi[np.ix_(fs, mask)])
-            # print time.time() - tm,
-            # tm = time.time(); sys.stdout.flush()
-        xbar_ni = xbar_ni_ideal * step_size + xbar_ni * (1 - step_size)
+            #for map:
+            xbar_ni_ideal = np.zeros_like(xbar_ni)
+            for i, (mask, fs) in enumerate(zip(all_region_mask_list, all_region_indices_list)):
+                tm = time.time()
+                A = np.transpose(w_nf)[fs]
+                # print time.time() - tm,
+                # tm = time.time(); sys.stdout.flush()
+                Ninv = np.eye(len(fs))#la.inv(i_covs[0][fs][:, fs])
+                # print time.time() - tm,
+                # tm = time.time(); sys.stdout.flush()
+                xbar_ni_ideal[:, mask] = la.inv(np.transpose(A).dot(Ninv.dot(A))).dot(np.transpose(A).dot(Ninv)).dot(x_fi[np.ix_(fs, mask)])
+                # print time.time() - tm,
+                # tm = time.time(); sys.stdout.flush()
+            xbar_ni = xbar_ni_ideal * step_size + xbar_ni * (1 - step_size)
 
-        x_fit = np.transpose(w_nf).dot(xbar_ni)
-        error = np.nansum((x_fit - x_fi).flatten()**2)
-        errors.append(error)
+            x_fit = np.transpose(w_nf).dot(xbar_ni)
+            error = np.nansum((x_fit - x_fi).flatten()**2)
+            errors.append(error)
 
     ev2, ec2 = la.eigh(np.einsum('ni,mi->nm', xbar_ni, xbar_ni))
     xbar_ni = la.inv(ec2).dot(xbar_ni)
@@ -290,49 +300,76 @@ for n_principal in n_principal_range:
     ##################################################
 
     ###########manually isolate components###############
-    M = np.eye(n_principal)
+    if n_principal == 6:
+        M = np.eye(n_principal)
 
-    M1inv = np.eye(n_principal)
-    manual_spike_ranges = [np.array([5, 6]), np.arange(8, 22), np.arange(0, 8), np.arange(13, 27)]
-    manual_spike_principals = [1, 0, 4, 2]
-    for spike_fs, spike_principal in zip(manual_spike_ranges, manual_spike_principals):
-        non_spike_fs = np.array([i for i in range(len(all_freqs)) if i not in spike_fs])
-        non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal])
-        spike_A = np.transpose(np.delete(w_nf[:, non_spike_fs], spike_principal, axis=0))
-        M1inv[non_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf[spike_principal, non_spike_fs]))
-    M1 = la.inv(M1inv)
-    w_nf1 = np.transpose(M1inv).dot(w_nf)
-    M = M1.dot(M)
-    print la.cond(M)
-
-
-    Minv2 = np.eye(n_principal)
-    for i in range(n_principal):
-        if i not in manual_spike_principals:
-            spike_principal = i
-            spike_fs = []
-            non_spike_fs = np.arange(len(all_freqs))
-            non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal])
-            spike_A = np.transpose(w_nf1[np.ix_(manual_spike_principals, non_spike_fs)])
-            Minv2[manual_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf1[spike_principal, non_spike_fs]))
-    M2 = la.inv(Minv2)
-    xbar_ni2 = M2.dot(M1.dot(xbar_ni))
-    M = M2.dot(M)
-    print la.cond(M)
+        M1inv = np.eye(n_principal)
+        manual_spike_freq_ranges = [[1, 2], [10, 1000], [0, 10], [50, 1e9], [500, 1e9]]
+        manual_spike_ranges = [np.arange(len(all_freqs))[(np.array(all_freqs) >= freq_range[0]) & (np.array(all_freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
+        # manual_spike_ranges = [np.arange(4, 8), np.arange(8, 22), np.arange(0, 8), np.arange(13, 29), np.arange(22, 29)]
+        manual_spike_principals = np.array([1, 0, 4, 2, 3]) - 6
+        for spike_fs, spike_principal in zip(manual_spike_ranges, manual_spike_principals):
+            if spike_principal >= -n_principal:
+                non_spike_fs = np.array([i for i in range(len(all_freqs)) if i not in spike_fs])
+                non_spike_principals = np.array([i for i in range(-n_principal, 0) if i != spike_principal])
+                spike_A = np.transpose(np.delete(w_nf[:, non_spike_fs], spike_principal, axis=0))
+                M1inv[non_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf[spike_principal, non_spike_fs]))
+        M1 = la.inv(M1inv)
+        w_nf1 = np.transpose(M1inv).dot(w_nf)
+        M = M1.dot(M)
+        print la.cond(M)
 
 
-    M3 = np.eye(n_principal)
-    galactic_plane_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) < np.pi/36
-    cmb_A = np.transpose(xbar_ni2[1:, galactic_plane_mask])
-    M3[0, 1:] = -la.inv(np.transpose(cmb_A).dot(cmb_A) + np.diag([100, 1, 1, 100, 1])).dot(np.transpose(cmb_A).dot(xbar_ni2[0, galactic_plane_mask]))
-    Minv3 = la.inv(M3)
-    M = M3.dot(M)
-    print la.cond(M)
+        Minv2 = np.eye(n_principal)
+        for i in range(n_principal):
+            if i not in manual_spike_principals:
+                spike_principal = i
+                spike_fs = []
+                non_spike_fs = np.arange(len(all_freqs))
+                non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal])
+                spike_A = np.transpose(w_nf1[np.ix_(manual_spike_principals, non_spike_fs)])
+                Minv2[manual_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf1[spike_principal, non_spike_fs]))
+        M2 = la.inv(Minv2)
+        xbar_ni2 = M2.dot(M1.dot(xbar_ni))
+        M = M2.dot(M)
+        print la.cond(M)
 
-    Minv = la.inv(M)
-    w_nf_final = np.transpose(Minv).dot(w_nf)
-    xbar_ni_final = M.dot(xbar_ni)
-    w_estimates_final = [si.interp1d(np.log10(all_freqs), w_nf_final[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
+
+        M3 = np.eye(n_principal)
+        if n_principal >= 6:
+            galactic_plane_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) < np.pi/36
+            cmb_A = np.transpose(xbar_ni2[np.ix_(np.arange(-n_principal, 0) != -6, galactic_plane_mask)])
+            regulation = np.ones(n_principal - 1)
+            regulation[-5] = 100
+            regulation[-2] = 100
+            M3[-6, np.arange(-n_principal, 0) != -6] = -la.inv(np.transpose(cmb_A).dot(cmb_A) + np.diag(regulation)).dot(np.transpose(cmb_A).dot(xbar_ni2[0, galactic_plane_mask]))
+        Minv3 = la.inv(M3)
+        M = M3.dot(M)
+        w_nf3 = np.transpose(la.inv(M)).dot(w_nf)
+        xbar_ni3 = M3.dot(xbar_ni2)
+        print la.cond(M)
+
+
+        # for n in range(20):
+        #     M4 = np.eye(n_principal)
+        #     for p in [-4, -1]:
+        #         negative_mask = xbar_ni_final[p] < 0
+        #         if negative_mask.any():
+        #             negative_A = np.transpose(xbar_ni3[np.ix_(np.arange(-n_principal, 0) != p, negative_mask)])
+        #             regulation = np.zeros(n_principal - 1)
+        #             M4[p, np.arange(-n_principal, 0) != p] = -la.inv(np.transpose(negative_A).dot(negative_A) + np.diag(regulation)).dot(np.transpose(negative_A).dot(xbar_ni3[p, negative_mask]))
+        #     xbar_ni3 = M4.dot(xbar_ni3)
+        #     M = M4.dot(M)
+        #     print la.cond(M), la.norm(xbar_ni3[-4][xbar_ni3[-4] < 0]), la.norm(xbar_ni3[-1][xbar_ni3[-1] < 0])
+
+
+        Minv = la.inv(M)
+        w_nf_final = np.transpose(Minv).dot(w_nf)
+        xbar_ni_final = M.dot(xbar_ni)
+        final_renorm = la.norm(w_nf_final, axis=-1)
+        w_nf_final /= final_renorm[:, None]
+        xbar_ni_final *= final_renorm[:, None]
+        w_estimates_final = [si.interp1d(np.log10(all_freqs), w_nf_final[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
     #
     # ####auto-identifying ranges######
     # eigen_thresh = 0.05
@@ -381,8 +418,9 @@ for n_principal in n_principal_range:
     matplotlib.rcParams.update({'font.size': 5})
     plot_filename_base = result_filename.replace('result', 'plot')
 
-    make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, '_result_plot', n_principal, mother_nside, show_plots)
-    make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_result_plot_M5', n_principal, mother_nside, show_plots)
+    make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, '_result_plot', n_principal, show_plots)
+    if n_principal == 6:
+        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_result_plot_M5', n_principal, show_plots)
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
@@ -410,7 +448,7 @@ for n_principal in n_principal_range:
     # ##########################################
     # ###put in interferometer measurements#####
     # ##########################################
-    if include_visibility:
+    if include_visibility and n_principal == 6:
         ###prepare big matrices stuff for interferometer data###
         # tag = "q3_abscalibrated"
         # datatag = '_seccasa_polcor.rad'
@@ -424,7 +462,7 @@ for n_principal in n_principal_range:
 
         vis_freqs = np.zeros(len(vis_tags))
         vis_norms = np.zeros(len(vis_tags))
-        vis_ws = np.zeros((len(vis_tags), n_principal))
+        vis_ws = np.zeros((len(vis_tags), n_principal)) + np.nan
         for tag_i, tag in enumerate(vis_tags):
             datatag = '_2015_05_09'
             vartag = '_2015_05_09'
@@ -524,10 +562,13 @@ for n_principal in n_principal_range:
             #
             #
 
-            vis_map_estimate = np.transpose(xbar_ni).dot([we(np.log10(vis_freq)) for we in w_estimates])
+            vis_w_estimates = np.array([we(np.log10(vis_freq)) for we in w_estimates_final])
+            vis_map_estimate = np.transpose(xbar_ni_final).dot(vis_w_estimates)
             vis_data_estimate = A_vis.dot(vis_map_estimate)
 
-            additive_calibrate_matrix = np.zeros((len(vis_data), 2 * (data_shape['x'][0] + data_shape['y'][0]) + n_principal))
+            vis_relevant_mask = np.abs(vis_w_estimates) > .01
+
+            additive_calibrate_matrix = np.zeros((len(vis_data), 2 * (data_shape['x'][0] + data_shape['y'][0]) + np.sum(vis_relevant_mask)))
             row = 0
             col = 0
             for ri in range(2):
@@ -537,14 +578,15 @@ for n_principal in n_principal_range:
                         col += 1
                         row += shp[1]
 
-            additive_calibrate_matrix[:, -n_principal:] = np.einsum('ji,ni->jn', A_vis, xbar_ni)
+            additive_calibrate_matrix[:, -np.sum(vis_relevant_mask):] = np.einsum('ji,ni->jn', A_vis, xbar_ni_final[vis_relevant_mask])
             additive = la.inv(np.einsum('ki,k,kj->ij', additive_calibrate_matrix, Ni, additive_calibrate_matrix)).dot(np.transpose(additive_calibrate_matrix).dot(Ni * vis_data))
             vis_data_fit = additive_calibrate_matrix.dot(additive)
 
-            vis_norm = la.norm(np.transpose(xbar_ni).dot(additive[-n_principal:])) / np.mean(la.norm(x_fit, axis=1))
-            vis_w = additive[-n_principal:] / vis_norm
+            vis_norm = la.norm(np.transpose(xbar_ni_final[vis_relevant_mask]).dot(additive[-np.sum(vis_relevant_mask):])) / np.mean(la.norm(x_fit, axis=1))
+            vis_w = additive[-np.sum(vis_relevant_mask):] / vis_norm
             vis_norms[tag_i] = vis_norm
-            vis_ws[tag_i] = vis_w
+            vis_ws[tag_i][vis_relevant_mask] = vis_w
+            print tag_i, vis_data[:10], vis_w, vis_ws[tag_i][vis_relevant_mask]
 
             dbg_matrix = np.copy(additive_calibrate_matrix[:, :-n_principal+1])
             dbg_matrix[:, -1] = vis_data_estimate
@@ -581,42 +623,7 @@ for n_principal in n_principal_range:
             plt.gcf().clear()
 
 
-        fig = plt.Figure(figsize=(200, 100))
-        fig.set_canvas(plt.gcf().canvas)
-
-        for i in range(n_principal):
-            cmap = cm.gist_rainbow_r
-            cmap.set_under('w')
-            cmap.set_bad('gray')
-            plot_data_lin = xbar_ni[i] * np.sign(xbar_ni[i, hpf.vec2pix(mother_nside, 1, 0, 0, nest=True)])
-            # if i == 0:
-            #     plot_data = np.log10(plot_data)
-            # else:
-            plot_data = np.arcsinh(plot_data_lin) / np.log(10.)
-
-            hpv.mollview(plot_data, nest=True, sub=(3, n_principal, i + 1), min=np.percentile(plot_data, 2), max=np.percentile(plot_data, 98), cmap=cmap, title='%.3e'%la.norm(plot_data_lin))
-
-            plt.subplot(3, n_principal, i + 1 + n_principal)
-            plt.plot(np.log10(all_freqs), w_nf[i], 'r+')
-            interp_x = np.arange(np.log10(all_freqs[0]), np.log10(all_freqs[-1]), .01)
-            interp_y = w_estimates[i](interp_x)
-            plt.plot(interp_x, interp_y, 'b-')
-            plt.plot(np.log10(vis_freqs), vis_ws[:, i], 'g+')
-            plt.ylim([-1.5, 1.5])
-
-            plt.subplot(3, n_principal, i + 1 + 2 * n_principal)
-            plt.plot(np.log10(all_freqs), np.log10(np.sign(np.mean(w_nf[i])) * w_nf[i] * normalization), 'b+')
-            plt.plot(np.log10(vis_freqs), np.log10(np.sign(np.mean(vis_ws[:, i])) * vis_ws[:, i] * vis_norms), 'g+')
-            plt.xlim([np.log10(all_freqs[0]), np.log10(all_freqs[-1])])
-            plt.ylim(-5, 8)
-
-
-        fig.savefig(plot_filename_base + datatag + '_vis_result_plot.png', dpi=1000)
-        if show_plots:
-            plt.show()
-        fig.clear()
-        plt.gcf().clear()
-
+        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_vis_result_plot', n_principal, show_plots, vis_freqs=vis_freqs, vis_ws=vis_ws, vis_norms=vis_norms)
 
     ##########################################
     ###ICA#####can get cmb very well
@@ -658,23 +665,6 @@ for n_principal in n_principal_range:
         plt.show()
     fig.clear()
     plt.gcf().clear()
-    #
-    # ##########################################
-    # ###seperate physical components#####
-    # ##########################################
-    # X = np.einsum('ni,mi->nm', xbar_ni, xbar_ni)
-    # A = np.zeros((n_principal**2, n_principal**2))
-    # for xa in range(n_principal):
-    #     for xb in range(n_principal):
-    #         nrow = xa * n_principal + xb
-    #         for mi in range(n_principal):
-    #             for mj in range(n_principal):
-    #                 ncol = mi * n_principal + mj
-    #                 if mi != xa:
-    #                     A[nrow, ncol] = X[xb, mj]
-    #                 else:
-    #                     A[nrow, ncol] = -X[xb, mj]
-    #
 
 # ##############################################
 # ##############################################
