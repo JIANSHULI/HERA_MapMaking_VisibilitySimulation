@@ -77,7 +77,7 @@ def ATNIA(A, Ni, C, nchunk=10):  # C=AtNiA
 
 nside_start = 32
 nside_beamweight = 16
-nside_standard = 256
+nside_standard = 128
 bnside = 256
 plotcoord = 'CG'
 thresh = .5
@@ -106,7 +106,7 @@ force_recompute_SEi = False
 ####################################################
 ################data file and load beam##############
 ####################################################
-tag = "q3A_abscal"  # L stands for lenient in flagging
+tag = "q3AL_abscal"  # L stands for lenient in flagging
 datatag = '_2015_05_09'
 vartag = '_2015_05_09'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
@@ -470,7 +470,7 @@ data = np.array([data['xx'], data['xy'], data['yx'], data['yy']]).reshape([4] + 
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 Ni = np.concatenate((Ni['xx'], Ni['xy'], Ni['yx'], Ni['yy'])).reshape([4] + list(data_shape['xx'])).transpose(
     (1, 0, 2)).flatten()
-Ni = np.concatenate((Ni / 2, Ni / 2))
+Ni = np.concatenate((Ni / 2, Ni / 2))#TODO should be *2?
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 

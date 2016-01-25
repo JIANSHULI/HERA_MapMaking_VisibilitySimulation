@@ -35,7 +35,7 @@ def solve_phase_degen(data_xx, data_yy, model_xx, model_yy, ubls, plot=False):#d
     #sooolve
     return omni.solve_slope(np.array(A), np.array(b), 1)
 
-Q = sys.argv[1]#'q3AL'#'q0C'#'q3A'#'q2C'#
+Q = 'q3AL'#'q0C'#'q3A'#'q2C'#
 
 fit_cas = True
 frac_cas = .9
@@ -250,7 +250,7 @@ plot_u(-1)
 
 cyg_cas_iquv = np.zeros((len(pick_fs), 2, 4))
 cyg_cas_iquv_std = np.zeros((len(pick_fs), 2, 4))
-psols = {}
+psols = [{}, {}]
 flipsols = {}
 realb_fits = {}
 flipb_fits = {}
@@ -514,151 +514,69 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             [sv.rotate_healpixmap(beam_healpixi, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for
              beam_healpixi in local_beam(freqs[pick_f])])
 
-        pcal_time_mask = (compressed2_lsts>cal_lst_range[0]) & (compressed2_lsts<cal_lst_range[1])#a True/False mask on all good data to get good data in cal time range
+        pcal_time_mask1 = (compressed2_lsts>cal_lst_range[0]) & (compressed2_lsts<np.mean(cal_lst_range))#a True/False mask on all good data to get good data in cal time range
+        pcal_time_mask2 = (compressed2_lsts>np.mean(cal_lst_range)) & (compressed2_lsts<cal_lst_range[1])#a True/False mask on all good data to get good data in cal time range
 
-        print "Computing polarized point sources matrix..."
-        sys.stdout.flush()
-        Apol = np.empty((np.sum(cal_ubl_mask), 4 * np.sum(pcal_time_mask), 4, len(cal_sources)), dtype='complex64')
-        timer = time.time()
-        for n, source in enumerate(['cyg', 'cas']):
-            ra = southern_points[source]['body']._ra
-            dec = southern_points[source]['body']._dec
+        for jack, pcal_time_mask in enumerate([pcal_time_mask1, pcal_time_mask2]):
+            print "Computing polarized point sources matrix..."
+            sys.stdout.flush()
+            Apol = np.empty((np.sum(cal_ubl_mask), 4 * np.sum(pcal_time_mask), 4, len(cal_sources)), dtype='complex64')
+            timer = time.time()
+            for n, source in enumerate(['cyg', 'cas']):
+                ra = southern_points[source]['body']._ra
+                dec = southern_points[source]['body']._dec
 
-            Apol[..., n] = vs.calculate_pol_pointsource_visibility(ra, dec, info['ubl'][cal_ubl_mask].dot(correction_mat), freqs[pick_f], beam_heal_equ=beam_heal_equ,
-                                                                tlist=compressed2_lsts[pcal_time_mask] / TPI * 24.).dot(
-                [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
+                Apol[..., n] = vs.calculate_pol_pointsource_visibility(ra, dec, info['ubl'][cal_ubl_mask].dot(correction_mat), freqs[pick_f], beam_heal_equ=beam_heal_equ,
+                                                                    tlist=compressed2_lsts[pcal_time_mask] / TPI * 24.).dot(
+                    [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
 
-        pcal_pol_mask = np.array([True, True, True, True])#for debugging when only want to allow certain pols
-        Apol = Apol.reshape((np.sum(cal_ubl_mask), 4, np.sum(pcal_time_mask), 4, len(cal_sources)))[:, pcal_pol_mask].reshape((np.sum(cal_ubl_mask), np.sum(pcal_pol_mask) * np.sum(pcal_time_mask), 4, len(cal_sources)))
-
-        Ni = 1 / np.transpose(calibrated_var[np.ix_(pcal_pol_mask, pcal_time_mask)], (2,0,1))[cal_ubl_mask]
-
-        realA = np.zeros((2 * Apol.shape[0] * Apol.shape[1], Apol.shape[2] * Apol.shape[3] + 2 * np.sum(cal_ubl_mask) * np.sum(pcal_pol_mask)), dtype='float32')
-        for coli, ncol in enumerate(range(Apol.shape[2] * Apol.shape[3], realA.shape[1])):
-            realA[coli * np.sum(pcal_time_mask): (coli + 1) * np.sum(pcal_time_mask), ncol] = 1
-        realA[:, :Apol.shape[2] * Apol.shape[3]] = np.concatenate((np.real(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2] * Apol.shape[3]))), np.imag(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2] * Apol.shape[3])))), axis=0)#consider only include non-V? doesnt seem to change answer much
-
-        realNi = np.concatenate((Ni.flatten() * 2, Ni.flatten() * 2))
-        realAtNiAinv = np.linalg.pinv(np.einsum('ji,j,jk->ik', realA, realNi, realA))
+            pcal_pol_mask = np.array([True, True, True, True])#for debugging when only want to allow certain pols
+            Apol = Apol.reshape((np.sum(cal_ubl_mask), 4, np.sum(pcal_time_mask), 4, len(cal_sources)))[:, pcal_pol_mask].reshape((np.sum(cal_ubl_mask), np.sum(pcal_pol_mask) * np.sum(pcal_time_mask), 4, len(cal_sources)))
 
 
-        b = np.conjugate(np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask])#TODO this neeeds fix otherwhere!
-        phase_degen_niter = 0
-        phase_degen2 = np.zeros(2)
-        phase_degen_iterative = np.zeros(2)
-        while (phase_degen_niter < 50 and np.linalg.norm(phase_degen_iterative) > 1e-5) or phase_degen_niter == 0:
-            phase_degen_niter += 1
-            b = b * np.exp(1.j * info['ubl'][cal_ubl_mask][:, :2].dot(phase_degen_iterative))[:, None, None]
-            realb = np.concatenate((np.real(b.flatten()), np.imag(b.flatten())))
+            Ni = 1 / np.transpose(calibrated_var[np.ix_(pcal_pol_mask, pcal_time_mask)], (2,0,1))[cal_ubl_mask]
 
-            psol = realAtNiAinv.dot(np.transpose(realA).dot(realNi * realb))
-            realb_fit = realA.dot(psol)
-            perror = ((realb_fit - realb) * (realNi**.5)).reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
+            realA = np.zeros((2 * Apol.shape[0] * Apol.shape[1], Apol.shape[2] * Apol.shape[3] + 2 * np.sum(cal_ubl_mask) * np.sum(pcal_pol_mask)), dtype='float32')
+            for coli, ncol in enumerate(range(Apol.shape[2] * Apol.shape[3], realA.shape[1])):
+                realA[coli * np.sum(pcal_time_mask): (coli + 1) * np.sum(pcal_time_mask), ncol] = 1
+            realA[:, :Apol.shape[2] * Apol.shape[3]] = np.concatenate((np.real(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2] * Apol.shape[3]))), np.imag(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2] * Apol.shape[3])))), axis=0)#consider only include non-V? doesnt seem to change answer much
 
-            bfit = realb_fit.reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
-            bfit = bfit[0] + 1.j * bfit[1]
-            phase_degen_iterative = solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask])
-            phase_degen2 += phase_degen_iterative
-            # print phase_degen_niter, phase_degen2, np.linalg.norm(perror)
+            realNi = np.concatenate((Ni.flatten() * 2, Ni.flatten() * 2))
+            realAtNiAinv = np.linalg.pinv(np.einsum('ji,j,jk->ik', realA, realNi, realA))
 
-        #try the other pi flip
-        flipb = np.conjugate(np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask])
-        flipb[:, 1:3] = flipb[:, 1:3] * -1
+            b = np.conjugate(np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask])#TODO this neeeds fix otherwhere!
+            phase_degen_niter = 0
+            phase_degen2 = np.zeros(2)
+            phase_degen_iterative = np.zeros(2)
+            while (phase_degen_niter < 50 and np.linalg.norm(phase_degen_iterative) > 1e-5) or phase_degen_niter == 0:
+                phase_degen_niter += 1
+                b = b * np.exp(1.j * info['ubl'][cal_ubl_mask][:, :2].dot(phase_degen_iterative))[:, None, None]
+                realb = np.concatenate((np.real(b.flatten()), np.imag(b.flatten())))
 
-        phase_degen_niter = 0
-        flip_phase_degen2 = np.zeros(2)
-        phase_degen_iterative = np.zeros(2)
-        while (phase_degen_niter < 50 and np.linalg.norm(phase_degen_iterative) > 1e-5) or phase_degen_niter == 0:
-            phase_degen_niter += 1
-            flipb = flipb * np.exp(1.j * info['ubl'][cal_ubl_mask][:, :2].dot(phase_degen_iterative))[:, None, None]
-            flipreal_b = np.concatenate((np.real(flipb).flatten(), np.imag(flipb).flatten()))
-            flipsol = realAtNiAinv.dot(np.transpose(realA).dot(realNi * flipreal_b))
-            fliprealb_fit = realA.dot(flipsol)
-            fliperror = ((fliprealb_fit - flipreal_b) * (realNi**.5)).reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
+                psol = realAtNiAinv.dot(np.transpose(realA).dot(realNi * realb))
+                realb_fit = realA.dot(psol)
+                perror = ((realb_fit - realb) * (realNi**.5)).reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
 
-            flipbfit = fliprealb_fit.reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
-            flipbfit = flipbfit[0] + 1.j * flipbfit[1]
-            phase_degen_iterative = solve_phase_degen(np.transpose(flipb[:, 0]), np.transpose(flipb[:, -1]), np.transpose(flipbfit[:, 0]), np.transpose(flipbfit[:, -1]), info['ubl'][cal_ubl_mask])
-            flip_phase_degen2 += phase_degen_iterative
+                bfit = realb_fit.reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
+                bfit = bfit[0] + 1.j * bfit[1]
+                phase_degen_iterative = solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask])
+                phase_degen2 += phase_degen_iterative
+                # print phase_degen_niter, phase_degen2, np.linalg.norm(perror)
 
-        psols[pick_f] = psol
-        psolstds[pick_f] = np.diagonal(realAtNiAinv)**.5
-        flipsols[pick_f] = flipsol
-        realb_fits[pick_f] = realb_fit
-        flipb_fits[pick_f] = fliprealb_fit
-        perrors[pick_f] = perror
-        fliperrors[pick_f] = fliperror
-        phase_degens[pick_f] = phase_degen2
-        flipphase_degens[pick_f] = flip_phase_degen2
-
-        calibrated_results[pick_f] = [compressed2_lsts, info['ubl'], calibrated_data, calibrated_var]
+            psols[jack][pick_f] = psol
 
     except Exception:
         print "&&&ERROR&&&&&&"
 
-flip_wins = 0
-for pick_f in perrors.keys():
-    if np.linalg.norm(fliperrors[pick_f]) < np.linalg.norm(perrors[pick_f]):
-        flip_wins += 1
-    else:
-        flip_wins -= 1
+iquv1 = np.zeros((15, 2, 4))
+iquv2 = np.zeros((15, 2, 4))
+for pick_f in psols[0].keys():
+    iquv1[pick_f] = np.transpose(psols[0][pick_f][:8].reshape((4, 2)))
+    iquv2[pick_f] = np.transpose(psols[1][pick_f][:8].reshape((4, 2)))
 
-if flip_wins > 0:
-    psols = flipsols
-    realb_fits = flipb_fits
-    perrors = fliperrors
-    phase_degens = flipphase_degens
-
-    for pick_f in calibrated_results.keys():
-        calibrated_results[pick_f][2][1:3] = -calibrated_results[pick_f][2][1:3]
-
-for pick_f in psols.keys():
-    renorm = flux_func['cyg'](freqs[pick_f]) / psols[pick_f][0]
-    cyg_cas_iquv[pick_f] = renorm * psols[pick_f][:8].reshape((4,2)).transpose()
-    cyg_cas_iquv_std[pick_f] = renorm * psolstds[pick_f][:8].reshape((4,2)).transpose()
-    calibrated_results[pick_f][2] *= renorm * np.exp(1.j * info['ubl'][:, :2].dot(phase_degens[pick_f]))
-    calibrated_results[pick_f][3] *= renorm**2
-
-    #################################
-    #######output data
-    ###################################
-    tag = "%s_%i_abscal"%(Q, pick_f)
-    datatag = '_2016_01_20_avg'
-    vartag = '_2016_01_20_avg'
-    datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-    nt = calibrated_results[pick_f][2].shape[1]
-    nf = 1
-    nUBL = calibrated_results[pick_f][2].shape[2]
-    for p, pol in enumerate(['xx','xy','yx','yy']):
-
-        (calibrated_results[pick_f][0]/TPI*24 + 1.j * freqs[pick_f]).astype('complex64').tofile(datadir + tag + '_%s_%i_%i.tf'%(pol, nt, nf))
-        calibrated_results[pick_f][2][p].astype('complex64').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + datatag)
-        calibrated_results[pick_f][3][p].astype('float32').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + vartag + '.var')
-        calibrated_results[pick_f][1].dot(correction_mat).astype('float32').tofile(datadir + tag + '_%s_%i_%i.ubl'%(pol, nUBL, 3))
-
-np.savez(datadir + 'cygcas_' + Q + datatag + vartag, cyg_cas_iquv=cyg_cas_iquv, cyg_cas_iquv_std=cyg_cas_iquv_std, freqs=freqs)
-
-
-
-
-real_iquv_fits = np.transpose((realA[:, :8] * psol[:8])).reshape((8, 2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
-iquv_fits = real_iquv_fits[:, 0] + 1.j * real_iquv_fits[:, 1]
-
-
-for i in range(np.sum(cal_ubl_mask)):
-    p = 1
-    fun = np.imag
-    plt.subplot(5, 7, i+1)
-    plt.plot(compressed2_lsts[pcal_time_mask], fun(b[i, p]))
-    plt.plot(compressed2_lsts[pcal_time_mask], fun(bfit[i, p]))
-    plt.plot(compressed2_lsts[pcal_time_mask], fun(iquv_fits[0, i, p] + iquv_fits[1, i, p]))
-    plt.plot(compressed2_lsts[pcal_time_mask], fun(iquv_fits[2, i, p] + iquv_fits[3, i, p]))
-    plt.plot(compressed2_lsts[pcal_time_mask], fun(iquv_fits[4, i, p] + iquv_fits[5, i, p]))
-    plt.plot(compressed2_lsts[pcal_time_mask], fun(iquv_fits[6, i, p] + iquv_fits[7, i, p]))
-    plt.title((info['ubl'][cal_ubl_mask][i, :2], '%.2f'%np.linalg.norm(perror[:, i, p])))
+plt.plot(freqs, np.angle(iquv1[:, :, 1] + 1.j * iquv1[:, :, 2])%TPI / 2. * (180./PI), '^')
+plt.plot(freqs, np.angle(iquv2[:, :, 1] + 1.j * iquv1[:, :, 2])%TPI / 2. * (180./PI), 'v')
+plt.ylim([0, 180])
+plt.xlabel("Frequency (MHz)")
+plt.ylabel("Angle (degree)")
 plt.show()
-
-
-plt.subplot(2,1,1); plt.plot(freqs, (cyg_cas_iquv[..., 1] ** 2 + cyg_cas_iquv[..., 2]**2) **.5 / cyg_cas_iquv[..., 0]); plt.ylim([0, .5]); plt.title(sa.date.__str__() + ' pol fraction'); plt.subplot(2,1,2); plt.plot(freqs, np.angle(cyg_cas_iquv[..., 1] + 1.j * cyg_cas_iquv[..., 2]) / 2); plt.ylim(-np.pi/2, np.pi/2); plt.title('pol angle')
-plt.show()
-
