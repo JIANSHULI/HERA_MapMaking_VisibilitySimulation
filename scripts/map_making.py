@@ -140,7 +140,7 @@ data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
 #plt.plot(Ni['x'][::nt])
 #plt.show()
 Ni = np.concatenate((Ni['x'],Ni['y']))
-Ni = np.concatenate((Ni/2, Ni/2))
+Ni = np.concatenate((Ni * 2, Ni * 2))
 
 pix_mask_filename = datadir + tag + '_%i.pixm'%(len(A['x'][0]))
 pix_mask = la.norm(A['x'],axis=0) != 0
