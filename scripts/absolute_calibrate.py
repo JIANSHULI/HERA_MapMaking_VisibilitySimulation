@@ -529,7 +529,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
                 [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
 
         pcal_pol_mask = np.array([True, True, True, True])#for debugging when only want to allow certain pols
-        Apol = Apol.reshape((np.sum(cal_ubl_mask), 4, np.sum(pcal_time_mask), 4, len(cal_sources)))[:, pcal_pol_mask].reshape((np.sum(cal_ubl_mask), np.sum(pcal_pol_mask) * np.sum(pcal_time_mask), 4, len(cal_sources)))
+        Apol = np.conjugate(Apol).reshape((np.sum(cal_ubl_mask), 4, np.sum(pcal_time_mask), 4, len(cal_sources)))[:, pcal_pol_mask].reshape((np.sum(cal_ubl_mask), np.sum(pcal_pol_mask) * np.sum(pcal_time_mask), 4, len(cal_sources)))#TODO this neeeds fix otherwhere!
 
         Ni = 1 / np.transpose(calibrated_var[np.ix_(pcal_pol_mask, pcal_time_mask)], (2,0,1))[cal_ubl_mask]
 
@@ -542,7 +542,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
         realAtNiAinv = np.linalg.pinv(np.einsum('ji,j,jk->ik', realA, realNi, realA))
 
 
-        b = np.conjugate(np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask])#TODO this neeeds fix otherwhere!
+        b = np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask]
         phase_degen_niter = 0
         phase_degen2 = np.zeros(2)
         phase_degen_iterative = np.zeros(2)
@@ -562,7 +562,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             # print phase_degen_niter, phase_degen2, np.linalg.norm(perror)
 
         #try the other pi flip
-        flipb = np.conjugate(np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask])
+        flipb = np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask]
         flipb[:, 1:3] = flipb[:, 1:3] * -1
 
         phase_degen_niter = 0

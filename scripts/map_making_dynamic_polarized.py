@@ -106,12 +106,12 @@ force_recompute_SEi = False
 ####################################################
 ################data file and load beam##############
 ####################################################
-tag = "q3AL_abscal"  # L stands for lenient in flagging
-datatag = '_2015_05_09'
-vartag = '_2015_05_09'
+tag = "q3AL_5_abscal"  # L stands for lenient in flagging
+datatag = '_2016_01_20_avg'
+vartag = '_2016_01_20_avg'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-A_version = 0.2
-nt = {"q3A_abscal": 253, "q3AL_abscal": 368}[tag]
+A_version = 0.3
+nt = 193
 nf = 1
 nUBL = 78
 

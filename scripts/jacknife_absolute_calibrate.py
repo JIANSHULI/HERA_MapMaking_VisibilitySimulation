@@ -40,6 +40,7 @@ Q = 'q3AL'#'q0C'#'q3A'#'q2C'#
 fit_cas = True
 frac_cas = .9
 delay_compression = 15
+ntjack = 4
 compress_method = 'average'
 pick_fs = range(delay_compression)
 
@@ -250,7 +251,7 @@ plot_u(-1)
 
 cyg_cas_iquv = np.zeros((len(pick_fs), 2, 4))
 cyg_cas_iquv_std = np.zeros((len(pick_fs), 2, 4))
-psols = [{}, {}]
+psols = [{} for i in range(ntjack)]
 flipsols = {}
 realb_fits = {}
 flipb_fits = {}
@@ -355,7 +356,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             plt.show()
 
 
-        cal_lst_range = [5, 6]
+        cal_lst_range = [5., 6.]
         if Q[:2] == 'qC':
             calibrate_ubl_length = 10.
         else:
@@ -514,10 +515,13 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             [sv.rotate_healpixmap(beam_healpixi, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for
              beam_healpixi in local_beam(freqs[pick_f])])
 
-        pcal_time_mask1 = (compressed2_lsts>cal_lst_range[0]) & (compressed2_lsts<np.mean(cal_lst_range))#a True/False mask on all good data to get good data in cal time range
-        pcal_time_mask2 = (compressed2_lsts>np.mean(cal_lst_range)) & (compressed2_lsts<cal_lst_range[1])#a True/False mask on all good data to get good data in cal time range
 
-        for jack, pcal_time_mask in enumerate([pcal_time_mask1, pcal_time_mask2]):
+        time_points = [cal_lst_range[0]]
+        for ijack in range(1, ntjack + 1):
+            time_points += [cal_lst_range[0] + (cal_lst_range[1] - cal_lst_range[0]) * ijack / ntjack]
+
+        for jack in range(ntjack):
+            pcal_time_mask = (compressed2_lsts >= time_points[jack]) & (compressed2_lsts < time_points[jack + 1])
             print "Computing polarized point sources matrix..."
             sys.stdout.flush()
             Apol = np.empty((np.sum(cal_ubl_mask), 4 * np.sum(pcal_time_mask), 4, len(cal_sources)), dtype='complex64')
@@ -531,8 +535,8 @@ for pick_f_i, pick_f in enumerate(pick_fs):
                     [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
 
             pcal_pol_mask = np.array([True, True, True, True])#for debugging when only want to allow certain pols
-            Apol = Apol.reshape((np.sum(cal_ubl_mask), 4, np.sum(pcal_time_mask), 4, len(cal_sources)))[:, pcal_pol_mask].reshape((np.sum(cal_ubl_mask), np.sum(pcal_pol_mask) * np.sum(pcal_time_mask), 4, len(cal_sources)))
-
+            Apol = np.conjugate(Apol).reshape((np.sum(cal_ubl_mask), 4, np.sum(pcal_time_mask), 4, len(cal_sources)))[:, pcal_pol_mask].reshape((np.sum(cal_ubl_mask), np.sum(pcal_pol_mask) * np.sum(pcal_time_mask), 4, len(cal_sources)))
+            #TODO this neeeds fix otherwhere!
 
             Ni = 1 / np.transpose(calibrated_var[np.ix_(pcal_pol_mask, pcal_time_mask)], (2,0,1))[cal_ubl_mask]
 
@@ -544,7 +548,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             realNi = np.concatenate((Ni.flatten() * 2, Ni.flatten() * 2))
             realAtNiAinv = np.linalg.pinv(np.einsum('ji,j,jk->ik', realA, realNi, realA))
 
-            b = np.conjugate(np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask])#TODO this neeeds fix otherwhere!
+            b = np.transpose(calibrated_data[np.ix_(pcal_pol_mask, pcal_time_mask)], (2, 0, 1))[cal_ubl_mask]
             phase_degen_niter = 0
             phase_degen2 = np.zeros(2)
             phase_degen_iterative = np.zeros(2)
@@ -568,14 +572,23 @@ for pick_f_i, pick_f in enumerate(pick_fs):
     except Exception:
         print "&&&ERROR&&&&&&"
 
-iquv1 = np.zeros((15, 2, 4))
-iquv2 = np.zeros((15, 2, 4))
-for pick_f in psols[0].keys():
-    iquv1[pick_f] = np.transpose(psols[0][pick_f][:8].reshape((4, 2)))
-    iquv2[pick_f] = np.transpose(psols[1][pick_f][:8].reshape((4, 2)))
+iquvs = [np.zeros((len(freqs), 2, 4)) for i in range(len(psols))]
 
-plt.plot(freqs, np.angle(iquv1[:, :, 1] + 1.j * iquv1[:, :, 2])%TPI / 2. * (180./PI), '^')
-plt.plot(freqs, np.angle(iquv2[:, :, 1] + 1.j * iquv1[:, :, 2])%TPI / 2. * (180./PI), 'v')
+for tjack in range(len(psols)):
+    for pick_f in psols[tjack].keys():
+        iquvs[tjack][pick_f] = np.transpose(psols[tjack][pick_f][:8].reshape((4, 2)))
+
+plt.subplot(2,1,1)
+for s in [0, 1]:
+    for tjack in range(len(psols)):
+        plt.plot(freqs, la.norm(iquvs[tjack][:, s, 1:3], axis=-1) / iquvs[tjack][:, s, 0], ['b', 'g'][s] + ['^', 'o', 's', 'v'][tjack])
+plt.ylim([0, .5])
+plt.xlabel("Frequency (MHz)")
+plt.ylabel("Fraction")
+plt.subplot(2,1,2)
+for s in [0, 1]:
+    for tjack in range(len(psols)):
+        plt.plot(freqs, np.angle(iquvs[tjack][:, s, 1] + 1.j * iquvs[tjack][:, s, 2])%TPI / 2. * (180./PI), ['b', 'g'][s] + ['^', 'o', 's', 'v'][tjack])
 plt.ylim([0, 180])
 plt.xlabel("Frequency (MHz)")
 plt.ylabel("Angle (degree)")
