@@ -41,7 +41,7 @@ bnside = 8
 lat_degree = 45.2977
 
 plot_data_error = True
-remove_additive = True
+remove_additive = False
 plot_projection = True
 force_recompute = False
 force_recompute_AtNiAi = False
@@ -146,12 +146,11 @@ pix_mask_filename = datadir + tag + '_%i.pixm'%(len(A['x'][0]))
 pix_mask = la.norm(A['x'],axis=0) != 0
 pix_mask.astype('float32').tofile(pix_mask_filename)
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+npix = np.sum(pix_mask)
 
-A = np.concatenate((A['x'][:, pix_mask],A['y'][:, pix_mask]))
+A = np.concatenate((np.real(A['x'][:, pix_mask]), np.real(A['y'][:, pix_mask]), np.imag(A['x'][:, pix_mask]), np.imag(A['y'][:, pix_mask]))).astype('float32') / 2 #factor of 2 for polarization: each pol only receives half energy
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-A = np.concatenate((np.real(A), np.imag(A))).astype('float32') / 2 #factor of 2 for polarization: each pol only receives half energy
-print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-npix = A.shape[1]
+
 #compute AtNi
 AtNi = A.transpose() * Ni
 print "Memory usage: %.3fMB"%(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)

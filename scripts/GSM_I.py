@@ -66,13 +66,14 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
         plt.plot(interp_x, interp_y * sign_flip, 'b-')
         if vis_freqs is not None:
             plt.plot(np.log10(vis_freqs), vis_ws[:, i] * sign_flip, 'g+')
+        plt.xlim([np.log10(all_freqs[0]) - .5, np.log10(all_freqs[-1]) + .5])
         plt.ylim([-1.5, 1.5])
 
         plt.subplot(3, n_principal, i + 1 + 2 * n_principal)
         plt.plot(np.log10(all_freqs), np.log10(w_nf[i] * normalization * sign_flip), '+')
         if vis_freqs is not None:
             plt.plot(np.log10(vis_freqs), np.log10(vis_ws[:, i] * vis_norms * sign_flip), 'g+')
-        plt.xlim([np.log10(all_freqs[0]), np.log10(all_freqs[-1])])
+        plt.xlim([np.log10(all_freqs[0]) - .5, np.log10(all_freqs[-1]) + .5])
         plt.ylim(-5, 8)
     fig.savefig(plot_filename_base + tag + '.png', dpi=1000)
     if show_plots:
@@ -87,14 +88,20 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
 mother_nside = 64
 mother_npix = hpf.nside2npix(mother_nside)
 smoothing_fwhm = 3. * np.pi / 180.
-edge_width = 2. * np.pi / 180.
+edge_width = 3. * np.pi / 180.
 remove_cmb = True
 
 n_principal_range = range(6, 7)
 
 include_visibility = False
-vis_tags = ["q0C_abscal", "q2C_abscal", "q3A_abscal"]  # L stands for lenient in flagging
-
+vis_Qs = ["q0C_*_abscal", "q1AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
+datatag = '_2016_01_20_avg'
+vartag = '_2016_01_20_avg'
+datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
+vis_tags = []
+for vis_Q in vis_Qs:
+    filenames = glob.glob(datadir + vis_Q + '_xx*' + datatag)
+    vis_tags = vis_tags + [os.path.basename(fn).split('_xx')[0] for fn in filenames]
 
 data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
 
@@ -137,7 +144,7 @@ region_indices_list, region_mask_list = find_regions(np.isnan(idata))
 region_illustration = np.empty(mother_npix)
 for i, mask in enumerate(region_mask_list):
     region_illustration[mask] = len(region_mask_list) - i
-hpv.mollview(region_illustration, nest=True)
+hpv.mollview(region_illustration, nest=True, title="Frequency Coverage Map")
 plt.show()
 
 ####PCA to get rough estimates
@@ -462,11 +469,12 @@ for n_principal in n_principal_range:
 
         vis_freqs = np.zeros(len(vis_tags))
         vis_norms = np.zeros(len(vis_tags))
+        vis_norms_final = np.zeros(len(vis_tags))
         vis_ws = np.zeros((len(vis_tags), n_principal)) + np.nan
+        vis_ws_final = np.zeros((len(vis_tags), n_principal)) + np.nan
         for tag_i, tag in enumerate(vis_tags):
-            datatag = '_2015_05_09'
-            vartag = '_2015_05_09'
-            datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
+            print tag
+            sys.stdout.flush()
             # nt = {"q3A_abscal": 253, "q3AL_abscal": 368}[tag]
             nf = 1
             # nUBL = 78
@@ -486,10 +494,13 @@ for n_principal in n_principal_range:
             tmasks = {}
             for p in ['x', 'y']:
                 pol = p+p
+                data_filename = glob.glob(datadir + tag + '_%s%s_*_*'%(p, p) + datatag)[0]
+                nt_nUBL = os.path.basename(data_filename).split(datatag)[0].split('%s%s_'%(p, p))[-1]
+                nt = int(nt_nUBL.split('_')[0])
+                nUBL = int(nt_nUBL.split('_')[1])
 
                 #tf file
-                tf_filename = glob.glob(datadir + tag + '_%s%s_*_%i.tf'%(p, p, nf))[0]
-                nt = len(np.fromfile(tf_filename, dtype='complex64')) / nf
+                tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
                 tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt,nf))
                 tlist = np.real(tflist[:, 0])
                 flist = np.imag(tflist[0, :])    #will be later assuming flist only has 1 element
@@ -510,14 +521,13 @@ for n_principal in n_principal_range:
                 #print vis_freq, tlist
 
                 #ubl file
-                ubl_filename = glob.glob(datadir + tag + '_%s%s_*_%i.ubl'%(p, p, 3))[0]
-                nUBL = len(np.fromfile(ubl_filename, dtype='float32')) / 3
+                ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
                 ubls[p] = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
                 ubl_mask = la.norm(ubls[p], axis=1) <= ubl_length_thresh
                 print "%i UBLs to include"%len(ubls[p])
 
 
-                #compute A matrix
+                #read A matrix computed by GSM_make_A_matrix.py
                 A_filename = datadir + tag + '_%s%s_%i_%i.Agsm'%(p, p, len(tlist)*len(ubls[p]), 12*nside**2) #.Agsm is nested galactic for this script, whereas .A is ring equtorial
 
                 print "Reading A matrix from %s"%A_filename
@@ -527,7 +537,7 @@ for n_principal in n_principal_range:
                 #get Ni (1/variance) and data
                 var_filename = datadir + tag + '_%s%s_%i_%i%s.var'%(p, p, nt, nUBL, vartag)
                 Ni[p] = 1./(np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[np.ix_(tmasks[p], ubl_mask)].transpose().flatten() * (1.e-26*(C/vis_freq)**2/2/kB/(4*np.pi/(12*nside**2)))**2)
-                data_filename = datadir + tag + '_%s%s_%i_%i'%(p, p, nt, nUBL) + datatag
+
                 vis_data[p] = (np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[np.ix_(tmasks[p], ubl_mask)].transpose().flatten()*1.e-26*(C/vis_freq)**2/2/kB/(4*np.pi/(12*nside**2))).conjugate()#there's a conjugate convention difference
                 data_shape[p] = (np.sum(ubl_mask), np.sum(tmasks[p]))
                 ubls[p] = ubls[p][ubl_mask]
@@ -538,7 +548,7 @@ for n_principal in n_principal_range:
 
             vis_data = np.concatenate((np.real(vis_data['x']), np.real(vis_data['y']), np.imag(vis_data['x']), np.imag(vis_data['y'])))
             Ni = np.concatenate((Ni['x'], Ni['y']))
-            Ni = np.concatenate((Ni/2, Ni/2))
+            Ni = np.concatenate((Ni * 2, Ni * 2))
 
             A_vis = np.concatenate((np.real(A_vis['x']), np.real(A_vis['y']), np.imag(A_vis['x']), np.imag(A_vis['y']))).astype('float32') / 2 #factor of 2 for polarization: each pol only receives half energy
             # AtNi_vis = np.transpose(A_vis).dot(Ni)
@@ -562,11 +572,12 @@ for n_principal in n_principal_range:
             #
             #
 
-            vis_w_estimates = np.array([we(np.log10(vis_freq)) for we in w_estimates_final])
-            vis_map_estimate = np.transpose(xbar_ni_final).dot(vis_w_estimates)
-            vis_data_estimate = A_vis.dot(vis_map_estimate)
+            vis_w_estimates = np.array([we(np.log10(vis_freq)) for we in w_estimates])
+            vis_w_estimates_final = np.array([we(np.log10(vis_freq)) for we in w_estimates_final])
+            vis_map_estimate_final = np.transpose(xbar_ni_final).dot(vis_w_estimates_final)
+            vis_data_estimate_final = A_vis.dot(vis_map_estimate_final)
 
-            vis_relevant_mask = np.abs(vis_w_estimates) > .01
+            vis_relevant_mask = np.abs(vis_w_estimates_final) >= .0#1
 
             additive_calibrate_matrix = np.zeros((len(vis_data), 2 * (data_shape['x'][0] + data_shape['y'][0]) + np.sum(vis_relevant_mask)))
             row = 0
@@ -578,19 +589,42 @@ for n_principal in n_principal_range:
                         col += 1
                         row += shp[1]
 
-            additive_calibrate_matrix[:, -np.sum(vis_relevant_mask):] = np.einsum('ji,ni->jn', A_vis, xbar_ni_final[vis_relevant_mask])
-            additive = la.inv(np.einsum('ki,k,kj->ij', additive_calibrate_matrix, Ni, additive_calibrate_matrix)).dot(np.transpose(additive_calibrate_matrix).dot(Ni * vis_data))
-            vis_data_fit = additive_calibrate_matrix.dot(additive)
+            #for pre-physics version
+            additive_calibrate_matrix[:, -np.sum(vis_relevant_mask):] = np.einsum('ji,ni->jn', A_vis, xbar_ni[vis_relevant_mask])
+            additive_sol = la.inv(np.einsum('ki,k,kj->ij', additive_calibrate_matrix, Ni, additive_calibrate_matrix)).dot(np.transpose(additive_calibrate_matrix).dot(Ni * vis_data))
+            vis_data_fit = additive_calibrate_matrix.dot(additive_sol)
 
-            vis_norm = la.norm(np.transpose(xbar_ni_final[vis_relevant_mask]).dot(additive[-np.sum(vis_relevant_mask):])) / np.mean(la.norm(x_fit, axis=1))
-            vis_w = additive[-np.sum(vis_relevant_mask):] / vis_norm
+            vis_norm = la.norm(np.transpose(xbar_ni[vis_relevant_mask]).dot(additive_sol[-np.sum(vis_relevant_mask):])) / np.mean(la.norm(x_fit, axis=1))
+            Sinv = np.zeros((additive_calibrate_matrix.shape[1], additive_calibrate_matrix.shape[1]))
+            for i, col in enumerate(range(-np.sum(vis_relevant_mask), 0)):
+                Sinv[col, col] = (vis_norm * vis_w_estimates[i]) ** -2.
+            additive_sol = la.inv(Sinv + np.einsum('ki,k,kj->ij', additive_calibrate_matrix, Ni, additive_calibrate_matrix)).dot(np.transpose(additive_calibrate_matrix).dot(Ni * vis_data))
+            vis_data_fit = additive_calibrate_matrix.dot(additive_sol)
+
+            vis_norm = la.norm(np.transpose(xbar_ni[vis_relevant_mask]).dot(additive_sol[-np.sum(vis_relevant_mask):])) / np.mean(la.norm(x_fit, axis=1))
+            vis_w = additive_sol[-np.sum(vis_relevant_mask):] / vis_norm
             vis_norms[tag_i] = vis_norm
             vis_ws[tag_i][vis_relevant_mask] = vis_w
-            print tag_i, vis_data[:10], vis_w, vis_ws[tag_i][vis_relevant_mask]
+            # print tag_i, vis_data[:10], vis_w, vis_ws[tag_i][vis_relevant_mask]
 
-            dbg_matrix = np.copy(additive_calibrate_matrix[:, :-n_principal+1])
-            dbg_matrix[:, -1] = vis_data_estimate
-            dbg = la.inv(np.einsum('ki,k,kj->ij', dbg_matrix, Ni, dbg_matrix)).dot(np.transpose(dbg_matrix).dot(Ni * vis_data))
+            #for post-physics version
+            additive_calibrate_matrix[:, -np.sum(vis_relevant_mask):] = np.einsum('ji,ni->jn', A_vis, xbar_ni_final[vis_relevant_mask])
+            additive_sol = la.inv(np.einsum('ki,k,kj->ij', additive_calibrate_matrix, Ni, additive_calibrate_matrix)).dot(np.transpose(additive_calibrate_matrix).dot(Ni * vis_data))
+            vis_data_fit = additive_calibrate_matrix.dot(additive_sol)
+
+            vis_norm = la.norm(np.transpose(xbar_ni_final[vis_relevant_mask]).dot(additive_sol[-np.sum(vis_relevant_mask):])) / np.mean(la.norm(x_fit, axis=1))
+            Sinv = np.zeros((additive_calibrate_matrix.shape[1], additive_calibrate_matrix.shape[1]))
+            for i, col in enumerate(range(-np.sum(vis_relevant_mask), 0)):
+                Sinv[col] = (vis_norm * vis_w_estimates_final[i]) ** -2.
+            additive_sol = la.inv(Sinv + np.einsum('ki,k,kj->ij', additive_calibrate_matrix, Ni, additive_calibrate_matrix)).dot(np.transpose(additive_calibrate_matrix).dot(Ni * vis_data))
+            vis_data_fit = additive_calibrate_matrix.dot(additive_sol)
+
+            vis_norm = la.norm(np.transpose(xbar_ni_final[vis_relevant_mask]).dot(additive_sol[-np.sum(vis_relevant_mask):])) / np.mean(la.norm(x_fit, axis=1))
+            vis_w = additive_sol[-np.sum(vis_relevant_mask):] / vis_norm
+            vis_norms_final[tag_i] = vis_norm
+            vis_ws_final[tag_i][vis_relevant_mask] = vis_w
+            # print tag_i, vis_data[:10], vis_w, vis_ws[tag_i][vis_relevant_mask]
+
 
             # scale_fit = additive[-1]
             # additive_term = {}
@@ -606,25 +640,66 @@ for n_principal in n_principal_range:
             # plt.plot(additive_term['x'])
             #
             #
-            fig = plt.Figure(figsize=(2000, 1000))
-            fig.set_canvas(plt.gcf().canvas)
-            plt.gcf().set_size_inches(w=30, h=10)
-            t_plot = (tlist[tmasks['x']] - 10.)%24 + 10
-            for i, bl in enumerate(ubl_sort['x']):
-                plt.subplot(8, 10, i + 1)
-                pstart, pend = (bl * data_shape['x'][1], (bl + 1) * data_shape['x'][1])
-                plt.plot(t_plot, vis_data[pstart:pend])
-                plt.plot(t_plot, vis_data_fit[pstart:pend])
-                plt.plot(t_plot, dbg[-1] * vis_data_estimate[pstart:pend])
-                plt.title('(%.1f, %.1f) %.1f'%(ubls['x'][bl][0], ubls['x'][bl][1], la.norm(ubls['x'][bl])))
-                plt.xlim([15, 30])
-            fig.savefig(plot_filename_base + datatag + '_vis_fit.png', dpi=1000)
-            fig.clear()
-            plt.gcf().clear()
+            if len(vis_tags) <= 3:
+                dbg_matrix = np.copy(additive_calibrate_matrix[:, :-n_principal+1])
+                dbg_matrix[:, -1] = vis_data_estimate_final
+                dbg = la.inv(np.einsum('ki,k,kj->ij', dbg_matrix, Ni, dbg_matrix)).dot(np.transpose(dbg_matrix).dot(Ni * vis_data))
+
+                fig = plt.Figure(figsize=(2000, 1000))
+                fig.set_canvas(plt.gcf().canvas)
+                plt.gcf().set_size_inches(w=30, h=10)
+                t_plot = (tlist[tmasks['x']] - 10.)%24 + 10
+                for i, bl in enumerate(ubl_sort['x']):
+                    plt.subplot(8, 10, i + 1)
+                    pstart, pend = (bl * data_shape['x'][1], (bl + 1) * data_shape['x'][1])
+                    plt.plot(t_plot, vis_data[pstart:pend])
+                    plt.plot(t_plot, vis_data_fit[pstart:pend])
+                    plt.plot(t_plot, dbg[-1] * vis_data_estimate_final[pstart:pend])
+                    plt.title('(%.1f, %.1f) %.1f'%(ubls['x'][bl][0], ubls['x'][bl][1], la.norm(ubls['x'][bl])))
+                    plt.xlim([15, 30])
+                fig.savefig(plot_filename_base + datatag + '_vis_fit.png', dpi=1000)
+                fig.clear()
+                plt.gcf().clear()
 
 
-        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_vis_result_plot', n_principal, show_plots, vis_freqs=vis_freqs, vis_ws=vis_ws, vis_norms=vis_norms)
+        make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, '_vis_result_plot1', n_principal, show_plots, vis_freqs=vis_freqs, vis_ws=vis_ws, vis_norms=vis_norms)
+        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_vis_result_plot2', n_principal, show_plots, vis_freqs=vis_freqs, vis_ws=vis_ws_final, vis_norms=vis_norms_final)
+        for i in range(n_principal):
+            plt.subplot(1, n_principal, i+1)
+            plt.plot(sorted(vis_freqs), vis_ws[np.argsort(vis_freqs), i], 'go')
+            plt.plot(sorted(vis_freqs), w_estimates[i](sorted(np.log10(vis_freqs))), 'b-')
+            plt.ylim([-1.5, 1.5])
+        plt.show()
+        for i in range(n_principal):
+            plt.subplot(1, n_principal, i+1)
+            plt.plot(sorted(vis_freqs), vis_ws_final[np.argsort(vis_freqs), i], 'go')
+            plt.plot(sorted(vis_freqs), w_estimates_final[i](sorted(np.log10(vis_freqs))), 'b-')
+            plt.ylim([-1.5, 1.5])
+        plt.show()
 
+        good_vis_mask = vis_ws_final[:, 4] >= 0
+        good_vis_freqs = vis_freqs[good_vis_mask]
+        vis_maps = vis_ws_final[good_vis_mask].dot(xbar_ni_final)
+        for plot_i, plot_freq in enumerate(np.arange(.13, .172, .001)):
+            fi = np.argmin(np.abs(good_vis_freqs - plot_freq))
+            hpv.mollview(np.log10(vis_maps[fi]), nest=True, title='%.1f MHz'%(good_vis_freqs[fi] * 1e3), min=-2.5, max=-1)
+            plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
+            plt.clf()
+
+        for plot_i, logfreq in enumerate(np.arange(-2., 4., .03)):
+            pltdata = np.log10(np.abs(np.transpose(xbar_ni).dot([w_estimates[i](logfreq) for i in range(n_principal)])))
+            hpv.mollview(pltdata, nest=True, title='%.2f GHz'%(10**logfreq), min=np.percentile(pltdata, 5), max=np.percentile(pltdata, 98))
+            plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
+            plt.clf()
+
+        for i in range(n_principal):
+            plt.subplot(1, n_principal, i+1)
+            plt.plot(sorted(good_vis_freqs), vis_ws_final[good_vis_mask][np.argsort(good_vis_freqs), i], 'go')
+            plt.plot(sorted(good_vis_freqs), w_estimates_final[i](sorted(np.log10(good_vis_freqs))), 'b-')
+            plt.ylim([-1.5, 1.5])
+        plt.show()
+
+        np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, normalization=normalization, w_nf_final=w_nf_final, x_ni_final=xbar_ni_final, vis_freqs=vis_freqs, vis_ws=vis_ws, vis_norms=vis_norms, vis_ws_final=vis_ws_final, vis_norms_final=vis_norms_final)
     ##########################################
     ###ICA#####can get cmb very well
     ##########################################

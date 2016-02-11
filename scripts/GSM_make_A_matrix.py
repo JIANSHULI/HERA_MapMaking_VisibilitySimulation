@@ -32,27 +32,29 @@ def pinv_sym(M, rcond = 1.e-15, verbose = True):
 # nt = 440
 # nf = 1
 # nUBL = 75
-for tag in ["q0C_abscal", "q2C_abscal", "q3A_abscal"]:
+
+vis_Qs = ["q0C_*_abscal", "q1AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
+datatag = '_2016_01_20_avg'
+vartag = '_2016_01_20_avg'
+datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
+vis_tags = []
+for vis_Q in vis_Qs:
+    filenames = glob.glob(datadir + vis_Q + '_xx*' + datatag)
+    vis_tags = vis_tags + [os.path.basename(fn).split('_xx')[0] for fn in filenames]
+
+
+for tag in vis_tags:
 # tag = "q2C_abscal"  # L stands for lenient in flagging
     print tag
-    datatag = '_2015_05_09'
-    vartag = '_2015_05_09'
-    datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
     # nt = {"q3A_abscal": 253, "q3AL_abscal": 368}[tag]
     nf = 1
 
 
-    nside = 256
+    nside = 64
     bnside = 16
     lat_degree = 45.2977
 
-    plot_data_error = True
-    remove_additive = True
-    plot_projection = True
     force_recompute = False
-    force_recompute_AtNiAi = False
-    force_recompute_S = False
-    force_recompute_SEi = False
 
     C = 299.792458
     kB = 1.3806488* 1.e-23
@@ -74,10 +76,13 @@ for tag in ["q0C_abscal", "q2C_abscal", "q3A_abscal"]:
     A = {}
     for p in ['x', 'y']:
         pol = p+p
+        data_filename = glob.glob(datadir + tag + '_%s%s_*_*'%(p, p) + datatag)[0]
+        nt_nUBL = os.path.basename(data_filename).split(datatag)[0].split('%s%s_'%(p, p))[-1]
+        nt = int(nt_nUBL.split('_')[0])
+        nUBL = int(nt_nUBL.split('_')[1])
 
         #tf file
-        tf_filename = glob.glob(datadir + tag + '_%s%s_*_%i.tf'%(p, p, nf))[0]
-        nt = len(np.fromfile(tf_filename, dtype='complex64')) / nf
+        tf_filename = datadir + tag + '_%s%s_%i_%i.tf'%(p, p, nt, nf)
         tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt, nf))
         tlist = np.real(tflist[:, 0])
         flist = np.imag(tflist[0, :])
@@ -85,8 +90,7 @@ for tag in ["q0C_abscal", "q2C_abscal", "q3A_abscal"]:
         print freq
 
         #ubl file
-        ubl_filename = glob.glob(datadir + tag + '_%s%s_*_%i.ubl'%(p, p, 3))[0]
-        nUBL = len(np.fromfile(ubl_filename, dtype='float32')) / 3
+        ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
         ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
         print "%i UBLs to include"%len(ubls)
 
@@ -95,7 +99,8 @@ for tag in ["q0C_abscal", "q2C_abscal", "q3A_abscal"]:
         A_filename = datadir + tag + '_%s%s_%i_%i.Agsm'%(p, p, len(tlist)*len(ubls), 12*nside**2)
 
         if os.path.isfile(A_filename) and not force_recompute:
-            raise Exception(A_filename + " already exists.")
+            print A_filename + " already exists."
+
         else:
             #beam
             beam_healpix = local_beam[p](freq)

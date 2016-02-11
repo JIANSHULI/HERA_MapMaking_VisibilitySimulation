@@ -48,8 +48,9 @@ mother_nside = 32
 mother_npix = hpf.nside2npix(mother_nside)
 smoothing_fwhm = 10. * np.pi / 180.
 edge_width = 10. * np.pi / 180.
-mask_name = 'plane10deg'
-pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > np.pi/18
+mask_name = 'plane20deg'
+plane_angle = np.pi / 9
+
 step = .2
 remove_cmb = True
 show_plots = False
@@ -62,21 +63,26 @@ data_file = np.load(data_file_name)
 freqs = data_file['freqs']
 qudata = data_file['qdata'] + 1.j * data_file['udata']
 
-bad_freqs_mask = np.isnan(qudata).any(axis=1)
+
+bad_freqs_mask = np.isnan(qudata).all(axis=1)
 freqs = freqs[~bad_freqs_mask]
 nf = len(freqs)
 qudata = qudata[~bad_freqs_mask]
 
-matplotlib.rcParams.update({'font.size': 6})
+pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > plane_angle
+pixel_mask = pixel_mask & ~(np.isnan(qudata).any(axis=0))
+
+matplotlib.rcParams.update({'font.size': 25})
 for n, qud in enumerate(qudata):
-    hpv.mollview(np.log10(np.abs(qud)), nest=True, sub=(2, len(qudata), n + 1), title=freqs[n])
-    hpv.mollview(np.angle(qud) / 2, nest=True, sub=(2, len(qudata), len(qudata) + n + 1), cmap=cm.hsv)
+    hpv.mollview(np.log10(np.abs(qud)), nest=True, sub=(4, (len(qudata)+1) / 2, n + 1), title="%.1fGHz"%freqs[n])
+    hpv.mollview(np.angle(qud) / 2, nest=True, sub=(4, (len(qudata)+1) / 2, (len(qudata)+1) / 2 * 2 + n + 1), cmap=cm.hsv, title="%.1fGHz"%freqs[n])
 plt.show()
 exclude_freqs_mask = np.array([freq in exclude_freqs for freq in freqs])
 
 freqs = freqs[~exclude_freqs_mask]
 nf = len(freqs)
-qudata = qudata[~exclude_freqs_mask] * pixel_mask[None, :]
+qudata = qudata[~exclude_freqs_mask]
+qudata[:, ~pixel_mask] = 0
 
 normalization = np.linalg.norm(qudata, axis=1)
 D = qudata / normalization[:, None]

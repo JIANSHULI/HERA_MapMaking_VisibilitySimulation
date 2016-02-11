@@ -45,10 +45,10 @@ def plot_dataset(data_set):
             iplot += 1
             plot_d = pol_frac(d[0], d[1], d[2])
             plot_mask = ~(np.isnan(plot_d) | np.isinf(plot_d))
-            hpv.mollview(plot_d, sub=(nrow, ncol, iplot), nest=True, min=np.percentile(plot_d[plot_mask], 5), max=np.percentile(plot_d[plot_mask], 95), title="%.3fGHz Q, n%i"%(f, (len(plot_d)/12)**.5))
+            hpv.mollview(plot_d, sub=(nrow, ncol, iplot), nest=True, min=np.percentile(plot_d[plot_mask], 5), max=np.percentile(plot_d[plot_mask], 95), title="%.3fGHz pol frac, n%i"%(f, (len(plot_d)/12)**.5))
 
             iplot += 1
-            hpv.mollview(pol_angle(d[0], d[1], d[2]), sub=(nrow, ncol, iplot), nest=True, cmap=cm.hsv, title="%.3fGHz U, n%i"%(f, (len(plot_d)/12)**.5))
+            hpv.mollview(pol_angle(d[0], d[1], d[2]), sub=(nrow, ncol, iplot), nest=True, cmap=cm.hsv, title="%.3fGHz angle, n%i"%(f, (len(plot_d)/12)**.5))
         elif d.ndim== 1:
             iplot += 1
             plot_d = np.log10(d)
@@ -286,6 +286,14 @@ if plot_individual:
     plot_dataset(all_1400)
 
 ###########################
+###S-PASS 9' 2.3GHz 224MHz BW
+#########################
+spass = {}
+spass[2.3] = np.array([fit.read('/home/omniscope/data/polarized foregrounds/spass_hmap_m_1111_%s.fits'%IQU)['UNKNOWN1'].flatten()[hpf.nest2ring(1024, range(hpf.nside2npix(1024)))] for IQU in ['I', 'Q', 'U']])
+spass[2.3][2] = -spass[2.3][2] # IAU convention to CMB convention
+if plot_individual:
+    plot_dataset(spass)
+###########################
 ###CMB######
 ###############
 T_CMB = 2.725 * (1 - remove_cmb) #if remove cmb, dont add cmb temp into wmap/planck
@@ -344,6 +352,9 @@ motherfile[.82] = motherfile_data[:, -2]
 motherfile[.010] = motherfile_data[:, -16]
 if plot_individual:
     plot_dataset(motherfile)
+
+
+
 
 ###########################
 ###high freq THz
@@ -424,6 +435,7 @@ new_mother = {}
 for dict in [
     motherfile,
     all_1400,
+    spass,
     haslam,
     wmap_iqu,
     planck_iqu,

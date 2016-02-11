@@ -368,7 +368,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
         ##calibrate cas flux and over all calibration amp
         if fit_cas:
             #first try fitting xx and yy seperately as a jackknife
-            cas_frac_options = np.arange(.1, 3, .01)
+            cas_frac_options = np.arange(.5, 1.5, .01)
             error = {'xx':1.e9, 'yy':1.e9}
             tmp_result = -1
             for pol in ['xx','yy']:
@@ -435,6 +435,8 @@ for pick_f_i, pick_f in enumerate(pick_fs):
 
         #sooolve
         phase_cal = solve_phase_degen(ampdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], ampdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], info['ubl'][cal_ubl_mask], plot=(len(pick_fs) == 1))
+        omni_phase_cal= omni.solve_phase_degen(ampdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], ampdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], info['ubl'][cal_ubl_mask], [3, 3, 1e3], plot=(len(pick_fs) == 1))
+        print phase_cal, 'new', omni_phase_cal
 
 
         ###############################################
@@ -558,6 +560,8 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             bfit = realb_fit.reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
             bfit = bfit[0] + 1.j * bfit[1]
             phase_degen_iterative = solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask])
+            omni_phase_degen_iterative = omni.solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask], [3, 3, 1e3])
+            print phase_degen_iterative, 'new', omni_phase_degen_iterative
             phase_degen2 += phase_degen_iterative
             # print phase_degen_niter, phase_degen2, np.linalg.norm(perror)
 
@@ -644,10 +648,9 @@ np.savez(datadir + 'cygcas_' + Q + datatag + vartag, cyg_cas_iquv=cyg_cas_iquv, 
 real_iquv_fits = np.transpose((realA[:, :8] * psol[:8])).reshape((8, 2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
 iquv_fits = real_iquv_fits[:, 0] + 1.j * real_iquv_fits[:, 1]
 
-
+p = 1
+fun = np.imag
 for i in range(np.sum(cal_ubl_mask)):
-    p = 1
-    fun = np.imag
     plt.subplot(5, 7, i+1)
     plt.plot(compressed2_lsts[pcal_time_mask], fun(b[i, p]))
     plt.plot(compressed2_lsts[pcal_time_mask], fun(bfit[i, p]))
@@ -656,6 +659,7 @@ for i in range(np.sum(cal_ubl_mask)):
     plt.plot(compressed2_lsts[pcal_time_mask], fun(iquv_fits[4, i, p] + iquv_fits[5, i, p]))
     plt.plot(compressed2_lsts[pcal_time_mask], fun(iquv_fits[6, i, p] + iquv_fits[7, i, p]))
     plt.title((info['ubl'][cal_ubl_mask][i, :2], '%.2f'%np.linalg.norm(perror[:, i, p])))
+    plt.ylim([-1000, 1000])
 plt.show()
 
 

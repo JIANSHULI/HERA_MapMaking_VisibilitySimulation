@@ -10,6 +10,7 @@ import healpy as hp
 import healpy.pixelfunc as hpf
 import healpy.visufunc as hpv
 import scipy.interpolate as si
+import glob
 
 PI = np.pi
 TPI = np.pi * 2
@@ -79,9 +80,9 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 
 
 
-nside_start = 16
+nside_start = 32
 nside_beamweight = 16
-nside_standard = 16
+nside_standard = 128
 bnside = 256
 plotcoord = 'CG'
 thresh = .5
@@ -89,7 +90,7 @@ valid_pix_thresh = 1e-3
 # S_scale = 2
 # S_thresh = 1000#Kelvin
 # S_type = 'gsm%irm%i'%(S_scale,S_thresh)
-S_type = 'dySP_addlimit'  # dynamic S polarized [[.25,0,0,.25], [0,p,0,0], [0,0,p,0], [.25,0,0,.25]]
+S_type = 'dySP_lowaddlimit_lowpol'  # dynamic S polarized [[.25,0,0,.25], [0,p,0,0], [0,0,p,0], [.25,0,0,.25]]. lowpol:polfrac=0.01; addlimit:additive same level as max data; lowaddlimit: 10% of max data
 remove_additive = False
 
 lat_degree = 45.2977
@@ -110,14 +111,17 @@ force_recompute_SEi = False
 ####################################################
 ################data file and load beam##############
 ####################################################
-tag = "q3AL_5_abscal"  # L stands for lenient in flagging
+tag = "q1AL_10_abscal"#"q3AL_5_abscal"  # L stands for lenient in flagging
 datatag = '_2016_01_20_avg'
 vartag = '_2016_01_20_avg'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 A_version = 1.0
-nt = 193
 nf = 1
-nUBL = 78
+data_filename = glob.glob(datadir + tag + '_xx_*_*' + datatag)[0]
+nt_nUBL = os.path.basename(data_filename).split(datatag)[0].split('xx_')[-1]
+nt = int(nt_nUBL.split('_')[0])
+nUBL = int(nt_nUBL.split('_')[1])
+
 
 # deal with beam: create a callable function of the form y(freq) in MHz and returns npix by 4
 freqs = range(110, 200, 10)
@@ -647,138 +651,94 @@ sim_data = clean_sim_data + np.random.randn(len(data)) / Ni ** .5
 # compute AtNi.y
 AtNi_data = np.transpose(A).dot((data * Ni).astype(A.dtype))
 AtNi_sim_data = np.transpose(A).dot((sim_data * Ni).astype(A.dtype))
+AtNi_clean_sim_data = np.transpose(A).dot((clean_sim_data * Ni).astype(A.dtype))
 
 # compute S
 print "computing S...",
 sys.stdout.flush()
 timer = time.time()
 
-pol_frac = .4  # assuming QQ=UU=pol_frac*II
+if 'lowpol' in S_type:
+    pol_frac = .01  # assuming QQ=UU=pol_frac*II
+elif 'nopol' in S_type:
+    pol_frac = 1e-6  # assuming QQ=UU=pol_frac*II
+else:
+    pol_frac = .4  # assuming QQ=UU=pol_frac*II
+
+v_pol_frac = 1e-6
 S = np.zeros((Ashape1, Ashape1), dtype='float32')
 for i in range(valid_npix):
-    S[i::Ashape1/4, i::Ashape1/4] = np.array([[1, 0, 0, 0], [0, pol_frac, 0, 0], [0, 0, pol_frac, 0], [0, 0, 0, 0]]) * \
+    S[i::Ashape1/4, i::Ashape1/4] = np.array([[1, 0, 0, 0], [0, pol_frac, 0, 0], [0, 0, pol_frac, 0], [0, 0, 0, v_pol_frac]]) * \
                                       fake_solution_map[i] ** 2  # np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
 
-data_max = np.transpose(np.percentile(np.abs(data.reshape((2, len(used_common_ubls), 4, len(tlist)))), 95, axis=-1), (2, 1, 0)). reshape((4, len(used_common_ubls) * 2))
+data_max = np.transpose(np.percentile(np.abs(data.reshape((2, len(used_common_ubls), 4, len(tlist)))), 95, axis=-1), (2, 1, 0)).reshape((4, len(used_common_ubls) * 2))
 for i in range(4):
     start = i * Ashape1 / 4 + valid_npix
     end = (i + 1) * Ashape1 / 4
-    S[start:end, start:end] = np.eye(len(used_common_ubls) * 2) * data_max[i]**2
+    S[start:end, start:end] = np.eye(len(used_common_ubls) * 2) * data_max[i]**2 / 100.
 
 print "Done."
 print "%f minutes used" % (float(time.time() - timer) / 60.)
 sys.stdout.flush()
 
+
+
+# compute (AtNiA+Si)i eigensystems
 precision = 'float64'
-# compute AtNiA eigensystems
-eigvl_tag = 'eigvl'
-eigvc_tag = 'eigvc'
-eig_version = 0.1
-eigvl_filename = eigvl_tag + '_%s_%s_v%.1f' % (vartag, precision, eig_version) + A_filename
-eigvc_filename = eigvc_tag + '_%s_%s_v%.1f' % (vartag, precision, eig_version) + A_filename
-eigvl_path = datadir + tag + eigvl_filename
-eigvc_path = datadir + tag + eigvc_filename
-if os.path.isfile(eigvl_path) and os.path.isfile(eigvc_path) and not force_recompute_AtNiAi_eig and not force_recompute:
-    print "Reading eigen system of AtNiA from %s and %s" % (eigvl_path, eigvc_path)
-    sys.stdout.flush()
-    del (A)
-    if precision != 'longdouble':
-        eigvl = np.fromfile(eigvl_path, dtype=precision)
-        eigvc = np.fromfile(eigvc_path, dtype=precision).reshape((Ashape1, Ashape1))
-    else:
-        eigvl = np.fromfile(eigvl_path, dtype='float64')
-        eigvc = np.fromfile(eigvc_path, dtype='float64').reshape((Ashape1, Ashape1))
-else:
-    print "Allocating AtNiA..."
-    sys.stdout.flush()
-    timer = time.time()
-    AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=precision)
-    print "Computing AtNiA...", datetime.datetime.now()
-    sys.stdout.flush()
-    ATNIA(A, Ni, AtNiA)
-
-    print "%f minutes used" % (float(time.time() - timer) / 60.)
-    sys.stdout.flush()
-    del (A)
-    print "Computing AtNiA eigensystem...", datetime.datetime.now()
-    print "Estiated Time", (AtNiA.shape[0] / 3700.) ** 3, "minutes"
-
-    sys.stdout.flush()
-    timer = time.time()
-    eigvl, eigvc = sla.eigh(AtNiA)
-    print "%f minutes used" % (float(time.time() - timer) / 60.)
-    sys.stdout.flush()
-    del (AtNiA)
-
-    if la.norm(eigvl) == 0:
-        print "ERROR: Eigensistem calculation failed...matrix %i by %i is probably too large." % (
-        Ashape1, Ashape1)
-    eigvl.tofile(eigvl_path)
-    eigvc.tofile(eigvc_path)
-
-plt.plot(eigvl)
-
-# compute AtNiAi
-precision = 'float64'
-if eigvl.dtype != precision or eigvc.dtype != precision:
-    print "casting eigen system from %s to %s" % (eigvl.dtype, precision)
-    eigvl = eigvl.astype(precision)
-    eigvc = eigvc.astype(precision)
-max_eigv = np.max(eigvl)
-lambd = 1e-5#1e-7#1e-9#1e-12
-rcondA = (lambd) / max_eigv
-eigvli = 1. / (max_eigv * rcondA + np.maximum(eigvl, 0))
-
-
-AtNiAi_tag = 'AtNiAi'
+AtNiAi_tag = 'AtNiASii'
 AtNiAi_version = 0.1
-AtNiAi_filename = AtNiAi_tag + '_rc%.1f_v%.1f'%(np.log10(rcondA), AtNiAi_version) + eigvc_filename
+rcond = .5e-3
+AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_v%.1f'%(S_type, np.log10(rcond), AtNiAi_version) + A_filename
 AtNiAi_path = datadir + tag + AtNiAi_filename
-def get_AtNiAi(rcondA):
 
-    if os.path.isfile(AtNiAi_path) and not force_recompute_AtNiAi and not force_recompute_AtNiAi_eig and not force_recompute:
-        print "Reading AtNiAi matrix from %s" % AtNiAi_path
-        return np.fromfile(AtNiAi_path, dtype=precision).reshape((Ashape1, Ashape1))
-
+if os.path.isfile(AtNiAi_path) and not force_recompute_AtNiAi and not force_recompute and not force_recompute_S:
+    print "Reading Regularized AtNiAi...",
+    sys.stdout.flush()
+    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision)
+else:
+    AtNiA_tag = 'AtNiA'
+    AtNiA_filename = AtNiA_tag + A_filename
+    AtNiA_path = datadir + tag + AtNiA_filename
+    if os.path.isfile(AtNiA_path) and not force_recompute:
+        print "Reading AtNiA...",
+        sys.stdout.flush()
+        AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
     else:
-
-        eigvli = 1. / (max_eigv * rcondA + np.maximum(eigvl, 0))
-        print "Allocating AtNiAi..."
+        print "Allocating AtNiA..."
         sys.stdout.flush()
         timer = time.time()
-        AtNiAi = np.zeros((len(eigvc), len(eigvc)), dtype=eigvc.dtype)
-        print "Computing AtNiAi...", datetime.datetime.now()
+        AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=precision)
+        print "Computing AtNiA...", datetime.datetime.now()
         sys.stdout.flush()
-        ATNIA(eigvc.transpose(), eigvli, AtNiAi)
+        ATNIA(A, Ni, AtNiA)
         print "%f minutes used" % (float(time.time() - timer) / 60.)
         sys.stdout.flush()
-        AtNiAi.tofile(AtNiAi_path)
+        AtNiA.tofile(AtNiA_path)
+    del (A)
 
-        return AtNiAi
+    print "Computing Regularized AtNiAi...",
+    sys.stdout.flush()
+    timer = time.time()
+    if la.norm(S) != la.norm(np.diagonal(S)):
+        raise Exception("Non-diagonal S not supported yet")
+    AtNiAi = sv.InverseCholeskyMatrix(np.diag(1./np.diagonal(S)) + AtNiA + np.eye(S.shape[0]) * np.max(AtNiA) * rcond).astype(precision)
+    AtNiAi.tofile(AtNiAi_path, overwrite=True)
+    print "%f minutes used" % (float(time.time() - timer) / 60.)
 
 
-AtNiAi = get_AtNiAi(rcondA)
+#####apply wiener filter##############
+print "Applying Regularized AtNiAi...",
+sys.stdout.flush()
+w_solution = AtNiAi.dotv(AtNi_data)
+w_GSM = AtNiAi.dotv(AtNi_clean_sim_data)
+w_sim_sol = AtNiAi.dotv(AtNi_sim_data)
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
-# solve for x
-x = AtNiAi.dot(AtNi_data.astype(AtNiAi.dtype))
-sim_x = AtNiAi.dot(AtNi_sim_data.astype(AtNiAi.dtype))
-sim_x_clean = fake_solution
 del (AtNiAi)
 A = get_A()
-best_fit = A.dot(x.astype(A.dtype))
-best_fit_no_additive = np.sum((A * (x.astype(A.dtype))).reshape((Ashape0, 4, Ashape1/4))[..., :valid_npix].reshape((Ashape0, 4 * valid_npix)), axis=-1)
-
-if remove_additive:
-    chisq = np.sum(Ni * np.abs((best_fit - data)) ** 2) / float(len(data) - valid_npix - data_shape['xx'][0] - data_shape['yy'][0])
-    default_chisq = np.sum(Ni * np.abs((A.dot(fake_solution.astype(A.dtype)) - data)) ** 2) / float(len(data) - valid_npix - data_shape['xx'][0] - data_shape['yy'][0])
-    print chisq, default_chisq
-else:
-    chisq = np.sum(Ni * np.abs((best_fit - data)) ** 2) / float(len(data) - valid_npix)
-    default_chisq = np.sum(Ni * np.abs((A.dot(fake_solution.astype(A.dtype)) - data)) ** 2) / float(len(data) - valid_npix)
-    print chisq, default_chisq
-chisq_sim = np.sum(Ni * np.abs((A.dot(sim_x.astype(A.dtype)) - sim_data)) ** 2) / float(len(sim_data) - valid_npix)
+best_fit = A.dot(w_solution.astype(A.dtype))
+best_fit_no_additive = np.sum((A * (w_solution.astype(A.dtype))).reshape((Ashape0, 4, Ashape1/4))[..., :valid_npix].reshape((Ashape0, 4 * valid_npix)), axis=-1)
 
 if plot_data_error:
     us = ubl_sort['x'][::len(ubl_sort['x'])/6]
@@ -794,98 +754,10 @@ if plot_data_error:
             plt.plot(qaz_model[ri, u, p])
             plt.plot(best_fit[ri, u, p])
             plt.plot(best_fit_no_additive[ri, u, p])
-            plt.plot(np.ones_like(qaz_data[ri, u, p]) * sol2additive(x)[p, u, ri])
+            plt.plot(np.ones_like(qaz_data[ri, u, p]) * sol2additive(w_solution)[p, u, ri])
     plt.show()
 
-#####investigate optimal rcondA
-print "lambda we use is", max_eigv * rcondA
-print "best lambda inferred from data is", (len(data) - chisq * float(len(data) - valid_npix)) / np.sum(x ** 2)
-print "best lambda inferred from simulated data is", (len(data) - chisq_sim * float(
-    len(sim_data) - valid_npix)) / np.sum(sim_x ** 2)
-del (A)
-# compare measurement and simulation
-if plot_projection:
-    xproj = (x.dot(eigvc))[::-1]
-    cleanproj = (sim_x_clean.dot(eigvc))[::-1]
-    print "normalization", np.median(xproj[:200] / cleanproj[:200])
-    simproj = (sim_x.dot(eigvc))[::-1]
-
-    plt.subplot('211')
-    plt.plot(xproj, 'b')
-    plt.plot(cleanproj, 'g')
-    plt.plot(simproj, 'r')
-    plt.ylim(-3e5, 3e5)
-    plt.subplot('212')
-    plt.plot(xproj - cleanproj, 'b')
-    plt.plot(simproj - cleanproj, 'r')
-    plt.plot(eigvli[::-1] ** .5, 'g')  # (1/np.abs(eigvl[::-1])**.5)
-    plt.ylim(-3e5, 3e5)
-    plt.show()
-
-
-    plt.plot(range(0, len(xproj)/100*100, 100), np.log10(np.mean(np.abs(xproj - cleanproj)[:len(xproj)/100*100].reshape(len(xproj) / 100, 100)**2, axis=1)**.5), 'b--', label='data diff')
-    plt.plot(range(0, len(xproj)/100*100, 100), np.log10(np.mean(np.abs(simproj - cleanproj)[:len(xproj)/100*100].reshape(len(xproj) / 100, 100)**2, axis=1)**.5), 'r--', label='noisy sim diff')
-    plt.plot(range(0, len(xproj)/100*100, 100), np.log10(eigvli[::-1][:len(xproj)/100*100:100] ** .5), 'g--', label='eigenvalue diff')
-    plt.plot(range(0, len(xproj)/100*100, 100), np.log10(np.mean(np.abs(cleanproj)[:len(xproj)/100*100].reshape(len(xproj) / 100, 100)**2, axis=1)**.5), 'g', label='GSM solution')
-    plt.plot(range(0, len(xproj)/100*100, 100), np.log10(np.mean(np.abs(xproj)[:len(xproj)/100*100].reshape(len(xproj) / 100, 100)**2, axis=1)**.5), 'b', label='data solution')
-    plt.legend()
-    plt.show()
-
-
-
-
-##generalized eigenvalue problem
-# genSEv_filename = datadir + tag + '_%i_%i.genSEv_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
-# genSEvec_filename = datadir + tag + '_%i_%i.genSEvec_%s_%i'%(len(S), len(S), S_type, np.log10(rcondA))
-# print "Computing generalized eigenvalue problem...",
-# sys.stdout.flush()
-# timer = time.time()
-# genSEv, genSEvec = sla.eigh(S, b=AtNiAi)
-# print "%f minutes used"%(float(time.time()-timer)/60.)
-# genSEv.tofile(genSEv_filename)
-# genSEvec.tofile(genSEvec_filename)
-
-# genSEvecplot = np.zeros_like(equatorial_GSM_standard)
-# for eigs in [-1,-2,1,0]:
-# genSEvecplot[pix_mask] = genSEvec[:,eigs]
-# hpv.mollview(genSEvecplot, coord=plotcoord, title=genSEv[eigs])
-
-# plt.show()
-# quit()
-
-#####compute wiener filter##############
-# lambd = 1e-12
-# rcondA = (lambd) / max_eigv
-SEi_tag = 'CSEi'
-SEi_version = 0.1
-SEi_filename = SEi_tag + '_S%s_v%.1f'%(S_type, SEi_version) + AtNiAi_filename
-SEi_path = datadir + tag + SEi_filename
-if os.path.isfile(SEi_path) and not force_recompute_SEi and not force_recompute_AtNiAi and not force_recompute_AtNiAi_eig and not force_recompute and not force_recompute_S:
-    print "Reading Wiener filter component...",
-    sys.stdout.flush()
-    SEi = sv.InverseCholeskyMatrix.fromfile(SEi_path, len(S), precision)
-else:
-    print "Computing Wiener filter component...",
-    sys.stdout.flush()
-    timer = time.time()
-    AtNiAi = get_AtNiAi(rcondA)
-    SEi = sv.InverseCholeskyMatrix(S + AtNiAi).astype(precision)
-    SEi.tofile(SEi_path, overwrite=True)
-    print "%f minutes used" % (float(time.time() - timer) / 60.)
-print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-sys.stdout.flush()
-
-#####apply wiener filter##############
-print "Applying Wiener filter...",
-sys.stdout.flush()
-w_solution = S.dot(SEi.dotv(x))
-w_GSM = S.dot(SEi.dotv(sim_x_clean))
-w_sim_sol = S.dot(SEi.dotv(sim_x))
-print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-sys.stdout.flush()
-
-
-def plot_IQU(solution, title, col, ncol=6):
+def plot_IQU(solution, title, col, ncol=6, coord='C'):
     # Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
     # I = Es[0] + Es[3]
     # Q = Es[0] - Es[3]
@@ -897,7 +769,7 @@ def plot_IQU(solution, title, col, ncol=6):
     U = IQUV[2]
     V = IQUV[3]
     pangle = 180 * np.arctan2(Q, U) / 2 / PI
-    plotcoordtmp = 'C'
+    plotcoordtmp = coord
     hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, col))
 
     hpv.mollview((Q ** 2 + U ** 2) ** .5 / I, min=0, max=1, coord=plotcoordtmp, title=title, nest=True,
@@ -914,13 +786,17 @@ def plot_IQU(solution, title, col, ncol=6):
     if col == ncol:
         plt.show()
 
+for coord in ['C', 'CG']:
+    plot_IQU(fake_solution, 'GSM gridded', 1, coord=coord)
+    plot_IQU(w_GSM, 'wienered GSM', 2, coord=coord)
+    plot_IQU(w_sim_sol, 'wienered simulated solution', 3, coord=coord)
+    plot_IQU(w_solution, 'wienered solution', 4, coord=coord)
+    sol_iquv = sol2map(w_solution).reshape((4, hpf.nside2npix(nside_standard)))
+    hpv.mollview(np.arcsinh(sol_iquv[1]/2.) * np.log10(np.e), nest=True, sub=(4, 6, 12), min=-4, max=4, coord=coord)
+    hpv.mollview(np.arcsinh(sol_iquv[2]/2.) * np.log10(np.e), nest=True, sub=(4, 6, 18), min=-4, max=4, coord=coord)
+    hpv.mollview(np.arcsinh(sol_iquv[3]/2.) * np.log10(np.e), nest=True, sub=(4, 6, 24), min=-4, max=4, coord=coord)
+    plt.show()
 
-plot_IQU(fake_solution, 'GSM gridded', 1)
-plot_IQU(x, 'raw solution, chi^2=%.2f' % chisq, 2)
-plot_IQU(sim_x, 'raw simulated solution, chi^2=%.2f' % chisq_sim, 3)
-plot_IQU(w_GSM, 'wienered GSM', 4)
-plot_IQU(w_solution, 'wienered solution', 5)
-plot_IQU(w_sim_sol, 'wienered simulated solution', 6)
 
 # hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min= 0, max =4, coord=plotcoord, title='GSM gridded', nest=True)
 # hpv.mollview(np.log10((x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq, nest=True)
