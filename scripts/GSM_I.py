@@ -93,10 +93,10 @@ remove_cmb = True
 
 n_principal_range = range(6, 7)
 
-include_visibility = False
-vis_Qs = ["q0C_*_abscal", "q1AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
-datatag = '_2016_01_20_avg'
-vartag = '_2016_01_20_avg'
+include_visibility = True
+vis_Qs = ["q0AL_*_abscal", "q0C_*_abscal", "q1AL_*_abscal", "q2AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
+datatag = '_2016_01_20_avg_unpol'
+vartag = '_2016_01_20_avg_unpol'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 vis_tags = []
 for vis_Q in vis_Qs:
@@ -677,24 +677,30 @@ for n_principal in n_principal_range:
             plt.ylim([-1.5, 1.5])
         plt.show()
 
-        good_vis_mask = vis_ws_final[:, 4] >= 0
+        good_vis_mask = np.ones_like(vis_freqs).astype(bool)#vis_ws_final[:, 4] >= 0
         good_vis_freqs = vis_freqs[good_vis_mask]
-        vis_maps = vis_ws_final[good_vis_mask].dot(xbar_ni_final)
-        for plot_i, plot_freq in enumerate(np.arange(.13, .172, .001)):
-            fi = np.argmin(np.abs(good_vis_freqs - plot_freq))
-            hpv.mollview(np.log10(vis_maps[fi]), nest=True, title='%.1f MHz'%(good_vis_freqs[fi] * 1e3), min=-2.5, max=-1)
-            plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
-            plt.clf()
 
-        for plot_i, logfreq in enumerate(np.arange(-2., 4., .03)):
-            pltdata = np.log10(np.abs(np.transpose(xbar_ni).dot([w_estimates[i](logfreq) for i in range(n_principal)])))
-            hpv.mollview(pltdata, nest=True, title='%.2f GHz'%(10**logfreq), min=np.percentile(pltdata, 5), max=np.percentile(pltdata, 98))
-            plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
-            plt.clf()
+        #making movies
+        # vis_maps = vis_ws_final[good_vis_mask].dot(xbar_ni_final)
+        # for plot_i, plot_freq in enumerate(np.arange(.13, .172, .001)):
+        #     fi = np.argmin(np.abs(good_vis_freqs - plot_freq))
+        #     hpv.mollview(np.log10(vis_maps[fi]), nest=True, title='%.1f MHz'%(good_vis_freqs[fi] * 1e3), min=-2.5, max=-1)
+        #     plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
+        #     plt.clf()
+        #
+        # for plot_i, logfreq in enumerate(np.arange(-2., 4., .03)):
+        #     pltdata = np.log10(np.abs(np.transpose(xbar_ni).dot([w_estimates[i](logfreq) for i in range(n_principal)])))
+        #     hpv.mollview(pltdata, nest=True, title='%.2f GHz'%(10**logfreq), min=np.percentile(pltdata, 5), max=np.percentile(pltdata, 98))
+        #     plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
+        #     plt.clf()
 
+        colors = ['r', 'g', 'b', 'c', 'm', 'k', 'y']
         for i in range(n_principal):
             plt.subplot(1, n_principal, i+1)
-            plt.plot(sorted(good_vis_freqs), vis_ws_final[good_vis_mask][np.argsort(good_vis_freqs), i], 'go')
+            for q, vis_q in enumerate(vis_Qs):
+                Q = vis_q.split('_')[0]
+                qmask = np.array([Q in vis_tag for vis_tag in vis_tags])
+                plt.plot(vis_freqs[qmask], vis_ws_final[qmask, i], colors[q] + 'o')
             plt.plot(sorted(good_vis_freqs), w_estimates_final[i](sorted(np.log10(good_vis_freqs))), 'b-')
             plt.ylim([-1.5, 1.5])
         plt.show()

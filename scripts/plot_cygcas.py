@@ -15,9 +15,9 @@ import time
 PI = np.pi
 TPI = 2*np.pi
 
-all_npzs = glob.glob('/home/omniscope/data/GSM_data/absolute_calibrated_data/cygcas*.npz')
+all_npzs = sorted(glob.glob('/home/omniscope/data/GSM_data/absolute_calibrated_data/cygcas*.npz'))
 
-npzs = [npz for npz in all_npzs if ('beam' not in npz and 'unpol' not in npz)]
+npzs = [npz for npz in all_npzs if ('beam' not in npz and 'unpol' in npz)]
 print npzs
 
 files = {}
@@ -25,9 +25,9 @@ for npz in npzs:
     Q = os.path.basename(npz).split('_')[1]
     files[Q] = np.load(npz)
 
-colors = ['b', 'g', 'r', 'k', 'c', 'y', 'm']
+colors = ['r', 'g', 'b', 'c', 'm', 'k', 'y']
 
-for i, Q in enumerate(files.keys()):
+for i, Q in enumerate(sorted(files.keys())):
     iquv = files[Q]['cyg_cas_iquv']
     mask = ~np.any(iquv[:, :, 1:3].reshape((len(iquv), 4)) == 0., axis=-1)
     frac = la.norm(iquv[..., 1:3], axis=-1) / iquv[..., 0]
@@ -77,21 +77,23 @@ plt.show()
 
 #I plot
 flux_func = {}
-flux_func['cas'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/casA2013.5out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/casA2013.5out')[:,2])
-flux_func['cyg'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,2])
-for i, Q in enumerate(files.keys()):
+flux_func['cas'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/casA2013.5out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/casA2013.5out')[:,2], bounds_error=False)
+flux_func['cyg'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,2], bounds_error=False)
+for i, Q in enumerate(sorted(files.keys())):
     iquv = files[Q]['cyg_cas_iquv']
-    mask = ~np.any(iquv[:, :, 1:3].reshape((len(iquv), 4)) == 0., axis=-1)
-    freqs = files[Q]['freqs']
+    iquv_std = files[Q]['cyg_cas_iquv_std']
 
-    plt.plot(freqs[mask], iquv[mask, 0, 0], colors[i] + '^', label='CygA FLux')
-    plt.plot(freqs[mask], flux_func['cyg'](freqs[mask]), colors[i], label='CygA Model FLux')
-    plt.plot(freqs[mask], iquv[mask, 1, 0], colors[i] + 'o', label='CasA Flux')
+    freqs = files[Q]['freqs']
+    mask = (freqs != 0)
+
+    # plt.plot(freqs[mask], iquv[mask, 0, 0], colors[i] + '^', label='CygA FLux')
+    # plt.plot(freqs[mask], flux_func['cyg'](freqs[mask]), colors[i], label='CygA Model FLux')
+    plt.errorbar(freqs[mask], iquv[mask, 1, 0], fmt=colors[i] + 'o', yerr=iquv_std[mask, 1, 0], label='CasA Flux')
     plt.plot(freqs[mask], flux_func['cas'](freqs[mask]), colors[i], label='CasA Model Flux')
 
     if i == 0:
         plt.xlabel("Frequency (MHz)")
-        plt.ylabel("Fraction")
+        plt.ylabel("Jy")
         # plt.title('polarization fraction')
         plt.ylim([0, 1.5e4])
         plt.legend()

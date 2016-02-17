@@ -434,6 +434,91 @@ class Visibility_Simulator:
         return result
 
 
+
+    def DBG_calculate_pol_pointsource_visibility(self, ra, dec, d_in, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d_in in horizontal coord, beam is 4 by npix (xx,xy,yx,yy) in unites of Jones matrix, square root of power, tlist in lst hours, return 4 by 4 by nt numbers, where first dim of 4 is received xx xy yx yy, and second is xx xy yx yy on sky
+        if self.initial_zenith.tolist() == [1000, 1000]:
+            raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
+        if tlist is None and nt is None:
+                raise Exception("ERROR: neither nt nor tlist was specified. Must input what lst you want in sidereal hours")
+        if np.array(d_in).ndim == 1:
+            d_in = [d_in]
+        d_equ = np.array([stoc(np.append(la.norm(d),rotatez(rotatey(ctos(d)[1:3], (np.pi/2 - self.initial_zenith[1])), self.initial_zenith[0]))) for d in d_in])
+        if beam_healpix_hor is None and beam_heal_equ is None:
+            raise Exception("ERROR: conversion from alm for beam to beam_healpix not yet supported, so please specify beam_healpix_hor as a keyword directly, in horizontal coord.")
+        elif beam_heal_equ is None:
+            beam_heal_equ = np.array([rotate_healpixmap(ibeam_healpix_hor, 0, np.pi/2 - self.initial_zenith[1], self.initial_zenith[0]) for ibeam_healpix_hor in beam_healpix_hor])
+        if tlist is None:
+            tlist = np.arange(0.,24.,24./nt)
+        else:
+            tlist = np.array(tlist)
+
+        angle_list = tlist/12.*np.pi
+
+        ps_vec = -np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])#pointing towards observer
+        ik = 2.j*np.pi*freq/299.792458
+
+
+        beamt = np.array([hpf.get_interp_val(ibeam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) for ibeam_heal_equ in beam_heal_equ])
+        beamt.shape = (2, 2, len(tlist))
+        if verbose:
+            plot_jones(beam_heal_equ)
+
+            print "J"
+            print beamt
+
+        Rut = rotatez_matrix(angle_list).transpose(2,0,1)#rotation matrix for ubl over t
+        fringe = np.exp(ik * (Rut.dot(d_equ.transpose()).transpose(2,0,1).dot(ps_vec)))#u by t
+
+        local_zenith_vect = Rut.dot([np.cos(self.initial_zenith[1]) * np.cos(self.initial_zenith[0]), np.cos(self.initial_zenith[1]) * np.sin(self.initial_zenith[0]), np.sin(self.initial_zenith[1])])#over t the zenith in local coord expressed in equitorial coord
+
+        #BUGGED CODE
+        # if np.abs(ps_vec[-1]) == 1:
+        #     phi0 = np.array([0, 1, 0])
+        #     alpha0 = np.array([-1, 0, 0])
+        # else:
+        #     phi0 = np.cross([0,0,1], -ps_vec)
+        #     phi0 = phi0/la.norm(phi0)
+        #     alpha0 = np.cross([0,0,1], phi0)
+        #     alpha0 = alpha0/la.norm(alpha0)
+        # phi1t = np.cross(local_zenith_vect, -ps_vec)
+        # if np.min(la.norm(local_zenith_vect-(-ps_vec), axis = -1)) == 0.:
+        #     if la.norm(np.cross([0,0,1], -ps_vec)) != 0:
+        #         phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.cross([0,0,1], -ps_vec)
+        #     else:
+        #         phi1t[np.argmin(la.norm(local_zenith_vect-(-ps_vec), axis = -1))] = np.array([0, 1, 0])
+        # phi1t = phi1t / (la.norm(phi1t, axis=-1)[:,None])
+        #
+        # Ranglet = np.arctan2(phi1t.dot(alpha0), phi1t.dot(phi0))#rotation angle for polarization coord over t, from equatotial(phi0,alpha0) to local(phi1,alpha1), around vector -ps_vec
+        if np.abs(ps_vec[-1]) == 1:
+            ps_equ_north_plane = np.array([0, 1, 0])
+        else:
+
+            ps_equ_north_plane = np.cross([0, 0, 1], ps_vec)
+            ps_equ_north_plane /= la.norm(ps_equ_north_plane)#normal vector of the plane defined by point source vec and north vec in equatorial
+
+        ps_local_north_plane_t = np.cross(local_zenith_vect, ps_vec)
+        ps_local_north_plane_t /= la.norm(ps_local_north_plane_t, axis=-1)[:, None]#normal vector of the plane defined by point source vec and north vec in local coord
+        Ranglet = -np.sign(np.cross(ps_local_north_plane_t, ps_equ_north_plane).dot(ps_vec)) * np.arccos(ps_local_north_plane_t.dot(ps_equ_north_plane))
+
+
+
+        Ranglet = rotatez_matrix(Ranglet)[:2,:2]#rotation matrix around -ps_vec for polarization coord over t, 3 by 3 by t
+
+        BRt = np.array([beamt[..., i].dot(Ranglet[...,i]) for i in range(len(tlist))])
+
+        if verbose:
+            print "R"
+            print Ranglet
+            print "B"
+            print BRt
+
+        result = np.empty((len(d_in), 4 * len(tlist), 4), dtype='complex64')#time is fastest changing in 4 by t
+        for truen, (truei, truej) in enumerate([[0,0],[0,1],[1,0],[1,1]]):
+            for measuren, (measurei, measurej) in enumerate([[0,0],[0,1],[1,0],[1,1]]):
+                result[:, measuren*len(tlist):(measuren+1)*len(tlist), truen] = (BRt[:, measurei,truei] * np.conjugate(BRt[:, measurej,truej]))[None,:]*fringe
+        return result
+
+
     def calculate_visibility(self, skymap_alm, d, freq, L, nt = None, tlist = None, verbose = False):#d in horizontal coord, tlist in [0,24) lst hours
         if self.initial_zenith.tolist() == [1000, 1000]:
             raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')

@@ -33,9 +33,9 @@ def pinv_sym(M, rcond = 1.e-15, verbose = True):
 # nf = 1
 # nUBL = 75
 
-vis_Qs = ["q0C_*_abscal", "q1AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
-datatag = '_2016_01_20_avg'
-vartag = '_2016_01_20_avg'
+vis_Qs = ["q0AL_*_abscal", "q0C_*_abscal", "q1AL_*_abscal", "q2AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
+datatag = '_2016_01_20_avg_unpol'
+vartag = '_2016_01_20_avg_unpol'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 vis_tags = []
 for vis_Q in vis_Qs:

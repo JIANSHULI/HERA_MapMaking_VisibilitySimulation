@@ -81,17 +81,17 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 
 
 nside_start = 32
-nside_beamweight = 16
 nside_standard = 128
 bnside = 256
 plotcoord = 'CG'
 thresh = .5
-valid_pix_thresh = 1e-3
+valid_pix_thresh = 1e-2
+nside_beamweight = 16
 # S_scale = 2
 # S_thresh = 1000#Kelvin
 # S_type = 'gsm%irm%i'%(S_scale,S_thresh)
-S_type = 'dySP_lowadduniform_lowpoluniform'  # dynamic S polarized [[.25,0,0,.25], [0,p,0,0], [0,0,p,0], [.25,0,0,.25]]. lowpol:polfrac=0.01; addlimit:additive same level as max data; lowaddlimit: 10% of max data
-remove_additive = False
+S_type = 'dyS_lowadduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+pre_remove_additive = False
 
 lat_degree = 45.2977
 C = 299.792458
@@ -111,9 +111,9 @@ force_recompute_SEi = False
 ####################################################
 ################data file and load beam##############
 ####################################################
-tag = "q3AL_5_abscal"#"q1AL_10_abscal"#  # L stands for lenient in flagging
-datatag = '_2016_01_20_avg'
-vartag = '_2016_01_20_avg'
+tag = "q3AL_5_abscal"  #"q4AL_3_abscal"#"q1AL_10_abscal"# L stands for lenient in flagging
+datatag = '_2016_01_20_avg_unpol'
+vartag = '_2016_01_20_avg_unpol'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 A_version = 1.0
 nf = 1
@@ -271,26 +271,26 @@ pixelize(equatorial_GSM_standard * beam_weight, nside_distribution, nside_standa
 npix = len(thetas)
 valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > valid_pix_thresh * max(beam_weight)
 valid_npix = np.sum(valid_pix_mask)
-fake_solution_map = (hpf.get_interp_val(equatorial_GSM_standard, thetas, phis, nest=True) * sizes)[valid_pix_mask]
-fake_solution = np.concatenate((fake_solution_map, np.zeros(2 * len(used_common_ubls)),
-                                np.zeros_like(fake_solution_map), np.zeros(2 * len(used_common_ubls)),
-                                np.zeros_like(fake_solution_map), np.zeros(2 * len(used_common_ubls)),
-                                np.zeros_like(fake_solution_map), np.zeros(2 * len(used_common_ubls))))
 
-sizes = np.concatenate((np.array(sizes)[valid_pix_mask], np.array(sizes)[valid_pix_mask],
-                        np.array(sizes)[valid_pix_mask], np.array(sizes)[valid_pix_mask]))
+
+fake_solution_map = np.zeros_like(thetas)
+for i in range(len(fake_solution_map)):
+    fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
+fake_solution_map = fake_solution_map[valid_pix_mask]
+
+fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * len(used_common_ubls))))
+
+sizes = np.array(sizes)[valid_pix_mask]
 
 
 def sol2map(sol):
-    solx = sol.reshape((4, valid_npix + 2 * len(used_common_ubls)))[:, :valid_npix].flatten()
-    final_index4 = np.concatenate(
-        (final_index, final_index + npix, final_index + npix * 2, final_index + npix * 3)).astype(int)
-    full_sol = np.zeros(4 * npix)
-    full_sol[np.concatenate((valid_pix_mask, valid_pix_mask, valid_pix_mask, valid_pix_mask))] = solx / sizes
-    return full_sol[final_index4]
+    solx = sol[:valid_npix]
+    full_sol = np.zeros(npix)
+    full_sol[valid_pix_mask] = solx / sizes
+    return full_sol[final_index]
 
 def sol2additive(sol):
-    return sol.reshape((4, valid_npix + 2 * len(used_common_ubls)))[:, valid_npix:].reshape(4, len(used_common_ubls), 2)
+    return np.transpose(sol[valid_npix:].reshape(len(used_common_ubls), 2, 2), (1, 0, 2))#ubl by pol by re/im before transpose
 
 
 # final_index_filename = datadir + tag + '_%i.dyind%i_%.3f'%(nside_standard, npix, thresh)
@@ -325,35 +325,65 @@ if plot_pixelization:
     plt.show()
 
 
+###########################################################
+####simulate visibilities using non dynamic pixelization###
+##########################################
+
+vs = sv.Visibility_Simulator()
+vs.initial_zenith = np.array([0, lat_degree * np.pi / 180])  # self.zenithequ
+beam_heal_hor_x = abs(local_beam(freq)[0])**2 + abs(local_beam(freq)[1])**2
+beam_heal_equ_x = sv.rotate_healpixmap(beam_heal_hor_x, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0])
+beam_heal_hor_y = abs(local_beam(freq)[2])**2 + abs(local_beam(freq)[3])**2
+beam_heal_equ_y = sv.rotate_healpixmap(beam_heal_hor_y, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0])
+
+full_sim_filename = datadir + tag + '_p2_u%i_t%i_nside%i_bnside%i.simvis'%(len(used_common_ubls)+1, len(tlist), nside_standard, bnside)
+
+if os.path.isfile(full_sim_filename):
+    fullsim_vis = np.fromfile(full_sim_filename, dtype='complex64').reshape((2, len(used_common_ubls)+1, len(tlist)))
+else:
+    print "Simulating visibilities, %s, expected time %.1f min"%(datetime.datetime.now(), 14.6 * (len(used_common_ubls) / 78.) * (len(tlist) / 193.) * (nside_standard / 128.)**2),
+    sys.stdout.flush()
+    fullsim_vis = np.zeros((2, len(common_ubls) + 1, len(tlist)), dtype='complex128')#since its going to accumulate along the pixels it needs to start with complex128. significant error if start with complex64
+    full_sim_ubls = np.concatenate((common_ubls, [[0, 0, 0]]), axis=0)#tag along auto corr
+    full_thetas, full_phis = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
+    full_decs = np.pi / 2 - full_thetas
+    full_ras = full_phis
+    if vs.initial_zenith[1] > 0:
+        full_sim_mask = full_decs >= (vs.initial_zenith[1] - np.pi/2)
+    else:
+        full_sim_mask = full_decs <= (vs.initial_zenith[1] + np.pi/2)
+
+    # fullsim_vis_DBG = np.zeros((2, len(common_ubls), len(tlist), np.sum(full_sim_mask)), dtype='complex128')
+
+    masked_equ_GSM = equatorial_GSM_standard[full_sim_mask]
+    timer = time.time()
+    for p, beam_heal_equ in enumerate([beam_heal_equ_x, beam_heal_equ_y]):
+        for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
+            res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=tlist) / 2
+            fullsim_vis[p] += masked_equ_GSM[i] * res
+            # fullsim_vis_DBG[p, ..., i] = res[:-1]
+    print "simulated visibilities in %.1f minutes."%((time.time() - timer) / 60.)
+    fullsim_vis.astype('complex64').tofile(full_sim_filename)
+autocorr_vis = fullsim_vis[:, -1]#TODO use this in cross talk removal
+autocorr_vis_normalized = np.array([autocorr_vis[p] / (la.norm(autocorr_vis[p]) / la.norm(np.ones_like(autocorr_vis[p]))) for p in range(2)])
+fullsim_vis = fullsim_vis[:, :-1].transpose((1, 0, 2))
 ##################################################################
 ####################compute dynamic A matrix########################
 ###############################################################
-
-
-A_tag = 'A_dpcIQUV'
+A_tag = 'A_dI'
 A_filename = A_tag + '_u%i_t%i_p%i_n%i_%i_b%i_%.3f_v%.1f' % (len(used_common_ubls), len(tlist), valid_npix, nside_start, nside_standard, bnside, thresh, A_version)
 A_path = datadir + tag + A_filename
-
 
 def get_A():
     if os.path.isfile(A_path) and not force_recompute:
         print "Reading A matrix from %s" % A_path
         sys.stdout.flush()
-        A = np.fromfile(A_path, dtype='complex64').reshape((len(used_common_ubls), 4, len(tlist), 4, valid_npix + 2 * len(used_common_ubls)))
+        A = np.fromfile(A_path, dtype='complex64').reshape((len(used_common_ubls) * 2 * len(tlist), valid_npix + 4 * len(used_common_ubls)))
     else:
-        # beam
-        beam_healpix = local_beam(freq)
-        # hpv.mollview(beam_healpix, title='beam %s'%p)
-        # plt.show()
 
-        vs = sv.Visibility_Simulator()
-        vs.initial_zenith = np.array([0, lat_degree * np.pi / 180])  # self.zenithequ
-        beam_heal_equ = np.array(
-            [sv.rotate_healpixmap(beam_healpixi, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for
-             beam_healpixi in local_beam(freq)])
         print "Computing A matrix..."
         sys.stdout.flush()
-        A = np.empty((len(used_common_ubls), 4 * len(tlist), 4, valid_npix + 2 * len(used_common_ubls)), dtype='complex64')
+        A = np.empty((len(used_common_ubls), 2, len(tlist), valid_npix + 4 * len(used_common_ubls)), dtype='complex64')
         timer = time.time()
         for n, i in enumerate(np.arange(npix)[valid_pix_mask]):
             ra = phis[i]
@@ -362,19 +392,17 @@ def get_A():
             100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.)),
             sys.stdout.flush()
 
-            A[..., n] = vs.calculate_pol_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ,
-                                                                tlist=tlist).dot(
-                [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
+            A[:, 0, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_x, tlist=tlist) / 2 #xx and yy are each half of I
+            A[:, -1, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_y, tlist=tlist) / 2
 
         for i in range(len(used_common_ubls)):
-            for p in range(4):
-                A[i, p * len(tlist): (p + 1) * len(tlist), p, valid_npix + 2 * i] = 1.
-                A[i, p * len(tlist): (p + 1) * len(tlist), p, valid_npix + 2 * i + 1] = 1.j
+            for p in range(2):
+                A[i, p, :, valid_npix + 4 * i + 2 * p] = 1.
+                A[i, p, :, valid_npix + 4 * i + 2 * p + 1] = 1.j
 
         print "%f minutes used" % (float(time.time() - timer) / 60.)
         sys.stdout.flush()
         A.tofile(A_path)
-        A.shape = (len(used_common_ubls), 4, len(tlist), 4, valid_npix + 2 * len(used_common_ubls))
     tmask = np.ones_like(tlist).astype(bool)
     for p in ['x', 'y']:
         # tf mask file, 0 means flagged bad data
@@ -387,7 +415,7 @@ def get_A():
             print "No mask file found"
             # print freq, tlist
     # Merge A
-    A.shape = (len(used_common_ubls) * 4 * len(tlist[tmask]), 4 * A.shape[-1])
+    A.shape = (len(used_common_ubls) * 2 * len(tlist[tmask]), A.shape[-1])
     try:
         return np.concatenate((np.real(A), np.imag(A)))
     except MemoryError:
@@ -410,76 +438,49 @@ def get_A():
 
 A = get_A()
 Ashape0, Ashape1 = A.shape
-# Compute autocorr
-if remove_additive:
-    # beam_healpix = local_beam(freq)
-    # vs = sv.Visibility_Simulator()
-    # vs.initial_zenith = np.array([0, lat_degree * np.pi / 180])  # self.zenithequ
-    # beam_heal_equ = np.array(
-    #     [sv.rotate_healpixmap(beam_healpixi, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for beam_healpixi in
-    #      local_beam(freq)])
-    # print "Computing autocorr..."
-    # sys.stdout.flush()
-    # timer = time.time()
-    # autocorr = np.empty((4 * len(tlist), 4, valid_npix), dtype='complex64')
 
-    # for n, i in enumerate(np.arange(npix)[valid_pix_mask]):
-    #     ra = phis[i]
-    #     dec = np.pi / 2 - thetas[i]
-    #     print "\r%.1f%% completed, %f minutes left" % (
-    #     100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.)),
-    #     sys.stdout.flush()
-    #
-    #     autocorr[..., n] = \
-    #     vs.calculate_pol_pointsource_visibility(ra, dec, [[0, 0, 0]], freq, beam_heal_equ=beam_heal_equ, tlist=tlist)[
-    #         0].dot([[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
-    #
-    # print "%f minutes used" % (float(time.time() - timer) / 60.)
-    # sys.stdout.flush()
-    # todo use autocorr rather than constant as removal term
-    # autocorr_vis = autocorr.reshape(4 * len(tlist), 4 * valid_npix).dot(fake_solution_map).reshape(4, len(tlist))
-    autocorr_vis = np.ones((4, len(tlist)))
+# for ipix in hpf.ang2pix(nside_standard, thetas, phis, nest=True):
+#     if
 
 data = {}
 Ni = {}
 data_shape = {}
 ubl_sort = {}
 for p in ['x', 'y']:
-    for p2 in ['x', 'y']:
-        pol = p + p2
-        # tf file
-        tf_filename = datadir + tag + '_%s%s_%i_%i.tf' % (p, p2, nt, nf)
-        tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt, nf))
-        tlist = np.real(tflist[:, 0])
+    pol = p + p
+    # tf file
+    tf_filename = datadir + tag + '_%s%s_%i_%i.tf' % (p, p, nt, nf)
+    tflist = np.fromfile(tf_filename, dtype='complex64').reshape((nt, nf))
+    tlist = np.real(tflist[:, 0])
 
-        # ubl file
-        ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl' % (p, p2, nUBL, 3)
-        ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
-        print "%i UBLs to include, longest baseline is %i wavelengths" % (
-        len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / freq))
+    # ubl file
+    ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl' % (p, p, nUBL, 3)
+    ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
+    print "%i UBLs to include, longest baseline is %i wavelengths" % (
+    len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / freq))
 
 
-        # get Ni (1/variance) and data
-        var_filename = datadir + tag + '_%s%s_%i_%i' % (p, p2, nt, nUBL) + vartag + '.var'
-        Ni[pol] = 1. / (np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[
-                            abs(ubl_index[p]) - 1].flatten() * (
-                        1.e-26 * (C / freq) ** 2 / 2 / kB / (4 * np.pi / (12 * nside_standard ** 2))) ** 2)
-        data_filename = datadir + tag + '_%s%s_%i_%i' % (p, p2, nt, nUBL) + datatag
-        data[pol] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[
-            abs(ubl_index[p]) - 1]
-        data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
-        data[pol] = (data[pol].flatten() * 1.e-26 * (C / freq) ** 2 / 2 / kB / (
-        4 * np.pi / (12 * nside_standard ** 2))).conjugate()  # there's a conjugate convention difference
-        data_shape[pol] = (len(used_common_ubls), np.sum(tmask))
-        ubl_sort[p] = np.argsort(la.norm(used_common_ubls, axis=1))
+    # get Ni (1/variance) and data
+    var_filename = datadir + tag + '_%s%s_%i_%i' % (p, p, nt, nUBL) + vartag + '.var'
+    Ni[pol] = 1. / (np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[
+                        abs(ubl_index[p]) - 1].flatten() * (
+                    1.e-26 * (C / freq) ** 2 / 2 / kB / (4 * np.pi / (12 * nside_standard ** 2))) ** 2)
+    data_filename = datadir + tag + '_%s%s_%i_%i' % (p, p, nt, nUBL) + datatag
+    data[pol] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[
+        abs(ubl_index[p]) - 1]
+    data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
+    data[pol] = (data[pol].flatten() * 1.e-26 * (C / freq) ** 2 / 2 / kB / (
+    4 * np.pi / (12 * nside_standard ** 2))).conjugate()  # there's a conjugate convention difference
+    data_shape[pol] = (len(used_common_ubls), np.sum(tmask))
+    ubl_sort[p] = np.argsort(la.norm(used_common_ubls, axis=1))
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
 # Merge data
-data = np.array([data['xx'], data['xy'], data['yx'], data['yy']]).reshape([4] + list(data_shape['xx'])).transpose(
+data = np.array([data['xx'], data['yy']]).reshape([2] + list(data_shape['xx'])).transpose(
     (1, 0, 2)).flatten()
 data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
-Ni = np.concatenate((Ni['xx'], Ni['xy'], Ni['yx'], Ni['yy'])).reshape([4] + list(data_shape['xx'])).transpose(
+Ni = np.concatenate((Ni['xx'], Ni['yy'])).reshape([2] + list(data_shape['xx'])).transpose(
     (1, 0, 2)).flatten()
 Ni = np.concatenate((Ni * 2, Ni * 2))
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
@@ -487,25 +488,45 @@ sys.stdout.flush()
 
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
-# simulate visibilities
 
-# clean_sim_data = np.array([Aiter.dot(fake_solution) for Aiter in A])
-clean_sim_data = A.dot(fake_solution.astype(A.dtype))
 
-def get_complex_data(flat_real_data, nubl, nt):
-    if len(flat_real_data) != 2 * nubl * 4 * nt:
+def get_complex_data(flat_real_data, nubl=len(used_common_ubls), nt=len(tlist)):
+    if len(flat_real_data) != 2 * nubl * 2 * nt:
         raise ValueError("Incorrect dimensions: data has length %i where nubl %i and nt %i together require length of %i."%(len(flat_real_data), nubl, nt, 2 * nubl * 4 * nt))
 
-    flat_real_data.shape = (2, nubl, 4, nt)
+    flat_real_data.shape = (2, nubl, 2, nt)
     result = flat_real_data[0] + 1.j * flat_real_data[1]
-    flat_real_data.shape = 2 * nubl * 4 * nt
+    flat_real_data.shape = 2 * nubl * 2 * nt
     return result
 
 def get_vis_normalization(data, clean_sim_data):
-    a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[:, :, [0, 3]], axis=0).flatten()
-    b = np.linalg.norm(clean_sim_data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[:, :, [0, 3]],
-                       axis=0).flatten()
+    a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
+    b = np.linalg.norm(clean_sim_data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
     return a.dot(b) / b.dot(b)
+
+##############
+# simulate visibilities according to the pixelized A matrix
+##############
+clean_sim_data = A.dot(fake_solution.astype(A.dtype))
+
+if plot_data_error:
+    us = ubl_sort['x'][::len(ubl_sort['x'])/6]
+    cdata = get_complex_data(data)
+    cdynamicmodel = get_complex_data(clean_sim_data)
+    fun = np.imag
+    for p in range(2):
+        for nu, u in enumerate(us):
+
+            plt.subplot(2, len(us), len(us) * p + nu + 1)
+
+            plt.plot(fun(cdata[u, p]))
+            plt.plot(fun(fullsim_vis[u, p]))
+            plt.plot(fun(cdynamicmodel[u, p]))
+            data_range = np.max(np.abs(fun(cdata[u, p])))
+            plt.ylim([-1.05*data_range, 1.05*data_range])
+    plt.show()
+
+
 
 
 vis_normalization = get_vis_normalization(data, clean_sim_data)
@@ -513,11 +534,11 @@ print "Normalization from visibilities", vis_normalization
 diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
 diff_data = diff_data[0] + 1j * diff_data[1]
 diff_norm = {}
-diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis=1)
-diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis=1)
+diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 2, data_shape['xx'][1])[:, 0], axis=1)
+diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 2, data_shape['yy'][1])[:, -1], axis=1)
 data_norm = {}
-data_norm['x'] = la.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[0, :, 0] + 1.j * data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[1, :, 0], axis=-1)
-data_norm['y'] = la.norm(data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[0, :, 3] + 1.j * data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])[1, :, 3], axis=-1)
+data_norm['x'] = la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[0, :, 0] + 1.j * data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[1, :, 0], axis=-1)
+data_norm['y'] = la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[0, :, -1] + 1.j * data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[1, :, -1], axis=-1)
 
 if plot_data_error:
     plt.subplot(7, 1, 1)
@@ -525,7 +546,7 @@ if plot_data_error:
     plt.plot((diff_norm['y']/data_norm['y'])[ubl_sort['y']])
 
 
-if remove_additive:
+if pre_remove_additive:
     niter = 0
 
     additive = 0
@@ -541,14 +562,9 @@ if remove_additive:
         diff_norm['y'] = la.norm(diff_data[:, 3], axis=1)
 
         additive_inc = np.zeros_like(diff_data)
-        for p in range(4):
-            if p == 0 or p == 3:
+        for p in range(2):
                 additive_inc[:, p] = np.outer(
                     autocorr_vis[p].dot(diff_data[:, p].transpose()) / np.sum(autocorr_vis[p] ** 2), autocorr_vis[p])
-            else:
-                additive_inc[:, p] = np.outer(
-                    (autocorr_vis[0] + autocorr_vis[3]).dot(diff_data[:, p].transpose()) / np.sum(
-                        (autocorr_vis[0] + autocorr_vis[3]) ** 2), (autocorr_vis[0] + autocorr_vis[3]))
 
         additive = additive + additive_inc
         data = data + np.concatenate((np.real(additive_inc.flatten()), np.imag(additive_inc.flatten())))
@@ -565,35 +581,35 @@ if remove_additive:
         plt.plot((diff_norm['y']/data_norm['y'])[ubl_sort['y']])
 
 if plot_data_error:
-    qaz_model = (clean_sim_data * vis_normalization).reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
-    qaz_data = data.reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
+    qaz_model = (clean_sim_data * vis_normalization).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    qaz_data = data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
     plt.subplot(7, 1, 2)
-    if remove_additive:
+    if pre_remove_additive:
         plt.plot(raw_data[1, ubl_sort['x'][0], 0])
     plt.plot(qaz_data[1, ubl_sort['x'][0], 0])
     plt.plot(qaz_model[1, ubl_sort['x'][0], 0])
     plt.subplot(7, 1, 3)
-    if remove_additive:
+    if pre_remove_additive:
         plt.plot(raw_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
     plt.plot(qaz_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
     plt.plot(qaz_model[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
     plt.subplot(7, 1, 4)
-    if remove_additive:
+    if pre_remove_additive:
         plt.plot(raw_data[1, ubl_sort['x'][-1], 0])
     plt.plot(qaz_data[1, ubl_sort['x'][-1], 0])
     plt.plot(qaz_model[1, ubl_sort['x'][-1], 0])
     plt.subplot(7, 1, 5)
-    if remove_additive:
+    if pre_remove_additive:
         plt.plot(raw_data[1, ubl_sort['x'][0], 1])
     plt.plot(qaz_data[1, ubl_sort['x'][0], 1])
     plt.plot(qaz_model[1, ubl_sort['x'][0], 1])
     plt.subplot(7, 1, 6)
-    if remove_additive:
+    if pre_remove_additive:
         plt.plot(raw_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
     plt.plot(qaz_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
     plt.plot(qaz_model[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
     plt.subplot(7, 1, 7)
-    if remove_additive:
+    if pre_remove_additive:
         plt.plot(raw_data[1, ubl_sort['x'][-1], 1])
     plt.plot(qaz_data[1, ubl_sort['x'][-1], 1])
     plt.plot(qaz_model[1, ubl_sort['x'][-1], 1])
@@ -643,12 +659,11 @@ if plot_data_error:
 ##renormalize the model
 fake_solution = fake_solution * vis_normalization
 clean_sim_data = clean_sim_data * vis_normalization
-#add noise
-sim_data = clean_sim_data + np.random.randn(len(data)) / Ni ** .5
+sim_data = np.concatenate((np.real(fullsim_vis.flatten()), np.imag(fullsim_vis.flatten()))) + np.random.randn(len(data)) / Ni ** .5
 #add additive term
-sim_data.shape = (2, len(used_common_ubls), 4, len(tlist))
-sim_additive = np.random.randn(2, len(used_common_ubls), 4) * np.median(np.abs(data))
-sim_data = sim_data + sim_additive[..., None]
+sim_data.shape = (2, len(used_common_ubls), 2, len(tlist))
+sim_additive = np.random.randn(2, len(used_common_ubls), 2) * np.median(np.abs(data)) / 2.
+sim_data = sim_data + np.array([np.outer(sim_additive[..., p], autocorr_vis_normalized[p]).reshape((2, len(used_common_ubls), len(tlist))) for p in range(2)]).transpose((1, 2, 0, 3))#sim_additive[..., None]
 sim_data = sim_data.flatten()
 
 # compute AtNi.y
@@ -661,39 +676,24 @@ print "computing S...",
 sys.stdout.flush()
 timer = time.time()
 
-if 'lowpol' in S_type:
-    pol_frac = .01  # assuming QQ=UU=pol_frac*II
-elif 'nopol' in S_type:
-    pol_frac = 1e-6  # assuming QQ=UU=pol_frac*II
+#diagonal of S consists of S_diag_I and S-diag_add
+if 'Iuniform' in S_type:
+    S_diag_I = (np.median(equatorial_GSM_standard) * sizes)**2
 else:
-    pol_frac = .4  # assuming QQ=UU=pol_frac*II
+    S_diag_I = fake_solution_map ** 2  # np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
 
-v_pol_frac = 1e-6
-S = np.zeros((Ashape1, Ashape1), dtype='float32')
-
-if 'poluniform' in S_type:
-    for i in range(valid_npix):
-        S[i::Ashape1/4, i::Ashape1/4] = np.array([[1, 0, 0, 0], [0, pol_frac, 0, 0], [0, 0, pol_frac, 0], [0, 0, 0, v_pol_frac]]) * \
-                                           sizes[i] ** 2  # np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
-    S = S * np.median(equatorial_GSM_standard)
-else:
-    for i in range(valid_npix):
-        S[i::Ashape1/4, i::Ashape1/4] = np.array([[1, 0, 0, 0], [0, pol_frac, 0, 0], [0, 0, pol_frac, 0], [0, 0, 0, v_pol_frac]]) * \
-                                          fake_solution_map[i] ** 2  # np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
-
-data_max = np.transpose(np.percentile(np.abs(data.reshape((2, len(used_common_ubls), 4, len(tlist)))), 95, axis=-1), (2, 1, 0)).reshape((4, len(used_common_ubls) * 2))
+data_max = np.transpose(np.percentile(np.abs(data.reshape((2, len(used_common_ubls), 2, len(tlist)))), 95, axis=-1), (1, 2, 0)).flatten()
 if 'lowadd' in S_type:
     add_supress = 100.
 else:
     add_supress = 1
-for i in range(4):
-    start = i * Ashape1 / 4 + valid_npix
-    end = (i + 1) * Ashape1 / 4
-    if 'adduniform' in S_type:
-        S[start:end, start:end] = np.eye(len(used_common_ubls) * 2) * np.median(data_max)**2 / add_supress
-    else:
-        S[start:end, start:end] = np.eye(len(used_common_ubls) * 2) * data_max[i]**2 / add_supress
 
+if 'adduniform' in S_type:
+    S_diag_add = np.ones(len(used_common_ubls) * 4) * np.median(data_max)**2 / add_supress
+else:
+    S_diag_add = data_max**2 / add_supress
+
+S = np.diag(np.concatenate((S_diag_I, S_diag_add))).astype('float64')
 print "Done."
 print "%f minutes used" % (float(time.time() - timer) / 60.)
 sys.stdout.flush()
@@ -704,8 +704,8 @@ sys.stdout.flush()
 precision = 'float64'
 AtNiAi_tag = 'AtNiASii'
 AtNiAi_version = 0.1
-rcond = .5e-3
-AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_v%.1f'%(S_type, np.log10(rcond), AtNiAi_version) + A_filename
+rcond = 1e-4
+AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
 AtNiAi_path = datadir + tag + AtNiAi_filename
 
 if os.path.isfile(AtNiAi_path) and not force_recompute_AtNiAi and not force_recompute and not force_recompute_S:
@@ -713,7 +713,7 @@ if os.path.isfile(AtNiAi_path) and not force_recompute_AtNiAi and not force_reco
     sys.stdout.flush()
     AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision)
 else:
-    AtNiA_tag = 'AtNiA'
+    AtNiA_tag = 'AtNiA_N%s'%vartag
     AtNiA_filename = AtNiA_tag + A_filename
     AtNiA_path = datadir + tag + AtNiA_filename
     if os.path.isfile(AtNiA_path) and not force_recompute:
@@ -755,14 +755,17 @@ sys.stdout.flush()
 del (AtNiAi)
 A = get_A()
 best_fit = A.dot(w_solution.astype(A.dtype))
-best_fit_no_additive = np.sum((A * (w_solution.astype(A.dtype))).reshape((Ashape0, 4, Ashape1/4))[..., :valid_npix].reshape((Ashape0, 4 * valid_npix)), axis=-1)
+best_fit_no_additive = np.sum((A * (w_solution.astype(A.dtype))).reshape((Ashape0, Ashape1))[..., :valid_npix], axis=-1)
+
+sim_best_fit = A.dot(w_sim_sol.astype(A.dtype))
+sim_best_fit_no_additive = np.sum((A * (w_sim_sol.astype(A.dtype))).reshape((Ashape0, Ashape1))[..., :valid_npix], axis=-1)
 
 if plot_data_error:
-    us = ubl_sort['x'][::len(ubl_sort['x'])/6]
-    best_fit.shape = (2, data_shape['xx'][0], 4, data_shape['xx'][1])
-    best_fit_no_additive.shape = (2, data_shape['xx'][0], 4, data_shape['xx'][1])
+    us = ubl_sort['x'][::len(ubl_sort['x'])/10]
+    best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
     ri = 1
-    for p in range(4):
+    for p in range(2):
         for nu, u in enumerate(us):
 
             plt.subplot(4, len(us), len(us) * p + nu + 1)
@@ -772,34 +775,38 @@ if plot_data_error:
             plt.plot(best_fit[ri, u, p])
             plt.plot(best_fit_no_additive[ri, u, p])
             plt.plot(np.ones_like(qaz_data[ri, u, p]) * sol2additive(w_solution)[p, u, ri])
+            plt.plot(best_fit[ri, u, p] - qaz_data[ri, u, p])
+            plt.plot(Ni.reshape((2, len(used_common_ubls), 2, len(tlist)))[ri, u, p]**-.5)
+            data_range = np.max(np.abs(qaz_data[ri, u, p]))
+            plt.ylim([-1.05*data_range, 1.05*data_range])
     plt.show()
 
-def plot_IQU(solution, title, col, ncol=6, coord='C'):
+    sim_best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    sim_best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    ri = 1
+    for p in range(2):
+        for nu, u in enumerate(us):
+
+            plt.subplot(4, len(us), len(us) * p + nu + 1)
+            sim_qazdata = sim_data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
+            plt.plot(sim_qazdata[ri, u, p])
+            plt.plot(qaz_model[ri, u, p])
+            plt.plot(sim_best_fit[ri, u, p])
+            plt.plot(sim_best_fit_no_additive[ri, u, p])
+            plt.plot(np.ones_like(sim_qazdata[ri, u, p]) * sol2additive(w_sim_sol)[p, u, ri])
+            plt.plot(sim_best_fit[ri, u, p] - sim_qazdata[ri, u, p])
+            data_range = np.max(np.abs(sim_qazdata[ri, u, p]))
+            plt.ylim([-1.05*data_range, 1.05*data_range])
+    plt.show()
+
+def plot_IQU(solution, title, col, ncol=4, coord='C'):
     # Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
     # I = Es[0] + Es[3]
     # Q = Es[0] - Es[3]
     # U = Es[1] + Es[2]
-    IQUV = sol2map(solution)
-    IQUV.shape = (4, IQUV.shape[0] / 4)
-    I = IQUV[0]
-    Q = IQUV[1]
-    U = IQUV[2]
-    V = IQUV[3]
-    pangle = 180 * np.arctan2(Q, U) / 2 / PI
+    I = sol2map(solution)
     plotcoordtmp = coord
-    hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, col))
-
-    hpv.mollview((Q ** 2 + U ** 2) ** .5 / I, min=0, max=1, coord=plotcoordtmp, title=title, nest=True,
-                 sub=(4, ncol, ncol + col))
-    from matplotlib import cm
-    cool_cmap = cm.hsv
-    cool_cmap.set_under("w")  # sets background to white
-    hpv.mollview(pangle, min=-90, max=90, coord=plotcoordtmp, title=title, nest=True, sub=(4, ncol, 2 * ncol + col),
-                 cmap=cool_cmap)
-
-    hpv.mollview(np.arcsinh(V) / np.log(10), min=-np.arcsinh(10. ** 4) / np.log(10),
-                 max=np.arcsinh(10. ** 4) / np.log(10), coord=plotcoordtmp, title=title, nest=True,
-                 sub=(4, ncol, 3 * ncol + col))
+    hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(1, ncol, col))
     if col == ncol:
         plt.show()
 
@@ -808,17 +815,117 @@ for coord in ['C', 'CG']:
     plot_IQU(w_GSM, 'wienered GSM', 2, coord=coord)
     plot_IQU(w_sim_sol, 'wienered simulated solution', 3, coord=coord)
     plot_IQU(w_solution, 'wienered solution', 4, coord=coord)
-    sol_iquv = sol2map(w_solution).reshape((4, hpf.nside2npix(nside_standard)))
-    hpv.mollview(np.arcsinh(sol_iquv[1]/2.) * np.log10(np.e), nest=True, sub=(4, 6, 12), min=-4, max=4, coord=coord)
-    hpv.mollview(np.arcsinh(sol_iquv[2]/2.) * np.log10(np.e), nest=True, sub=(4, 6, 18), min=-4, max=4, coord=coord)
-    hpv.mollview(np.arcsinh(sol_iquv[3]/2.) * np.log10(np.e), nest=True, sub=(4, 6, 24), min=-4, max=4, coord=coord)
     plt.show()
 
 
-# hpv.mollview(np.log10(fake_solution[np.array(final_index).tolist()]), min= 0, max =4, coord=plotcoord, title='GSM gridded', nest=True)
-# hpv.mollview(np.log10((x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw solution, chi^2=%.2f'%chisq, nest=True)
-# hpv.mollview(np.log10((sim_x/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='raw simulated solution, chi^2=%.2f'%chisq_sim, nest=True)
-# hpv.mollview(np.log10((w_GSM/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered GSM', nest=True)
-# hpv.mollview(np.log10((w_solution/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered solution', nest=True)
-# hpv.mollview(np.log10((w_sim_sol/sizes)[np.array(final_index).tolist()]), min=0, max=4, coord=plotcoord, title='wienered simulated solution', nest=True)
-# plt.show()
+
+error = data.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
+chi = error * (Ni.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])))**.5
+print "chi^2 = %.3e, data points %i, pixels %i"%(la.norm(chi)**2, len(data), valid_npix)
+print "re/im chi2 %.3e, %.3e"%(la.norm(chi[0])**2, la.norm(chi[1])**2)
+print "xx/yy chi2 %.3e, %.3e"%(la.norm(chi[:, :, 0])**2, la.norm(chi[:, :, 1])**2)
+plt.subplot(2, 2, 1)
+plt.plot([la.norm(error[:, u]) for u in ubl_sort['x']])
+plt.subplot(2, 2, 2)
+plt.plot([la.norm(chi[:, u]) for u in ubl_sort['x']])
+plt.subplot(2, 2, 3)
+plt.plot(tlist, [la.norm(error[..., t]) for t in range(error.shape[-1])])
+plt.subplot(2, 2, 4)
+plt.plot(tlist, [la.norm(chi[..., t]) for t in range(error.shape[-1])])
+plt.show()
+
+cheat_cal = False
+if cheat_cal:
+    data_noadditive = data.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])) - (best_fit - best_fit_no_additive)
+    cdata_noadditive = data_noadditive[0] + 1.j * data_noadditive[1]
+    cbestfit_noadditive = best_fit_no_additive[0] + 1.j * best_fit_no_additive[1]
+    cclean_sim_data = get_complex_data(clean_sim_data)
+    cheat_ratio = np.sum(cdata_noadditive * np.conjugate(cclean_sim_data), axis=-1) / np.sum(cclean_sim_data * np.conjugate(cclean_sim_data), axis=-1)
+    cheat_fit = (cclean_sim_data * cheat_ratio[..., None]).flatten()
+    cheat_error = (data_noadditive.flatten() - np.concatenate((np.real(cheat_fit), np.imag(cheat_fit)))).reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1]))
+    cheat_chi = cheat_error * (Ni.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])))**.5
+    print "chi^2 = %.3e, data points %i, pixels %i"%(la.norm(cheat_chi)**2, len(data), valid_npix)
+    print "re/im chi2 %.3e, %.3e"%(la.norm(cheat_chi[0])**2, la.norm(cheat_chi[1])**2)
+    print "xx/yy chi2 %.3e, %.3e"%(la.norm(cheat_chi[:, :, 0])**2, la.norm(cheat_chi[:, :, 1])**2)
+    plt.subplot(2, 2, 1)
+    plt.plot([la.norm(cheat_error[:, u]) for u in ubl_sort['x']])
+    plt.subplot(2, 2, 2)
+    plt.plot([la.norm(cheat_chi[:, u]) for u in ubl_sort['x']])
+    plt.subplot(2, 2, 3)
+    plt.plot(tlist, [la.norm(cheat_error[..., t]) for t in range(error.shape[-1])])
+    plt.subplot(2, 2, 4)
+    plt.plot(tlist, [la.norm(cheat_chi[..., t]) for t in range(error.shape[-1])])
+    plt.show()
+
+    ccheat_data = (cdata_noadditive / cheat_ratio[..., None]).flatten()
+    cheat_data = np.concatenate((np.real(ccheat_data), np.imag(ccheat_data)))
+    cheat_w_solution = AtNiAi.dotv(np.transpose(A).dot((cheat_data * Ni).astype(A.dtype)))
+
+    for coord in ['C', 'CG']:
+        plot_IQU(fake_solution, 'GSM gridded', 1, coord=coord)
+        plot_IQU(w_GSM, 'wienered GSM', 2, coord=coord)
+        plot_IQU(w_sim_sol, 'wienered simulated solution', 3, coord=coord)
+        plot_IQU(cheat_w_solution, 'wienered solution', 4, coord=coord)
+        plt.show()
+
+selfcal = False#currently buggy: chi2 increases over iterations
+if selfcal:
+
+    import omnical.calibration_omni as omni
+    def solve_phase_degen(data_xx, data_yy, model_xx, model_yy, ubls, plot=False):#data should be time by ubl at single freq. data * phasegensolution = model
+        if data_xx.shape != data_yy.shape or data_xx.shape != model_xx.shape or data_xx.shape != model_yy.shape or data_xx.shape[1] != ubls.shape[0]:
+            raise ValueError("Shapes mismatch: %s %s %s %s, ubl shape %s"%(data_xx.shape, data_yy.shape, model_xx.shape, model_yy.shape, ubls.shape))
+        A = np.zeros((len(ubls) * 2, 2))
+        b = np.zeros(len(ubls) * 2)
+
+        nrow = 0
+        for p, (data, model) in enumerate(zip([data_xx, data_yy], [model_xx, model_yy])):
+            for u, ubl in enumerate(ubls):
+                amp_mask = (np.abs(data[:, u]) > (np.median(np.abs(data[:, u])) / 2.))
+                A[nrow] = ubl[:2]
+                b[nrow] = omni.medianAngle(np.angle(model[:, u] / data[:, u])[amp_mask])
+                nrow += 1
+        phase_cal = omni.solve_slope(np.array(A), np.array(b), 1)
+        if plot:
+            plt.hist((np.array(A).dot(phase_cal)-b + PI)%TPI-PI)
+            plt.title('phase fitting error')
+            plt.show()
+
+        #sooolve
+        return phase_cal
+
+    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision)
+    new_data = np.copy(data)
+    new_best_fit = np.copy(best_fit)
+    new_best_fit_no_additive = np.copy(best_fit_no_additive)
+
+    for i in range(5):
+        data_noadditive = new_data.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])) - (new_best_fit - new_best_fit_no_additive)
+        complex_data = np.sum(data_noadditive.transpose((2, 3, 1, 0)) * [1, 1.j], axis=-1)
+        complex_best_fit = np.sum(new_best_fit_no_additive.transpose((2, 3, 1, 0)) * [1, 1.j], axis=-1)
+        for p in range(2):
+            amp = 1#data_noadditive.flatten().dot(new_best_fit_no_additive.flatten()) / new_best_fit_no_additive.flatten().dot(new_best_fit_no_additive.flatten())
+            print amp
+            degen = solve_phase_degen(complex_data[p], complex_data[p], complex_best_fit[p], complex_best_fit[p], used_common_ubls)
+            print degen,
+            complex_data[p] *= np.exp(1.j * common_ubls[:, :2].dot(degen)) / amp
+            print solve_phase_degen(complex_data[p], complex_data[p], complex_best_fit[p], complex_best_fit[p], used_common_ubls)
+
+        new_data = np.concatenate((np.real(complex_data.transpose((2, 0, 1)).flatten()), np.imag(complex_data.transpose((2, 0, 1)).flatten())))
+        new_w_solution = AtNiAi.dotv(np.transpose(A).dot((new_data * Ni).astype(A.dtype)))
+        new_best_fit = A.dot(new_w_solution.astype(A.dtype))
+        new_chi = (new_data - new_best_fit).reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])) * (Ni.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])))**.5
+        print la.norm(chi)**2, la.norm(new_chi)**2
+        print "-----"
+
+
+        new_best_fit_no_additive = np.sum((A * (new_w_solution.astype(A.dtype))).reshape((Ashape0, Ashape1))[..., :valid_npix], axis=-1)
+        new_best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+        new_best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+
+    for coord in ['C', 'CG']:
+        plot_IQU(fake_solution, 'GSM gridded', 1, coord=coord)
+        plot_IQU(w_GSM, 'wienered GSM', 2, coord=coord)
+        plot_IQU(w_sim_sol, 'wienered simulated solution', 3, coord=coord)
+        plot_IQU(new_w_solution, 'wienered solution', 4, coord=coord)
+        plt.show()

@@ -435,8 +435,8 @@ for pick_f_i, pick_f in enumerate(pick_fs):
 
         #sooolve
         phase_cal = solve_phase_degen(ampdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], ampdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], info['ubl'][cal_ubl_mask], plot=(len(pick_fs) == 1))
-        omni_phase_cal= omni.solve_phase_degen(ampdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], ampdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], info['ubl'][cal_ubl_mask], [3, 3, 1e3], plot=(len(pick_fs) == 1))
-        print phase_cal, 'new', omni_phase_cal
+        #omni_phase_cal= omni.solve_phase_degen(ampdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], ampdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['xx'][np.ix_(cal_time_mask, cal_ubl_mask)], simdata['yy'][np.ix_(cal_time_mask, cal_ubl_mask)], info['ubl'][cal_ubl_mask], [3, 3, 1e3], plot=(len(pick_fs) == 1))
+        print phase_cal#, 'new', omni_phase_cal
 
 
         ###############################################
@@ -526,7 +526,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             ra = southern_points[source]['body']._ra
             dec = southern_points[source]['body']._dec
 
-            Apol[..., n] = vs.calculate_pol_pointsource_visibility(ra, dec, info['ubl'][cal_ubl_mask].dot(correction_mat), freqs[pick_f], beam_heal_equ=beam_heal_equ,
+            Apol[..., n] = vs.DBG_calculate_pol_pointsource_visibility(ra, dec, info['ubl'][cal_ubl_mask].dot(correction_mat), freqs[pick_f], beam_heal_equ=beam_heal_equ,
                                                                 tlist=compressed2_lsts[pcal_time_mask] / TPI * 24.).dot(
                 [[.5, .5, 0, 0], [0, 0, .5, .5j], [0, 0, .5, -.5j], [.5, -.5, 0, 0]])
 
@@ -560,7 +560,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             bfit = realb_fit.reshape((2, np.sum(cal_ubl_mask), np.sum(pcal_pol_mask), np.sum(pcal_time_mask)))
             bfit = bfit[0] + 1.j * bfit[1]
             phase_degen_iterative = solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask])
-            # omni_phase_degen_iterative = omni.solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask], [3, 3, 1e3])
+            #omni_phase_degen_iterative = omni.solve_phase_degen(np.transpose(b[:, 0]), np.transpose(b[:, -1]), np.transpose(bfit[:, 0]), np.transpose(bfit[:, -1]), info['ubl'][cal_ubl_mask], [3, 3, 1e3])
             print phase_degen_iterative#, 'new', omni_phase_degen_iterative
             phase_degen2 += phase_degen_iterative
             # print phase_degen_niter, phase_degen2, np.linalg.norm(perror)
@@ -633,14 +633,14 @@ for pick_f in psols.keys():
     nt = calibrated_results[pick_f][2].shape[1]
     nf = 1
     nUBL = calibrated_results[pick_f][2].shape[2]
-    for p, pol in enumerate(['xx','xy','yx','yy']):
+    # for p, pol in enumerate(['xx','xy','yx','yy']):
+    #
+    #     (calibrated_results[pick_f][0]/TPI*24 + 1.j * freqs[pick_f]).astype('complex64').tofile(datadir + tag + '_%s_%i_%i.tf'%(pol, nt, nf))
+    #     calibrated_results[pick_f][2][p].astype('complex64').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + datatag)
+    #     calibrated_results[pick_f][3][p].astype('float32').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + vartag + '.var')
+    #     calibrated_results[pick_f][1].dot(correction_mat).astype('float32').tofile(datadir + tag + '_%s_%i_%i.ubl'%(pol, nUBL, 3))
 
-        (calibrated_results[pick_f][0]/TPI*24 + 1.j * freqs[pick_f]).astype('complex64').tofile(datadir + tag + '_%s_%i_%i.tf'%(pol, nt, nf))
-        calibrated_results[pick_f][2][p].astype('complex64').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + datatag)
-        calibrated_results[pick_f][3][p].astype('float32').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + vartag + '.var')
-        calibrated_results[pick_f][1].dot(correction_mat).astype('float32').tofile(datadir + tag + '_%s_%i_%i.ubl'%(pol, nUBL, 3))
-
-np.savez(datadir + 'cygcas_' + Q + datatag + vartag, cyg_cas_iquv=cyg_cas_iquv, cyg_cas_iquv_std=cyg_cas_iquv_std, freqs=freqs)
+# np.savez(datadir + 'cygcas_' + Q + datatag + vartag, cyg_cas_iquv=cyg_cas_iquv, cyg_cas_iquv_std=cyg_cas_iquv_std, freqs=freqs)
 
 
 

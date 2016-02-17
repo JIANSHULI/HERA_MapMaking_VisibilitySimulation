@@ -48,8 +48,12 @@ mother_nside = 32
 mother_npix = hpf.nside2npix(mother_nside)
 smoothing_fwhm = 10. * np.pi / 180.
 edge_width = 10. * np.pi / 180.
+# mask_name = 'herastrip'
+# pixel_mask = (hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] > np.pi/2 + np.pi/9) & (hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] < np.pi/2 + np.pi/4.5)
+
 mask_name = 'plane20deg'
-plane_angle = np.pi / 9
+pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > np.pi / 9
+
 
 step = .2
 remove_cmb = True
@@ -57,10 +61,12 @@ show_plots = False
 
 data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
 
-exclude_freqs = [60.8, 70, 93.5]
-
 data_file = np.load(data_file_name)
 freqs = data_file['freqs']
+exclude_freqs = [freq for freq in freqs if freq > 40.]#[60.8, 70, 93.5]
+
+
+
 qudata = data_file['qdata'] + 1.j * data_file['udata']
 
 
@@ -69,7 +75,42 @@ freqs = freqs[~bad_freqs_mask]
 nf = len(freqs)
 qudata = qudata[~bad_freqs_mask]
 
-pixel_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) > plane_angle
+#####quick digression
+
+def mod(x, m, lower=None):
+    if lower is None:
+        lower = -m/2.
+    return (x-lower)%m + lower
+lambda2 = (0.3/freqs)**2
+
+ploti = 0
+for conjugate0 in [False]:
+    for conjugate1 in [True, False]:
+        ploti += 1
+        plt.subplot(1, 4, ploti)
+        if conjugate0:
+            rm1 = mod(np.angle(np.conjugate(qudata[0]) / qudata[2]) / 2, np.pi) / lambda2[0]
+        else:
+            rm1 = mod(np.angle(qudata[0] / qudata[2]) / 2, np.pi) / lambda2[0]
+        if conjugate1:
+            rm2 = mod(np.angle(np.conjugate(qudata[1]) / qudata[2]) / 2, np.pi) / lambda2[1]
+        else:
+            rm2 = mod(np.angle(qudata[1] / qudata[2]) / 2, np.pi) / lambda2[1]
+        def colorcode(i):
+            return abs(hpf.pix2ang(mother_nside, i, nest=True)[0] - np.pi/2)/(np.pi/2)
+        plt.scatter(rm1, rm2, marker='+', c=[(1. - colorcode(i), 0, colorcode(i)) for i in range(mother_npix)])
+
+        maxrm = 500.
+        rm_step = .5
+        plt.scatter(mod(np.arange(-maxrm, maxrm, rm_step), np.pi/lambda2[0]), mod(np.arange(-maxrm, maxrm, rm_step), np.pi/lambda2[1]), c=[(0, .5+.5*abs(rm)/maxrm, 0) for rm in np.arange(-maxrm, maxrm,rm_step)])
+        plt.ylim([-100, 100])
+        plt.xlabel('RM from 1.4GHz map')
+        plt.ylabel('RM from 2.3GHz map')
+plt.show()
+
+####end of digression
+
+
 pixel_mask = pixel_mask & ~(np.isnan(qudata).any(axis=0))
 
 matplotlib.rcParams.update({'font.size': 25})
@@ -104,7 +145,7 @@ for n in range(nf):
     plt.plot(np.angle(ec)[:, n] / 2)
 plt.show()
 
-for n_principal in range(1, 6):
+for n_principal in range(1, min(6, 1+nf)):
     w_fn = np.copy(ec[:, -1:-n_principal-1:-1])
     x_ni = np.copy(principal_maps[-1:-n_principal-1:-1])
     errors = [np.linalg.norm(D - np.einsum('fn,ni->fi', w_fn, x_ni))]
@@ -158,7 +199,7 @@ for n_principal in range(1, 6):
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
     for f in range(nf):
-        hpv.mollview(np.log10(np.abs(D_error[f])), nest=True, sub=(3, 5, f + 1), title=np.linalg.norm(D_error[f]), min=-4, max=-1.5)
+        hpv.mollview(np.log10(np.abs(D_error[f]/D[f])), nest=True, sub=(3, 5, f + 1), title=np.linalg.norm(D_error[f]), min=-2, max=-0)
     plt.subplot(3, 5, nf + 2)
     plt.plot(errors)
     fig.savefig(data_file_name.replace('data_', 'plot_QU_%i_'%len(qudata)).replace('.npz', '_' + mask_name + '_principal_%i_step_%.2f_error_plot.png'%(n_principal, step)), dpi=1000)
