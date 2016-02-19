@@ -66,13 +66,14 @@ freqs = data_file['freqs']
 exclude_freqs = [freq for freq in freqs if freq > 40.]#[60.8, 70, 93.5]
 
 
-
+idata = data_file['idata']
 qudata = data_file['qdata'] + 1.j * data_file['udata']
 
 
 bad_freqs_mask = np.isnan(qudata).all(axis=1)
 freqs = freqs[~bad_freqs_mask]
 nf = len(freqs)
+idata = idata[~bad_freqs_mask]
 qudata = qudata[~bad_freqs_mask]
 
 #####quick digression
@@ -84,30 +85,26 @@ def mod(x, m, lower=None):
 lambda2 = (0.3/freqs)**2
 
 ploti = 0
-for conjugate0 in [False]:
-    for conjugate1 in [True, False]:
-        ploti += 1
-        plt.subplot(1, 4, ploti)
-        if conjugate0:
-            rm1 = mod(np.angle(np.conjugate(qudata[0]) / qudata[2]) / 2, np.pi) / lambda2[0]
-        else:
-            rm1 = mod(np.angle(qudata[0] / qudata[2]) / 2, np.pi) / lambda2[0]
-        if conjugate1:
-            rm2 = mod(np.angle(np.conjugate(qudata[1]) / qudata[2]) / 2, np.pi) / lambda2[1]
-        else:
-            rm2 = mod(np.angle(qudata[1] / qudata[2]) / 2, np.pi) / lambda2[1]
-        def colorcode(i):
-            return abs(hpf.pix2ang(mother_nside, i, nest=True)[0] - np.pi/2)/(np.pi/2)
-        plt.scatter(rm1, rm2, marker='+', c=[(1. - colorcode(i), 0, colorcode(i)) for i in range(mother_npix)])
+ploti += 1
+rm1 = mod(np.angle(qudata[0] / qudata[2]) / 2, np.pi) / lambda2[0]
+rm2 = mod(np.angle(qudata[1] / qudata[2]) / 2, np.pi) / lambda2[1]
+def colorcode(i):
+    return abs(hpf.pix2ang(mother_nside, i, nest=True)[0] - np.pi/2)/(np.pi/2)
+plt.scatter(rm2, rm1, marker='+', c=[(1. - colorcode(i), .5-2*(colorcode(i) - .5)**2, colorcode(i)) for i in range(mother_npix)], label='data')
 
-        maxrm = 500.
-        rm_step = .5
-        plt.scatter(mod(np.arange(-maxrm, maxrm, rm_step), np.pi/lambda2[0]), mod(np.arange(-maxrm, maxrm, rm_step), np.pi/lambda2[1]), c=[(0, .5+.5*abs(rm)/maxrm, 0) for rm in np.arange(-maxrm, maxrm,rm_step)])
-        plt.ylim([-100, 100])
-        plt.xlabel('RM from 1.4GHz map')
-        plt.ylabel('RM from 2.3GHz map')
+maxrm = 500.
+rm_step = .5
+plt.scatter(mod(np.arange(-maxrm, maxrm, rm_step), np.pi/lambda2[1]), mod(np.arange(-maxrm, maxrm, rm_step), np.pi/lambda2[0]), c=[(0, .5+.5*abs(rm)/maxrm, 0) for rm in np.arange(-maxrm, maxrm,rm_step)], label='equal RM guideline')
+plt.xlim([-120, 120])
+plt.legend()
+plt.ylabel('Inferred RM from 1.4GHz map')
+plt.xlabel('Inferred RM from 2.3GHz map')
 plt.show()
 
+hpv.mollview(np.abs(rm1-rm2), nest=True, max=10, sub=(3,1,1), title='RM diff')
+hpv.mollview(np.abs(qudata[0]) / idata[0], nest=True, sub=(3,1,2), min=0, max=.2, title='1.4GHz pol fraction')
+hpv.mollview(np.abs(qudata[1]) / idata[1], nest=True, sub=(3,1,3), min=0, max=.2, title='2.3GHz pol fraction')
+plt.show()
 ####end of digression
 
 

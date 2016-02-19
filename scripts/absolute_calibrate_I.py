@@ -256,6 +256,7 @@ for Q in ['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
 
             op_data_filename = datadir + tag + '_%s%s_%i_%i%s'%(p, p, nt, nUBL, dataoptag)
             op_var_filename = datadir + tag + '_%s%s_%i_%i%s.var'%(p, p, nt, nUBL, varoptag)
+            op_var100_filename = datadir + tag + '_%s%s_%i_%i%s.var'%(p, p, nt, nUBL, varoptag+'x100')
 
             #ubl file
             ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
@@ -274,5 +275,6 @@ for Q in ['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
                 raise IOError(op_var_filename + ' exists.')
             else:
                 new_var.astype('float32').tofile(op_var_filename)
+                (new_var * 100.).astype('float32').tofile(op_var100_filename)
 
     np.savez(datadir + 'cygcas_' + Q + dataoptag + varoptag, cyg_cas_iquv=cyg_cas_iquv, cyg_cas_iquv_std=cyg_cas_iquv_std, freqs=freqs)

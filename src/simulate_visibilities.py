@@ -581,7 +581,8 @@ class Visibility_Simulator:
                 vlist = vlist[::(nfourier/nt)]
         return vlist
 
-
+def tc(arr):
+    return np.transpose(np.conjugate(arr))
 #################################
 ####IO functions for alms########
 #################################
