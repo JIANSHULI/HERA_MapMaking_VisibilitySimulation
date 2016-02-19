@@ -131,17 +131,16 @@ if INSTRUMENT == 'miteor':
         '/home/omniscope/data/mwa_beam/healpix_%i_%s.bin' % (bnside, p), dtype='complex64').reshape(
         (len(freqs), 12 * bnside ** 2, 2)), axis=-1)**2 for p in ['x', 'y']]).transpose(1, 0, 2), axis=0)
 else:
-
     nside_beamweight = 256
     lat_degree = -26.703319
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
     tag = "mwa_aug23_eor0" #
-    datatag = '.dat'#
+    datatag = '.datt4'#
     vartag = ''#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/mwa_aug23_eor0_forjeff/'
 
     # deal with beam: create a callable function of the form y(freq) in MHz and returns 2 by npix
-    bnside = 1024
+    bnside = 256
     freqs = range(110, 200, 10)
     local_beam_unpol = si.interp1d(freqs, np.array([[np.fromfile(
         '/home/omniscope/data/GSM_data/absolute_calibrated_data/mwa_aug23_eor0_forjeff/mwa_curtin_beam_%s_nside%i_freq167.275_zenith_float32.dat'%(P, bnside), dtype='float32') for P in ['XX', 'YY']] for i in range(len(freqs))]), axis=0)
@@ -358,7 +357,7 @@ for thresh in 2.**np.arange(-7., 2., 2.):
                     # fullsim_vis_DBG[p, ..., i] = res[:-1]
             print "simulated visibilities in %.1f minutes."%((time.time() - timer) / 60.)
             fullsim_vis.astype('complex64').tofile(full_sim_filename)
-        autocorr_vis = np.real(fullsim_vis[:, -1])#TODO use this in cross talk removal
+        autocorr_vis = np.real(fullsim_vis[:, -1])
         if crosstalk_type == 'autocorr':
             autocorr_vis_normalized = np.array([autocorr_vis[p] / (la.norm(autocorr_vis[p]) / la.norm(np.ones_like(autocorr_vis[p]))) for p in range(2)])
         else:

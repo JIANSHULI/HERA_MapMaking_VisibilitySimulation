@@ -92,8 +92,7 @@ crosstalk_type = 'autocorr'
 # S_scale = 2
 # S_thresh = 1000#Kelvin
 # S_type = 'gsm%irm%i'%(S_scale,S_thresh)
-S_type = 'dyS_lowadduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-pre_remove_additive = False
+
 
 
 C = 299.792458
@@ -116,8 +115,8 @@ force_recompute_SEi = False
 INSTRUMENT = sys.argv[1]#'miteor'#'mwa'#
 if INSTRUMENT == 'miteor':
     dynamic_precision = .2#ratio of dynamic pixelization error vs data std, in units of data, so not power
-    # thresh = 2#.5
-    # valid_pix_thresh = 1e-4#1e-2
+    S_type = 'dyS_lowadduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+    pre_remove_additive = True
     nside_beamweight = 16
     lat_degree = 45.2977
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
@@ -134,13 +133,13 @@ if INSTRUMENT == 'miteor':
         (len(freqs), 12 * bnside ** 2, 2)), axis=-1)**2 for p in ['x', 'y']]).transpose(1, 0, 2), axis=0)
 else:
     dynamic_precision = .5
-    # thresh = .05
-    # valid_pix_thresh = 1e-4
+    S_type = 'dyS_min2adduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+    pre_remove_additive = False
     nside_beamweight = 256
     lat_degree = -26.703319
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
     tag = "mwa_aug23_eor0" #
-    datatag = '.dat'#
+    datatag = '.datt4'#
     vartag = ''#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/mwa_aug23_eor0_forjeff/'
 
@@ -320,7 +319,7 @@ else:
             # fullsim_vis_DBG[p, ..., i] = res[:-1]
     print "simulated visibilities in %.1f minutes."%((time.time() - timer) / 60.)
     fullsim_vis.astype('complex64').tofile(full_sim_filename)
-autocorr_vis = np.real(fullsim_vis[:, -1])#TODO use this in cross talk removal
+autocorr_vis = np.real(fullsim_vis[:, -1])
 if crosstalk_type == 'autocorr':
     autocorr_vis_normalized = np.array([autocorr_vis[p] / (la.norm(autocorr_vis[p]) / la.norm(np.ones_like(autocorr_vis[p]))) for p in range(2)])
 else:
@@ -379,6 +378,60 @@ Ni = np.concatenate((Ni['xx'], Ni['yy'])).reshape([2] + list(data_shape['xx'])).
     (1, 0, 2)).flatten()
 Ni = np.concatenate((Ni * 2, Ni * 2))
 
+def get_complex_data(real_data, nubl=nUBL_used, nt=nt_used):
+    if len(real_data.flatten()) != 2 * nubl * 2 * nt:
+        raise ValueError("Incorrect dimensions: data has length %i where nubl %i and nt %i together require length of %i."%(len(real_data), nubl, nt, 2 * nubl * 2 * nt))
+    input_shape = real_data.shape
+    real_data.shape = (2, nubl, 2, nt)
+    result = real_data[0] + 1.j * real_data[1]
+    real_data.shape = input_shape
+    return result
+
+
+################
+####pre_remove_additive
+################
+additive_A = np.empty((nUBL_used, 2, nt_used, 1 + 4 * nUBL_used), dtype='complex128')
+
+#put in autocorr regardless of whats saved on disk
+for p in range(2):
+    additive_A[:, p, :, 0] = fullsim_vis[:, p]
+    for i in range(nUBL_used):
+        additive_A[i, p, :, 1 + 4 * i + 2 * p] = 1. * autocorr_vis_normalized[p]
+        additive_A[i, p, :, 1 + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
+
+additive_A.shape = (nUBL_used * 2 * nt_used, 1 + 4 * nUBL_used)
+if pre_remove_additive:
+    import omnical.calibration_omni as omni
+    raw_data = np.copy(data).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    real_additive_A = np.concatenate((np.real(additive_A), np.imag(additive_A)), axis=0)
+    additive_AtNiA = np.empty((1 + 4 * nUBL_used, 1 + 4 * nUBL_used), dtype='float64')
+    ATNIA(real_additive_A, Ni, additive_AtNiA)
+
+    niter = 0
+    rephase = np.zeros((2,2))
+    additive_term = np.zeros_like(data)
+    while (niter == 0 or la.norm(rephase) > .001) and niter < 10:
+        niter += 1
+        additive_sol = sla.inv(additive_AtNiA).dot(np.transpose(real_additive_A).dot(data * Ni))
+        print '>>>>>>>>>>>>>additive fitting amp', additive_sol[0],
+        additive_term_incr = real_additive_A[:, 1:].dot(additive_sol[1:])
+        data -= additive_term_incr
+        additive_term += additive_term_incr
+        cdata = get_complex_data(data)
+        for p, pol in enumerate(['xx', 'yy']):
+            rephase = omni.solve_phase_degen_fast(cdata[:, p].transpose(), cdata[:, p].transpose(), fullsim_vis[:, p].transpose(), fullsim_vis[:, p].transpose(), used_common_ubls)
+
+            if p == 0:
+                print 'pre process rephase', pol, rephase,
+            else:
+                print pol, rephase
+            cdata[:, p] *= np.exp(1.j * used_common_ubls[:, :2].dot(rephase))[:, None]
+        data = np.concatenate((np.real(cdata).flatten(), np.imag(cdata).flatten()))
+
+
+
+
 ################
 ####Use N and the par file generated by pixel_parameter_search to determine dynamic pixel parameters
 ################
@@ -408,8 +461,10 @@ fake_solution_map = np.zeros_like(thetas)
 for i in range(len(fake_solution_map)):
     fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
 fake_solution_map = fake_solution_map[valid_pix_mask]
-
-fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
+if pre_remove_additive:
+    fake_solution = np.copy(fake_solution_map)
+else:
+    fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
 
 sizes = np.array(sizes)[valid_pix_mask]
 
@@ -490,13 +545,17 @@ def get_A():
         sys.stdout.flush()
         A.tofile(A_path)
 
-    #put in autocorr regardless of whats saved on disk
-    for i in range(nUBL_used):
-        for p in range(2):
-            A[i, p, :, valid_npix + 4 * i + 2 * p] = 1. * autocorr_vis_normalized[p]
-            A[i, p, :, valid_npix + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
+    # #put in autocorr regardless of whats saved on disk
+    # for i in range(nUBL_used):
+    #     for p in range(2):
+    #         A[i, p, :, valid_npix + 4 * i + 2 * p] = 1. * autocorr_vis_normalized[p]
+    #         A[i, p, :, valid_npix + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
 
     A.shape = (nUBL_used * 2 * nt_used, A.shape[-1])
+    if pre_remove_additive:
+        A = A[:, :valid_npix]
+    else:
+        A[:, valid_npix:] = additive_A[:, 1:]
     # Merge A
     try:
         return np.concatenate((np.real(A), np.imag(A)))
@@ -531,14 +590,6 @@ print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxr
 sys.stdout.flush()
 
 
-def get_complex_data(real_data, nubl=nUBL_used, nt=nt_used):
-    if len(real_data.flatten()) != 2 * nubl * 2 * nt:
-        raise ValueError("Incorrect dimensions: data has length %i where nubl %i and nt %i together require length of %i."%(len(real_data), nubl, nt, 2 * nubl * 4 * nt))
-    input_shape = real_data.shape
-    real_data.shape = (2, nubl, 2, nt)
-    result = real_data[0] + 1.j * real_data[1]
-    real_data.shape = input_shape
-    return result
 
 def get_vis_normalization(data, clean_sim_data):
     a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
@@ -554,10 +605,13 @@ if plot_data_error:
     cdata = get_complex_data(data)
     cdynamicmodel = get_complex_data(clean_sim_data)
     cNi = get_complex_data(Ni)
-    fun = np.real
+    if pre_remove_additive:
+        cadd = get_complex_data(additive_term)
+
+    fun = np.imag
     srt = sorted((tlist - lst_offset)%24.+lst_offset)
     asrt = np.argsort((tlist - lst_offset)%24.+lst_offset)
-    pncol = int(6. / (srt[-1] - srt[0]))
+    pncol = min(int(60. / (srt[-1] - srt[0])), 12)
     us = ubl_sort['x'][::len(ubl_sort['x'])/pncol]
     for p in range(2):
         for nu, u in enumerate(us):
@@ -567,6 +621,8 @@ if plot_data_error:
             plt.plot(srt, fun(fullsim_vis[u, p][asrt]))
             plt.plot(srt, fun(cdynamicmodel[u, p][asrt]))
             plt.plot(srt, fun(cNi[u, p][asrt])**-.5)
+            if pre_remove_additive:
+                plt.plot(srt, fun(cadd[u, p][asrt]))
             data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p]))), 5 * np.max(np.abs(fun(cNi[u, p])))])
             plt.title("%.1f,%.1f"%(used_common_ubls[u, 0], used_common_ubls[u, 1]))
             plt.ylim([-1.05*data_range, 1.05*data_range])
@@ -580,130 +636,7 @@ if plot_data_error:
 
 vis_normalization = get_vis_normalization(data, clean_sim_data)
 print "Normalization from visibilities", vis_normalization
-diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
-diff_data = diff_data[0] + 1j * diff_data[1]
-diff_norm = {}
-diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 2, data_shape['xx'][1])[:, 0], axis=1)
-diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 2, data_shape['yy'][1])[:, -1], axis=1)
-data_norm = {}
-data_norm['x'] = la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[0, :, 0] + 1.j * data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[1, :, 0], axis=-1)
-data_norm['y'] = la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[0, :, -1] + 1.j * data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[1, :, -1], axis=-1)
 
-if plot_data_error:
-    plt.subplot(7, 1, 1)
-    plt.plot((diff_norm['x']/data_norm['x'])[ubl_sort['x']])
-    plt.plot((diff_norm['y']/data_norm['y'])[ubl_sort['y']])
-
-
-if pre_remove_additive:
-    niter = 0
-
-    additive = 0
-    raw_data = np.copy(data).reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
-    while niter == 0 or (abs(vis_normalization - get_vis_normalization(data, clean_sim_data)) > 1e-2 and niter < 20):
-        niter += 1
-        vis_normalization = get_vis_normalization(data, clean_sim_data)
-        print "Normalization from visibilities", vis_normalization
-        diff_data = (clean_sim_data * vis_normalization - data).reshape(2, data_shape['xx'][0], 4, data_shape['xx'][1])
-        diff_data = diff_data[0] + 1j * diff_data[1]
-        diff_norm = {}
-        diff_norm['x'] = la.norm(diff_data[:, 0], axis=1)
-        diff_norm['y'] = la.norm(diff_data[:, 3], axis=1)
-
-        additive_inc = np.zeros_like(diff_data)
-        for p in range(2):
-                additive_inc[:, p] = np.outer(
-                    autocorr_vis[p].dot(diff_data[:, p].transpose()) / np.sum(autocorr_vis[p] ** 2), autocorr_vis[p])
-
-        additive = additive + additive_inc
-        data = data + np.concatenate((np.real(additive_inc.flatten()), np.imag(additive_inc.flatten())))
-
-    if plot_data_error:
-        vis_normalization = get_vis_normalization(data, clean_sim_data)
-        print "Normalization from visibilities", vis_normalization
-        diff_data = (clean_sim_data * vis_normalization - data).reshape(2, len(data) / 2)
-        diff_data = diff_data[0] + 1j * diff_data[1]
-        diff_norm = {}
-        diff_norm['x'] = la.norm(diff_data.reshape(data_shape['xx'][0], 4, data_shape['xx'][1])[:, 0], axis=1)
-        diff_norm['y'] = la.norm(diff_data.reshape(data_shape['yy'][0], 4, data_shape['yy'][1])[:, 3], axis=1)
-        plt.plot((diff_norm['x']/data_norm['x'])[ubl_sort['x']])
-        plt.plot((diff_norm['y']/data_norm['y'])[ubl_sort['y']])
-
-if plot_data_error:
-    qaz_model = (clean_sim_data * vis_normalization).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
-    qaz_data = np.copy(data).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
-    plt.subplot(7, 1, 2)
-    if pre_remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][0], 0])
-    plt.plot(qaz_data[1, ubl_sort['x'][0], 0])
-    plt.plot(qaz_model[1, ubl_sort['x'][0], 0])
-    plt.subplot(7, 1, 3)
-    if pre_remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
-    plt.plot(qaz_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
-    plt.plot(qaz_model[1, ubl_sort['x'][data_shape['xx'][0]/2], 0])
-    plt.subplot(7, 1, 4)
-    if pre_remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][-1], 0])
-    plt.plot(qaz_data[1, ubl_sort['x'][-1], 0])
-    plt.plot(qaz_model[1, ubl_sort['x'][-1], 0])
-    plt.subplot(7, 1, 5)
-    if pre_remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][0], 1])
-    plt.plot(qaz_data[1, ubl_sort['x'][0], 1])
-    plt.plot(qaz_model[1, ubl_sort['x'][0], 1])
-    plt.subplot(7, 1, 6)
-    if pre_remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
-    plt.plot(qaz_data[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
-    plt.plot(qaz_model[1, ubl_sort['x'][data_shape['xx'][0]/2], 1])
-    plt.subplot(7, 1, 7)
-    if pre_remove_additive:
-        plt.plot(raw_data[1, ubl_sort['x'][-1], 1])
-    plt.plot(qaz_data[1, ubl_sort['x'][-1], 1])
-    plt.plot(qaz_model[1, ubl_sort['x'][-1], 1])
-    plt.show()
-
-
-# vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
-# print "Normalization from visibilities", vis_normalization
-# diff_data = (clean_sim_data * vis_normalization - data)
-# diff_norm = {}
-# diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
-# diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
-
-# if plot_data_error:
-# plt.plot(diff_norm['x'][ubl_sort['x']], label='original x error')
-# plt.plot(diff_norm['y'][ubl_sort['y']], label='original y error')
-
-# if remove_additive:
-# niter = 0
-# additive = {'x':0, 'y':0}
-# additive_inc = {'x':0, 'y':0}
-# while niter == 0 or (abs(vis_normalization - np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))) > 1e-2 and niter < 20):
-# niter += 1
-# vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
-# print "Normalization from visibilities", vis_normalization
-# diff_data = clean_sim_data * vis_normalization - data
-# diff_norm = {}
-# diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
-# diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
-# additive_inc['x'] = np.repeat(np.mean(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1, keepdims = True), data_shape['x'][1], axis = 1)
-# additive_inc['y'] = np.repeat(np.mean(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1, keepdims = True), data_shape['y'][1], axis = 1)
-# additive['x'] = additive['x'] + additive_inc['x']
-# additive['y'] = additive['y'] + additive_inc['y']
-# data = data + np.concatenate((additive_inc['x'].flatten(), additive_inc['y'].flatten()))
-
-# if plot_data_error:
-# vis_normalization = np.median(np.concatenate((np.real(data) / np.real(clean_sim_data), np.imag(data) / np.imag(clean_sim_data))))
-# print "Normalization from visibilities", vis_normalization
-# diff_data = clean_sim_data * vis_normalization - data
-# diff_norm = {}
-# diff_norm['x'] = la.norm(diff_data[:data_shape['x'][0] * data_shape['x'][1]].reshape(*data_shape['x']), axis = 1)
-# diff_norm['y'] = la.norm(diff_data[data_shape['x'][0] * data_shape['x'][1]:].reshape(*data_shape['y']), axis = 1)
-# plt.plot(diff_norm['x'][ubl_sort['x']], label='new x error')
-# plt.plot(diff_norm['y'][ubl_sort['y']], label='new y error')
-# plt.legend();plt.show()
 
 ##renormalize the model
 fake_solution *= vis_normalization
@@ -711,10 +644,11 @@ clean_sim_data *= vis_normalization
 fullsim_vis *= vis_normalization
 sim_data = np.concatenate((np.real(fullsim_vis.flatten()), np.imag(fullsim_vis.flatten()))) + np.random.randn(len(data)) / Ni ** .5
 #add additive term
-sim_data.shape = (2, nUBL_used, 2, nt_used)
-sim_additive = np.random.randn(2, nUBL_used, 2) * np.median(np.abs(data)) / 2.
-sim_data = sim_data + np.array([np.outer(sim_additive[..., p], autocorr_vis_normalized[p]).reshape((2, nUBL_used, nt_used)) for p in range(2)]).transpose((1, 2, 0, 3))#sim_additive[..., None]
-sim_data = sim_data.flatten()
+if not pre_remove_additive:
+    sim_data.shape = (2, nUBL_used, 2, nt_used)
+    sim_additive = np.random.randn(2, nUBL_used, 2) * np.median(np.abs(data)) / 2.
+    sim_data = sim_data + np.array([np.outer(sim_additive[..., p], autocorr_vis_normalized[p]).reshape((2, nUBL_used, nt_used)) for p in range(2)]).transpose((1, 2, 0, 3))#sim_additive[..., None]
+    sim_data = sim_data.flatten()
 
 # compute AtNi.y
 AtNi_data = np.transpose(A).dot((data * Ni).astype(A.dtype))
@@ -747,7 +681,10 @@ if 'adduniform' in S_type:
 else:
     S_diag_add = data_max**2 / add_supress
 
-S = np.diag(np.concatenate((S_diag_I, S_diag_add))).astype('float64')
+if pre_remove_additive:
+    S = np.diag(S_diag_I).astype('float64')
+else:
+    S = np.diag(np.concatenate((S_diag_I, S_diag_add))).astype('float64')
 print "Done."
 print "%f minutes used" % (float(time.time() - timer) / 60.)
 sys.stdout.flush()
@@ -757,7 +694,9 @@ sys.stdout.flush()
 # compute (AtNiA+Si)i eigensystems
 precision = 'float64'
 AtNiAi_tag = 'AtNiASii'
-if crosstalk_type == 'autocorr':
+if pre_remove_additive:
+    AtNiAi_version = 0.3
+elif crosstalk_type == 'autocorr':
     AtNiAi_version = 0.2
 else:
     AtNiAi_version = 0.1
@@ -771,7 +710,9 @@ if os.path.isfile(AtNiAi_path) and not force_recompute_AtNiAi and not force_reco
     AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision)
 else:
     AtNiA_tag = 'AtNiA_N%s'%vartag
-    if crosstalk_type == 'autocorr':
+    if pre_remove_additive:
+        AtNiA_tag += "_noadd"
+    elif crosstalk_type == 'autocorr':
         AtNiA_tag += "_autocorr"
     AtNiA_filename = AtNiA_tag + A_filename
     AtNiA_path = datadir + tag + AtNiA_filename
@@ -820,6 +761,10 @@ sim_best_fit = A.dot(w_sim_sol.astype(A.dtype))
 sim_best_fit_no_additive = np.sum((A * (w_sim_sol.astype(A.dtype))).reshape((Ashape0, Ashape1))[..., :valid_npix].astype('float64'), axis=-1)
 
 if plot_data_error:
+    qaz_model = (clean_sim_data * vis_normalization).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    qaz_data = np.copy(data).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
+    if pre_remove_additive:
+        qaz_add = np.copy(additive_term).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
     us = ubl_sort['x']#[::len(ubl_sort['x'])/10]
     best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
     best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
@@ -833,7 +778,10 @@ if plot_data_error:
             plt.plot(qaz_model[ri, u, p])
             plt.plot(best_fit[ri, u, p])
             plt.plot(best_fit_no_additive[ri, u, p])
-            plt.plot(np.ones_like(qaz_data[ri, u, p]) * sol2additive(w_solution)[p, u, ri])
+            if pre_remove_additive:
+                plt.plot(qaz_add[ri, u, p])
+            else:
+                plt.plot(np.ones_like(qaz_data[ri, u, p]) * sol2additive(w_solution)[p, u, ri])
             plt.plot(best_fit[ri, u, p] - qaz_data[ri, u, p])
             plt.plot(Ni.reshape((2, nUBL_used, 2, nt_used))[ri, u, p]**-.5)
             data_range = np.max(np.abs(qaz_data[ri, u, p]))
