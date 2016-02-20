@@ -119,7 +119,7 @@ if INSTRUMENT == 'miteor':
     nside_beamweight = 16
     lat_degree = 45.2977
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
-    tag = "q3AL_5_abscal"  #'q3_abscalibrated'#"q4AL_3_abscal"#"q1AL_10_abscal"# L stands for lenient in flagging
+    tag = "q1AL_10_abscal"#"q3AL_5_abscal"  #'q3_abscalibrated'#"q4AL_3_abscal"#"q1AL_10_abscal"# L stands for lenient in flagging
     datatag = '_2016_01_20_avg_unpol'#'_seccasa.rad'#
     vartag = '_2016_01_20_avg_unpolx100'#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
