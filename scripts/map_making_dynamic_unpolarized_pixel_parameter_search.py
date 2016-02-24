@@ -80,8 +80,8 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 
 
 
-nside_start = 32
-nside_standard = 128
+
+
 
 plotcoord = 'CG'
 
@@ -115,11 +115,12 @@ force_recompute_SEi = False
 ####################################################
 INSTRUMENT = sys.argv[1]#'miteor'#'mwa'#
 if INSTRUMENT == 'miteor':
-
+    nside_start = 32
+    nside_standard = 256
     nside_beamweight = 16
     lat_degree = 45.2977
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
-    tag = "q1AL_10_abscal"#"q3AL_5_abscal"  #'q3_abscalibrated'#"q4AL_3_abscal"#"q1AL_10_abscal"# L stands for lenient in flagging
+    tag = "q3AL_5_abscal"  #"q1AL_10_abscal"#'q3_abscalibrated'#"q4AL_3_abscal"#"q1AL_10_abscal"# L stands for lenient in flagging
     datatag = '_2016_01_20_avg_unpol'#'_seccasa.rad'#
     vartag = '_2016_01_20_avg_unpolx100'#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
@@ -131,6 +132,8 @@ if INSTRUMENT == 'miteor':
         '/home/omniscope/data/mwa_beam/healpix_%i_%s.bin' % (bnside, p), dtype='complex64').reshape(
         (len(freqs), 12 * bnside ** 2, 2)), axis=-1)**2 for p in ['x', 'y']]).transpose(1, 0, 2), axis=0)
 else:
+    nside_start = 64
+    nside_standard = 128
     nside_beamweight = 256
     lat_degree = -26.703319
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]

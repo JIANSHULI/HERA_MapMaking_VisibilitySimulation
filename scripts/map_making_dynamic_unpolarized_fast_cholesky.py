@@ -7,6 +7,7 @@ import time, ephem, sys, os, resource, datetime, warnings
 import aipy as ap
 import matplotlib.pyplot as plt
 import healpy as hp
+import healpy.rotator as hpr
 import healpy.pixelfunc as hpf
 import healpy.visufunc as hpv
 import scipy.interpolate as si
@@ -80,20 +81,13 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 
 
 
-nside_start = 32
-nside_standard = 128
 
 plotcoord = 'CG'
 
 
 baseline_safety_factor = 10.#max_ubl = 1.4*lambda/baseline_safety_factor
-nside_beamweight = 16
+
 crosstalk_type = 'autocorr'
-# S_scale = 2
-# S_thresh = 1000#Kelvin
-# S_type = 'gsm%irm%i'%(S_scale,S_thresh)
-
-
 
 C = 299.792458
 kB = 1.3806488 * 1.e-23
@@ -113,40 +107,54 @@ force_recompute_SEi = False
 ################data file and load beam##############
 ####################################################
 INSTRUMENT = sys.argv[1]#'miteor'#'mwa'#
+AtNiA_only = False
+if len(sys.argv) > 2 and sys.argv[2][:5] == 'atnia':
+    AtNiA_only = True
+    pixel_scheme_number = int(sys.argv[2][5:])
 if INSTRUMENT == 'miteor':
-    dynamic_precision = .2#ratio of dynamic pixelization error vs data std, in units of data, so not power
-    S_type = 'none'#'dyS_lowadduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+    S_type = 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+
     seek_optimal_threshs = False
-    thresh = 2.
+    dynamic_precision = .2#.1#ratio of dynamic pixelization error vs data std, in units of data, so not power
+    thresh = 2.#.03125#
     valid_pix_thresh = 1.e-4
-    pre_remove_additive = True
+    nside_start = 32
+    nside_standard = 256
+
+    pre_calibrate = True
+    fit_for_additive = False
     nside_beamweight = 16
+
     lat_degree = 45.2977
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
-    tag = "q3AL_5_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
+    tag = "q0AL_13_abscal"  #"q3AL_5_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
     datatag = '_2016_01_20_avg_unpol'#'_seccasa.rad'#
     vartag = '_2016_01_20_avg_unpolx100'#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
-
+    antpairs = None
     # deal with beam: create a callable function of the form y(freq) in MHz and returns 2 by npix
     bnside = 256
     freqs = range(110, 200, 10)
     local_beam_unpol = si.interp1d(freqs, np.array([la.norm(np.fromfile(
         '/home/omniscope/data/mwa_beam/healpix_%i_%s.bin' % (bnside, p), dtype='complex64').reshape(
         (len(freqs), 12 * bnside ** 2, 2)), axis=-1)**2 for p in ['x', 'y']]).transpose(1, 0, 2), axis=0)
-else:
-    dynamic_precision = .5
-    S_type = 'dyS_min2adduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+elif INSTRUMENT == 'mwa':
+    S_type = 'dyS_lowadduniform_lowI'  #'none'#'dyS_min2adduniform_Iuniform'  # dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
     seek_optimal_threshs = True
-    pre_remove_additive = False
+    dynamic_precision = .2
+    pre_calibrate = True
+    fit_for_additive = False
     nside_beamweight = 256
+    nside_beamweight = 16
+    nside_start = 64
+    nside_standard = 128
     lat_degree = -26.703319
     lst_offset = 5.#tlist will be wrapped around [lst_offset, 24+lst_offset]
     tag = "mwa_aug23_eor0" #
     datatag = '.datt4'#
     vartag = ''#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/mwa_aug23_eor0_forjeff/'
-
+    antpairs = np.array(zip(np.fromfile(datadir + 'ant1_int16.dat', dtype='int16'), np.fromfile(datadir + 'ant2_int16.dat', dtype='int16')))
     # deal with beam: create a callable function of the form y(freq) in MHz and returns 2 by npix
     bnside = 256
     freqs = range(110, 200, 10)
@@ -391,10 +399,16 @@ def get_complex_data(real_data, nubl=nUBL_used, nt=nt_used):
     real_data.shape = input_shape
     return result
 
-
-################
-####pre_remove_additive
-################
+################################
+################################
+####pre_calibrate################
+################################
+################################
+#####1. antenna based calibration#######
+if antpairs is not None:
+    used_antpairs = antpairs[abs(ubl_index['x'])-1]
+    n_usedants = np.unique(used_antpairs)
+#####2. re-phasing and crosstalk#######
 additive_A = np.empty((nUBL_used, 2, nt_used, 1 + 4 * nUBL_used), dtype='complex128')
 
 #put in autocorr regardless of whats saved on disk
@@ -405,7 +419,7 @@ for p in range(2):
         additive_A[i, p, :, 1 + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
 
 additive_A.shape = (nUBL_used * 2 * nt_used, 1 + 4 * nUBL_used)
-if pre_remove_additive:
+if pre_calibrate:
     import omnical.calibration_omni as omni
     raw_data = np.copy(data).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
     real_additive_A = np.concatenate((np.real(additive_A), np.imag(additive_A)), axis=0)
@@ -433,6 +447,8 @@ if pre_remove_additive:
             cdata[:, p] *= np.exp(1.j * used_common_ubls[:, :2].dot(rephase))[:, None]
         data = np.concatenate((np.real(cdata).flatten(), np.imag(cdata).flatten()))
 
+
+    np.savez(os.path.dirname(data_filename) + tag + datatag + vartag + '_gsmcal_n%i_bn%i.npz'%(nside_standard, bnside), data=data, Ni=Ni)
 
 
 
@@ -466,13 +482,12 @@ fake_solution_map = np.zeros_like(thetas)
 for i in range(len(fake_solution_map)):
     fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
 fake_solution_map = fake_solution_map[valid_pix_mask]
-if pre_remove_additive:
+if not fit_for_additive:
     fake_solution = np.copy(fake_solution_map)
 else:
     fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
 
 sizes = np.array(sizes)[valid_pix_mask]
-
 
 def sol2map(sol):
     solx = sol[:valid_npix]
@@ -557,7 +572,7 @@ def get_A():
     #         A[i, p, :, valid_npix + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
 
     A.shape = (nUBL_used * 2 * nt_used, A.shape[-1])
-    if pre_remove_additive:
+    if not fit_for_additive:
         A = A[:, :valid_npix]
     else:
         A[:, valid_npix:] = additive_A[:, 1:]
@@ -610,7 +625,7 @@ if plot_data_error:
     cdata = get_complex_data(data)
     cdynamicmodel = get_complex_data(clean_sim_data)
     cNi = get_complex_data(Ni)
-    if pre_remove_additive:
+    if pre_calibrate:
         cadd = get_complex_data(additive_term)
 
     fun = np.imag
@@ -626,7 +641,7 @@ if plot_data_error:
             plt.plot(srt, fun(fullsim_vis[u, p][asrt]))
             plt.plot(srt, fun(cdynamicmodel[u, p][asrt]))
             plt.plot(srt, fun(cNi[u, p][asrt])**-.5)
-            if pre_remove_additive:
+            if pre_calibrate:
                 plt.plot(srt, fun(cadd[u, p][asrt]))
             data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p]))), 5 * np.max(np.abs(fun(cNi[u, p])))])
             plt.title("%.1f,%.1f"%(used_common_ubls[u, 0], used_common_ubls[u, 1]))
@@ -636,6 +651,21 @@ if plot_data_error:
     print "total deviation between dynamic and full sim compared to data noise", la.norm(fullsim_vis - cdynamicmodel) / np.sum(Ni**-1)**.5
     plt.show()
 
+    try:
+        fullsim_vis2 = 4 * np.fromfile(datadir + tag + '_p2_u%i_t%i_nside%i_bnside%i.simvis'%(nUBL_used+1, nt_used, nside_standard / 2, bnside), dtype='complex64').reshape((2, nUBL_used+1, nt_used))[:, :-1].transpose((1, 0 ,2))
+        plt.plot(la.norm(used_common_ubls, axis=-1)*freq/300, la.norm(fullsim_vis - fullsim_vis2, axis=-1)[:, 0] / la.norm(fullsim_vis, axis=-1)[:, 0], 'g+', label='nside error')
+    except:
+        try:
+            fullsim_vis2 = .25 * np.fromfile(datadir + tag + '_p2_u%i_t%i_nside%i_bnside%i.simvis'%(nUBL_used+1, nt_used, nside_standard * 2, bnside), dtype='complex64').reshape((2, nUBL_used+1, nt_used))[:, :-1].transpose((1, 0 ,2))
+            plt.plot(la.norm(used_common_ubls, axis=-1)*freq/300, la.norm(fullsim_vis - fullsim_vis2, axis=-1)[:, 0] / la.norm(fullsim_vis, axis=-1)[:, 0], 'g+', label='nside error')
+        except:
+            pass
+    plt.plot(la.norm(used_common_ubls, axis=-1)*freq/300, np.sum(2. / np.real(get_complex_data(Ni)), axis=-1)[:, 0]**.5 / la.norm(fullsim_vis, axis=-1)[:, 0], 'b+', label='noise error')
+    plt.plot(la.norm(used_common_ubls, axis=-1)*freq/300, la.norm(fullsim_vis - cdynamicmodel, axis=-1)[:, 0] / la.norm(fullsim_vis, axis=-1)[:, 0], 'r+', label='dynamic pixel error')
+    plt.legend()
+    plt.xlabel('Baseline Length (wavelength)')
+    plt.ylabel('Relative RMS Error')
+    plt.show()
 
 
 
@@ -649,7 +679,7 @@ clean_sim_data *= vis_normalization
 fullsim_vis *= vis_normalization
 sim_data = np.concatenate((np.real(fullsim_vis.flatten()), np.imag(fullsim_vis.flatten()))) + np.random.randn(len(data)) / Ni ** .5
 #add additive term
-if not pre_remove_additive:
+if fit_for_additive:
     sim_data.shape = (2, nUBL_used, 2, nt_used)
     sim_additive = np.random.randn(2, nUBL_used, 2) * np.median(np.abs(data)) / 2.
     sim_data = sim_data + np.array([np.outer(sim_additive[..., p], autocorr_vis_normalized[p]).reshape((2, nUBL_used, nt_used)) for p in range(2)]).transpose((1, 2, 0, 3))#sim_additive[..., None]
@@ -667,12 +697,16 @@ timer = time.time()
 
 #diagonal of S consists of S_diag_I and S-diag_add
 if S_type == 'none':
-    S = np.eye(Ashape1) * np.max(equatorial_GSM_standard)**2 * 1.e12
+    S_diag = np.ones(Ashape1) * np.max(equatorial_GSM_standard)**2 * 1.e12
 else:
-    if 'Iuniform' in S_type:
-        S_diag_I = (np.median(equatorial_GSM_standard) * sizes)**2
+    if 'lowI' in S_type:
+        I_supress = 25.
     else:
-        S_diag_I = fake_solution_map ** 2  # np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
+        I_supress = 1.
+    if 'Iuniform' in S_type:
+        S_diag_I = (np.median(equatorial_GSM_standard) * sizes)**2 / I_supress
+    else:
+        S_diag_I = fake_solution_map ** 2 /I_supress  # np.array([[1+pol_frac,0,0,1-pol_frac],[0,pol_frac,pol_frac,0],[0,pol_frac,pol_frac,0],[1-pol_frac,0,0,1+pol_frac]]) / 4 * (2*sim_x_clean[i])**2
 
     data_max = np.transpose(np.percentile(np.abs(data.reshape((2, nUBL_used, 2, nt_used))), 95, axis=-1), (1, 2, 0)).flatten()
     if 'min2add' in S_type:
@@ -689,10 +723,10 @@ else:
     else:
         S_diag_add = data_max**2 / add_supress
 
-    if pre_remove_additive:
-        S = np.diag(S_diag_I).astype('float64')
+    if not fit_for_additive:
+        S_diag = S_diag_I.astype('float64')
     else:
-        S = np.diag(np.concatenate((S_diag_I, S_diag_add))).astype('float64')
+        S_diag = np.concatenate((S_diag_I, S_diag_add)).astype('float64')
     print "Done."
     print "%f minutes used" % (float(time.time() - timer) / 60.)
     sys.stdout.flush()
@@ -702,7 +736,7 @@ else:
 # compute (AtNiA+Si)i eigensystems
 precision = 'float64'
 AtNiAi_tag = 'AtNiASii'
-if pre_remove_additive:
+if not fit_for_additive:
     AtNiAi_version = 0.3
 elif crosstalk_type == 'autocorr':
     AtNiAi_version = 0.2
@@ -710,19 +744,19 @@ else:
     AtNiAi_version = 0.1
 rcond_list = 10.**np.arange(-12., -2., 1.)
 
-AtNiAi_candidate_files = glob.glob(AtNiAi_tag + '_S%s_RE*_N%s_v%.1f'%(S_type, vartag, AtNiAi_version) + A_filename)
-if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_recompute and not force_recompute_S:
-    rcond = min([float(fn.split('_RE')[1].split('_N')[0]) for fn in AtNiAi_candidate_files])
+AtNiAi_candidate_files = glob.glob(datadir + tag + AtNiAi_tag + '_S%s_RE*_N%s_v%.1f'%(S_type, vartag, AtNiAi_version) + A_filename)
+if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_recompute and not force_recompute_S and not AtNiA_only:
+    rcond = 10**min([float(fn.split('_RE')[1].split('_N')[0]) for fn in AtNiAi_candidate_files])
 
     AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
     AtNiAi_path = datadir + tag + AtNiAi_filename
 
     print "Reading Regularized AtNiAi...",
     sys.stdout.flush()
-    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision)
+    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
 else:
     AtNiA_tag = 'AtNiA_N%s'%vartag
-    if pre_remove_additive:
+    if not fit_for_additive:
         AtNiA_tag += "_noadd"
     elif crosstalk_type == 'autocorr':
         AtNiA_tag += "_autocorr"
@@ -743,26 +777,37 @@ else:
         print "%f minutes used" % (float(time.time() - timer) / 60.)
         sys.stdout.flush()
         AtNiA.tofile(AtNiA_path)
+        if AtNiA_only:
+            sys.exit(0)
     del (A)
-
-    print "Computing Regularized AtNiAi, %s, expected time %.1f min"%(datetime.datetime.now(), 88. * (len(S) / 4.6e4)**3.),
+    AtNiA_diag = np.diagonal(AtNiA)
+    print "Computing Regularized AtNiAi, %s, expected time %.1f min"%(datetime.datetime.now(), 88. * (len(S_diag) / 4.6e4)**3.),
     sys.stdout.flush()
     timer = time.time()
-    if la.norm(S) != la.norm(np.diagonal(S)):
-        raise Exception("Non-diagonal S not supported yet")
+    # if la.norm(S) != la.norm(np.diagonal(S)):
+    #     raise Exception("Non-diagonal S not supported yet")
 
     for rcond in rcond_list:
+        #add Si on top og AtNiA without renaming AtNiA to save memory
+        maxAtNiA = np.max(AtNiA)
+        AtNiA.shape = (len(AtNiA) ** 2)
+        AtNiA[::len(S_diag) + 1] += 1./S_diag
+
         print 'trying', rcond,
         sys.stdout.flush()
         try:
             AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
             AtNiAi_path = datadir + tag + AtNiAi_filename
-
-            AtNiAi = sv.InverseCholeskyMatrix(np.diag(1./np.diagonal(S)) + AtNiA + np.eye(S.shape[0]) * np.max(AtNiA) * rcond).astype(precision)
+            AtNiA[::len(S_diag) + 1] += maxAtNiA * rcond
+            AtNiA.shape = (Ashape1, Ashape1)
+            AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(precision)
+            del(AtNiA)
             AtNiAi.tofile(AtNiAi_path, overwrite=True)
             print "%f minutes used" % (float(time.time() - timer) / 60.)
+            print "regularization stength", (maxAtNiA * rcond)**-.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes)
             break
         except:
+            AtNiA[::len(S_diag) + 1] -= maxAtNiA * rcond
             continue
 
 
@@ -778,33 +823,33 @@ sys.stdout.flush()
 del (AtNiAi)
 A = get_A()
 best_fit = A.dot(w_solution.astype(A.dtype))
-best_fit_no_additive = np.sum((A * (w_solution.astype(A.dtype))).reshape((Ashape0, Ashape1))[..., :valid_npix].astype('float64'), axis=-1)
+best_fit_no_additive = A[..., :valid_npix].dot(w_solution[:valid_npix].astype(A.dtype))
 
 sim_best_fit = A.dot(w_sim_sol.astype(A.dtype))
-sim_best_fit_no_additive = np.sum((A * (w_sim_sol.astype(A.dtype))).reshape((Ashape0, Ashape1))[..., :valid_npix].astype('float64'), axis=-1)
+sim_best_fit_no_additive = A[..., :valid_npix].dot(w_sim_sol[:valid_npix].astype(A.dtype))
 
 if plot_data_error:
     qaz_model = (clean_sim_data * vis_normalization).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
     qaz_data = np.copy(data).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
-    if pre_remove_additive:
+    if pre_calibrate:
         qaz_add = np.copy(additive_term).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
-    us = ubl_sort['x'][::len(ubl_sort['x'])/70]
+    us = ubl_sort['x'][::max(1, len(ubl_sort['x'])/70)]
     best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
     best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
     ri = 1
     for p in range(2):
         for nu, u in enumerate(us):
 
-            plt.subplot(6, (len(us) + 3)/6, nu + 1)
+            plt.subplot(6, (len(us) + 5) / 6, nu + 1)
             # plt.errorbar(range(nt_used), qaz_data[ri, u, p], yerr=Ni.reshape((2, nUBL_used, 2, nt_used))[ri, u, p]**-.5)
             plt.plot(qaz_data[ri, u, p])
             plt.plot(qaz_model[ri, u, p])
             plt.plot(best_fit[ri, u, p])
             plt.plot(best_fit_no_additive[ri, u, p])
-            if pre_remove_additive:
+            if pre_calibrate:
                 plt.plot(qaz_add[ri, u, p])
-            else:
-                plt.plot(np.ones_like(qaz_data[ri, u, p]) * sol2additive(w_solution)[p, u, ri])
+            if fit_for_additive:
+                plt.plot(autocorr_vis_normalized[p] * sol2additive(w_solution)[p, u, ri])
             plt.plot(best_fit[ri, u, p] - qaz_data[ri, u, p])
             plt.plot(Ni.reshape((2, nUBL_used, 2, nt_used))[ri, u, p]**-.5)
             data_range = np.max(np.abs(qaz_data[ri, u, p]))
@@ -830,22 +875,24 @@ if plot_data_error:
     #         plt.ylim([-1.05*data_range, 1.05*data_range])
     # plt.show()
 
-def plot_IQU(solution, title, col, ncol=4, coord='C'):
+def plot_IQU(solution, title, col, shape=(2,3), coord='C'):
     # Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
     # I = Es[0] + Es[3]
     # Q = Es[0] - Es[3]
     # U = Es[1] + Es[2]
     I = sol2map(solution)
     plotcoordtmp = coord
-    hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(1, ncol, col))
-    if col == ncol:
+    hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
+    if col == shape[0] * shape[1]:
         plt.show()
 
 for coord in ['C', 'CG']:
-    plot_IQU(fake_solution, 'GSM gridded', 1, coord=coord)
-    plot_IQU(w_GSM, 'wienered GSM', 2, coord=coord)
-    plot_IQU(w_sim_sol, 'wienered simulated solution', 3, coord=coord)
-    plot_IQU(w_solution, 'wienered solution', 4, coord=coord)
+    plot_IQU(w_GSM, 'wienered GSM', 1, coord=coord)
+    plot_IQU(w_sim_sol, 'wienered simulated solution', 2, coord=coord)
+    plot_IQU(w_solution, 'wienered solution', 3, coord=coord)
+    plot_IQU(fake_solution, 'GSM gridded', 4, coord=coord)
+    plot_IQU(w_sim_sol - w_GSM + fake_solution, 'combined sim solution', 5, coord=coord)
+    plot_IQU(w_solution - w_GSM + fake_solution, 'combined solution', 6, coord=coord)
     plt.show()
 
 
@@ -865,7 +912,54 @@ plt.subplot(2, 2, 4)
 plt.plot(tlist, [la.norm(chi[..., t]) for t in range(error.shape[-1])])
 plt.show()
 
-cheat_cal = True
+#point spread function:
+if True and S_type == 'none':
+    print "Reading Regularized AtNiAi...",
+    sys.stdout.flush()
+    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
+
+    AtNiA_tag = 'AtNiA_N%s'%vartag
+    if not fit_for_additive:
+        AtNiA_tag += "_noadd"
+    elif crosstalk_type == 'autocorr':
+        AtNiA_tag += "_autocorr"
+    AtNiA_filename = AtNiA_tag + A_filename
+    AtNiA_path = datadir + tag + AtNiA_filename
+    print "Reading AtNiA...",
+    sys.stdout.flush()
+    AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
+
+    iplot = 0
+    valid_thetas_phis = np.array(zip(thetas, phis))[valid_pix_mask]
+    full_thetas, full_phis = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
+    for theta in np.arange(0, np.pi*.9, np.pi/6.):
+        for phi in np.arange(0, np.pi*2, np.pi/3.):
+            iplot += 1
+            choose_plots = [1, 12, 24]
+            if iplot in choose_plots:
+                np.argmin(la.norm(valid_thetas_phis - [theta, phi], axis=-1))
+                point_vec = np.zeros_like(fake_solution)
+
+                point_vec[np.argmin(la.norm(valid_thetas_phis - [theta, phi], axis=-1))] = 1
+                spreaded = sol2map(AtNiAi.dotv(AtNiA.dot(point_vec)))
+                spreaded /= np.max(spreaded)
+                fwhm_mask = np.abs(spreaded) >= .5
+                masked_max_ind = np.argmax(spreaded[fwhm_mask])
+                fwhm_thetas = full_thetas[fwhm_mask]
+                fwhm_phis = full_phis[fwhm_mask]
+                #rotate angles to center around np.pi/2 0
+                fwhm_thetas, fwhm_phis = hpr.Rotator(rot=[fwhm_phis[masked_max_ind], np.pi/2-fwhm_thetas[masked_max_ind], 0], deg=False)(fwhm_thetas, fwhm_phis)
+                print fwhm_thetas[masked_max_ind], fwhm_phis[masked_max_ind]#should print 1.57079632679 0.0 if rotation is working correctly
+
+
+                fwhm_theta = max(fwhm_thetas) - min(fwhm_thetas)
+                phi_offset = fwhm_phis[masked_max_ind] - np.pi
+                fwhm_phis = (fwhm_phis - phi_offset)%(2*np.pi) + phi_offset
+                fwhm_phi = max(fwhm_phis) - min(fwhm_phis)
+                hpv.mollview(np.log10(np.abs(spreaded)), min=-3, max=0, nest=True, coord='CG', title='FWHM = %.1f°'%((fwhm_theta*fwhm_phi)**.5*180./np.pi), sub=(len(choose_plots), 1, choose_plots.index(iplot)+1))
+    plt.show()
+
+cheat_cal = False
 if cheat_cal:
     cdata = get_complex_data(data)
     ccheat_data = np.zeros_like(cdata)
@@ -901,7 +995,7 @@ if cheat_cal:
     plt.show()
 
     cheat_data = np.concatenate((np.real(ccheat_data.flatten()), np.imag(ccheat_data.flatten())))
-    cheat_w_solution = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision).dotv(np.transpose(A).dot((cheat_data * Ni).astype(A.dtype)))
+    cheat_w_solution = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision).dotv(np.transpose(A).dot((cheat_data * Ni).astype(A.dtype)))
 
     for coord in ['C', 'CG']:
         plot_IQU(fake_solution, 'GSM gridded', 1, coord=coord)
@@ -936,7 +1030,7 @@ if selfcal:
         #sooolve
         return phase_cal
 
-    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S), precision)
+    AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
     new_data = np.copy(data)
     new_best_fit = np.copy(best_fit)
     new_best_fit_no_additive = np.copy(best_fit_no_additive)
