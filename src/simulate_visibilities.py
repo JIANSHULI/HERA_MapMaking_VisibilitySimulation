@@ -4,6 +4,7 @@ import scipy.sparse as sps
 import scipy.linalg as sla
 import numpy.linalg as la
 import scipy.special as ssp
+import scipy.interpolate as si
 import math as m
 import cmath as cm
 from wignerpy._wignerpy import wigner3j, wigner3jvec
@@ -18,6 +19,8 @@ import os, time, sys
 #some constant
 pi=m.pi
 e=m.e
+PI = np.pi
+TPI = 2 * PI
 
 ###############################################
 #functions for coordinate transformation
@@ -112,6 +115,39 @@ def spheh(l,m,theta,phi):
 ############################################
 #other functions
 ################################################
+def equirectangular2heapix(data, nside=None, data_x=None, data_y=None, nest=True, manual_phi_correction=0):
+    if data_x is None:
+        delx = 2*np.pi / (data.shape[1] - 1)
+        data_x = np.arange(0, 2*np.pi+delx/100., delx)
+    if data_y is None:
+        dely = np.pi / (data.shape[0] - 1)
+        data_y = np.arange(np.pi, -dely/100., -dely)
+    if data.shape != (len(data_y), len(data_x)):
+        raise ValueError("Input shape mismatch between %s and (%i, %i)"%(data.shape, len(data_y), len(data_x)))
+    inter_f = si.interp2d(sorted(data_x), sorted(data_y), data[np.ix_(np.argsort(data_y), np.argsort(data_x))])
+    if nside is None:
+        nside = 4 * 64 * int(2**np.ceil(np.log2(PI / 180. / min(TPI / (len(data_x) - 1), PI / (len(data_y) - 1)))))
+
+    result = np.empty(12*nside**2, dtype=data.dtype)
+
+    heal_thetas, heal_phis = hpf.pix2ang(nside, range(12*nside**2), nest=nest)
+    unique_heal_thetas = np.unique(heal_thetas)
+
+    for heal_theta in unique_heal_thetas:
+        theta_mask = heal_thetas == heal_theta
+
+        #doing some complicated juggling bc interp function automatically sort the list input and output according to that implicitly re-arranged inuput list
+        qaz_phis = (heal_phis[theta_mask] + manual_phi_correction) % (np.pi*2)
+        qaz = np.zeros_like(heal_phis[theta_mask])
+        qaz[np.argsort(qaz_phis)] = inter_f(np.sort(qaz_phis), heal_theta).flatten()
+
+        result[theta_mask] = qaz
+    #     if np.abs(heal_theta - np.pi/2.) < 5*np.pi/180.:
+    #         print np.isnan(qaz).all()
+    # print np.isnan(data).all()
+    # print data_x
+    # print data_y
+    return result
 ##########################################
 #get the appropriate nside that has the desired accuracy for a healpix map
 ##########################################

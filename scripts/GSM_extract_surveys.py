@@ -12,7 +12,8 @@ import matplotlib
 from matplotlib import cm
 import sys, time, os
 import simulate_visibilities.simulate_visibilities as sv
-
+PI = np.pi
+TPI = PI * 2
 def pol_frac(I, Q, U, V=0):
     return (Q**2 + U**2 + V**2)**.5 / I
 
@@ -59,37 +60,6 @@ def plot_dataset(data_set):
             raise ValueError("Shape problem.")
     plt.show()
 
-def equirectangular2heapix(data, nside, data_x=None, data_y=None, nest=True, manual_phi_correction=0):
-    if data_x is None:
-        delx = 2*np.pi / (data.shape[1] - 1)
-        data_x = np.arange(0, 2*np.pi+delx/100., delx)
-    if data_y is None:
-        dely = np.pi / (data.shape[0] - 1)
-        data_y = np.arange(np.pi, -dely/100., -dely)
-    if data.shape != (len(data_y), len(data_x)):
-        raise ValueError("Input shape mismatch between %s and (%i, %i)"%(data.shape, len(data_y), len(data_x)))
-    inter_f = si.interp2d(sorted(data_x), sorted(data_y), data[np.ix_(np.argsort(data_y), np.argsort(data_x))])
-
-    result = np.empty(12*nside**2, dtype=data.dtype)
-
-    heal_thetas, heal_phis = hpf.pix2ang(nside, range(12*nside**2), nest=nest)
-    unique_heal_thetas = np.unique(heal_thetas)
-
-    for heal_theta in unique_heal_thetas:
-        theta_mask = heal_thetas == heal_theta
-
-        #doing some complicated juggling bc interp function automatically sort the list input and output according to that implicitly re-arranged inuput list
-        qaz_phis = (heal_phis[theta_mask] + manual_phi_correction) % (np.pi*2)
-        qaz = np.zeros_like(heal_phis[theta_mask])
-        qaz[np.argsort(qaz_phis)] = inter_f(np.sort(qaz_phis), heal_theta).flatten()
-
-        result[theta_mask] = qaz
-    #     if np.abs(heal_theta - np.pi/2.) < 5*np.pi/180.:
-    #         print np.isnan(qaz).all()
-    # print np.isnan(data).all()
-    # print data_x
-    # print data_y
-    return result
 
 def ud_grade(m, nside, nest=True):
     if nside != hpf.npix2nside(len(m)):
@@ -178,67 +148,145 @@ def merge_map(maps, nside=None, nest=True, verbose=False, renormalize=False):
 
     return result
 
+def read_equirectangular(file_name, unit_scale=1, ):
+    f = fit.read_header(file_name)
+    data = fit.read(file_name)[0]
+    data[:, :-1] = np.roll(data[:, :-1], (f['NAXIS1'] - 1) / 2, axis=1)[:, ::-1]
+    data[:, -1] = data[:, 0]
+    dmax = f['DATAMAX']
+    dmin = f['DATAMIN']
+    data[data > dmax] = -1e6 * dmax
+    data[data < dmin] = -1e6 * dmax
+    data = sv.equirectangular2heapix(data)
+    data[data <= 0] = np.nan
+    return unit_scale * data
 
 plot_individual = False
 
-
+DEGREE = PI / 180.
+ARCMIN = DEGREE / 60.
 ###########################
 ###########################
 ###OVER ALL PARAMETERS
 ###########################
 ###########################
-extract_nside = 512
-mother_nside = 32
+version = 2.5
+I_only = True
+mother_nside = 128
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 10. * np.pi / 180.
-edge_width = 10. * np.pi / 180.
+smoothing_fwhm = 5 * DEGREE
+edge_width = 5 * DEGREE
 remove_cmb = True
 
 #it's a pretty bad crime to not diffretiate file name based on what data set are included...
-data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
+data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb, not I_only, version)
 
 
 if os.path.isfile(data_file_name):
     raise Exception(data_file_name + " already exist.")
 else:
     ns = mother_nside * 2
-    while ns <= extract_nside:
-        larger_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(ns, smoothing_fwhm, edge_width, remove_cmb)
-        if os.path.isfile(larger_file_name):
-            print 'Found ' + larger_file_name
-            data_file = np.load(larger_file_name)
-            freqs = data_file['freqs']
-            idata = [ud_grade(m, mother_nside) for m in data_file['idata']]
-            qdata = [ud_grade(m, mother_nside) for m in data_file['qdata']]
-            udata = [ud_grade(m, mother_nside) for m in data_file['udata']]
-            np.savez(data_file_name, freqs=freqs, idata=idata, qdata=qdata, udata=udata)
-            sys.exit(0)
+    while ns <= 4096:
+        larger_file_names = ['/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(ns, smoothing_fwhm, edge_width, remove_cmb, not I_only, version)]
+        if I_only:
+            larger_file_names.append('/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(ns, smoothing_fwhm, edge_width, remove_cmb, True, version))
+        for larger_file_name in larger_file_names:
+            if os.path.isfile(larger_file_name):
+                print 'Found ' + larger_file_name
+                data_file = np.load(larger_file_name)
+                freqs = data_file['freqs']
+                idata = [ud_grade(m, mother_nside) for m in data_file['idata']]
+                qdata = [ud_grade(m, mother_nside) for m in data_file['qdata']]
+                udata = [ud_grade(m, mother_nside) for m in data_file['udata']]
+                np.savez(data_file_name, freqs=freqs, idata=idata, qdata=qdata, udata=udata)
+                sys.exit(0)
         ns *= 2
+
+resolutions = {}
+
+
+###########################
+###DRAO 10MHZ and 22MHz
+#########################
+drao_low = {.01: read_equirectangular("/home/omniscope/data/polarized foregrounds/fits23904_DRAO10.bin"),
+          .022: read_equirectangular("/home/omniscope/data/polarized foregrounds/fits23937_DRAO22.bin"),
+          }
+resolutions[.010] = (2.6 * 1.9)**.5 * DEGREE
+resolutions[.022] = (1.1 * 1.7)**.5 * DEGREE
+if plot_individual:
+    plot_dataset(drao_low)
+
 ###########################
 ###parkes 85 and 150mhz
 #########################
-
-parkes_85 = fit.read("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin")[0]
-parkes_85[:, :-1] = np.roll(parkes_85[:, :-1], 180, axis=1)[:, ::-1]
-parkes_85[:, -1] = parkes_85[:, 0]
-parkes_85[parkes_85 > 1.4e4] = -1e-9
-parkes_85[parkes_85 <= 0] = -1e-9
-parkes_85 = equirectangular2heapix(parkes_85, extract_nside)
-parkes_85[parkes_85 <= 0] = np.nan
-
-parkes_150 = fit.read("/home/omniscope/data/polarized foregrounds/parkes_150mhz.bin")[0]
-parkes_150[:, :-1] = np.roll(parkes_150[:, :-1], 180, axis=1)[:, ::-1]
-parkes_150[:, -1] = parkes_150[:, 0]
-parkes_150[parkes_150 > 7.e3] = -1e-9
-parkes_150[parkes_150 <= 0] = -1e-9
-parkes_150 = equirectangular2heapix(parkes_150, extract_nside)
-parkes_150[parkes_150 <= 0] = np.nan
-
-parkes = {.085: parkes_85,
-          .15: parkes_150,
+parkes = {.085: read_equirectangular("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin"),
+          .15: read_equirectangular("/home/omniscope/data/polarized foregrounds/parkes_150mhz.bin"),
           }
+resolutions[.085] = (3.8 * 3.5)**.5 * DEGREE
+resolutions[.15] = 2.2 * DEGREE
 if plot_individual:
     plot_dataset(parkes)
+
+
+#########################
+###Dwingloo#########################
+#########################
+dwingloo = {.82: read_equirectangular('/home/omniscope/data/polarized foregrounds/fits19231_Dwingloo.bin', unit_scale=0.1)}
+resolutions[.82] = 1.2 * DEGREE
+
+
+#########################
+###Stockert 2.72#########################
+#########################
+data_x = np.arange(PI/2, -PI/2-.00001, -DEGREE/8)%(2*PI)
+data_y = np.arange(PI/2+DEGREE*50, PI/2-DEGREE*50-.00001, -DEGREE/8)%(2*PI)
+stockert11cm = fit.read('/home/omniscope/data/polarized foregrounds/fits27917_stockert11cm_180_100.bin')[0] * 1e-3
+stockert11cm_header = fit.read_header('/home/omniscope/data/polarized foregrounds/fits27917_stockert11cm_180_100.bin')
+stockert11cm[stockert11cm > stockert11cm_header['DATAMAX']] = -1e6 * stockert11cm_header['DATAMAX']
+stockert11cm[stockert11cm < stockert11cm_header['DATAMIN']] = -1e6 * stockert11cm_header['DATAMAX']
+stockert11cm = sv.equirectangular2heapix(stockert11cm, nside=1024, data_x=data_x, data_y=data_y)
+stockert11cm[stockert11cm < 0] = np.nan
+stockert11cm = {2.72: stockert11cm}
+resolutions[2.72] = 21 * ARCMIN#data website uses 21, paper says 4.3
+
+
+
+#########################
+###mother file#########################
+#########################
+# motherfile = {}
+# motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
+# for i in range(motherfile_data.shape[1]):
+#     motherfile[i] = motherfile_data[:, i]
+# plot_dataset(motherfile)
+
+motherfile = {}
+motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
+motherfile[.045] = motherfile_data[:, -9]
+motherfile[2.33] = motherfile_data[:, -1]
+# motherfile[.0345] = motherfile_data[:, -11]
+# motherfile[.408] = motherfile_data[:, -3]
+# motherfile[.022] = motherfile_data[:, -13]
+# motherfile[.82] = motherfile_data[:, -2]
+# motherfile[.010] = motherfile_data[:, -16]
+
+# resolutions[.010] = (2.6 * 1.9)**.5 * DEGREE
+# resolutions[.022] = (1.1 * 1.7)**.5 * DEGREE
+resolutions[.045] = 5*DEGREE#3.6 * DEGREE
+# resolutions[.82] = 1.2 * DEGREE
+resolutions[2.33] = 5*DEGREE#20 * ARCMIN
+if plot_individual:
+    plot_dataset(motherfile)
+
+#########################
+###Haslam#########################
+#########################
+haslam = fit.read("/home/omniscope/data/polarized foregrounds/haslam408_dsds_Remazeilles2014.fits")['TEMPERATURE'].flatten()
+haslam = {.408: haslam[hpf.nest2ring(int((len(haslam)/12)**.5), range(len(haslam)))]}
+resolutions[.408] = .8 * DEGREE
+if plot_individual:
+    plot_dataset(haslam)
+
 ###########################
 ###1.4G: DRAO+villa Elisa+CHIPASS+LAB
 ###########################
@@ -253,16 +301,16 @@ chipass[chipass <= 0] = np.nan
 stockert = fit.read("/home/omniscope/data/polarized foregrounds/stocker_villa_elisa.bin")[0]
 stockert[:, :-1] = np.roll(stockert[:, :-1], 720, axis=1)[:, ::-1]
 stockert[:, -1] = stockert[:, 0]
-stockert = equirectangular2heapix(stockert, extract_nside)
+stockert = sv.equirectangular2heapix(stockert)
 
-elisa = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/Elisa_POL_%s.bin"%key)[0], extract_nside) for key in ['I', 'Q', 'U']])
+elisa = np.array([sv.equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/Elisa_POL_%s.bin"%key)[0]) for key in ['I', 'Q', 'U']])
 elisa[elisa > 1000] = np.nan
 
-drao = np.array([equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/DRAO_POL_%s.bin"%key)[0], extract_nside) for key in ['I', 'Q', 'U']])
+drao = np.array([sv.equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/DRAO_POL_%s.bin"%key)[0]) for key in ['I', 'Q', 'U']])
 drao[drao > 1000] = np.nan
 
-reich_q = equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.q.lb.fits")[0], extract_nside, data_x=(np.pi+np.arange(np.pi * 2 + 1e-9, 0, -np.pi/720))%(np.pi*2+1e-9))
-reich_u = -equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.u.lb.fits")[0], extract_nside, data_x=(np.pi+np.arange(np.pi * 2 + 1e-9, 0, -np.pi/720))%(np.pi*2+1e-9))#reich is in IAU convention whose U is minus sign the CMB healpix convention
+reich_q = sv.equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.q.lb.fits")[0], data_x=(PI+np.arange(PI * 2 + 1e-9, 0, -PI/720))%(PI*2+1e-9))
+reich_u = -sv.equirectangular2heapix(fit.read("/home/omniscope/data/polarized foregrounds/allsky.u.lb.fits")[0], data_x=(PI+np.arange(PI * 2 + 1e-9, 0, -PI/720))%(PI*2+1e-9))#reich is in IAU convention whose U is minus sign the CMB healpix convention
 
 drao_elisa_iqu_syn[1.3945] = chipass
 drao_elisa_iqu_syn[1.435] = elisa
@@ -281,7 +329,8 @@ all_1400 = {
             reich_u, #merge_map([drao[2], elisa[2]]),
         ]) / 1.e3,
     1.3945: chipass / 1.e3}
-
+resolutions[1.42] = 0.6 * DEGREE
+resolutions[1.3945] = 14.4 * ARCMIN
 if plot_individual:
     plot_dataset(all_1400)
 
@@ -291,6 +340,7 @@ if plot_individual:
 spass = {}
 spass[2.3] = np.array([fit.read('/home/omniscope/data/polarized foregrounds/spass_hmap_m_1111_%s.fits'%IQU)['UNKNOWN1'].flatten()[hpf.nest2ring(1024, range(hpf.nside2npix(1024)))] for IQU in ['I', 'Q', 'U']])
 spass[2.3][2] = -spass[2.3][2] # IAU convention to CMB convention
+resolutions[2.3] = 9 * ARCMIN
 if plot_individual:
     plot_dataset(spass)
 ###########################
@@ -310,6 +360,15 @@ planck_iqu[217.0] = np.array([fit.read("/home/omniscope/data/polarized foregroun
 planck_iqu[353.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_353_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
 planck_iqu[545.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_545_2048_R2.02_full.fits")['I_STOKES']
 planck_iqu[857.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_857_2048_R2.02_full.fits")['I_STOKES']
+resolutions[30.0] = 33 * ARCMIN
+resolutions[44.0] = 24 * ARCMIN
+resolutions[70.0] = 14 * ARCMIN
+resolutions[100.0] = 10 * ARCMIN
+resolutions[143.0] = 7.1 * ARCMIN
+resolutions[217.0] = 5.5 * ARCMIN
+resolutions[353.0] = 5 * ARCMIN
+resolutions[545.0] = 5 * ARCMIN
+resolutions[857.0] = 5 * ARCMIN
 if plot_individual:
     plot_dataset(planck_iqu)
 
@@ -320,6 +379,8 @@ wmap_iqu[33.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/
 wmap_iqu[40.7] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Q_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
 wmap_iqu[60.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_V_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
 wmap_iqu[93.5] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_W_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
+for key in wmap_iqu.keys():
+    resolutions[key] = .88 * DEGREE
 if plot_individual:
     plot_dataset(wmap_iqu)
 
@@ -331,28 +392,6 @@ if plot_individual:
 # cmb_iqu_syn[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_Synchrotron-commander_0256_R2.00.fits")['I_ML']]
 #                                 + [fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_SynchrotronPol-commander_0256_R2.00.fits")[key] for key in ['Q_ML_FULL', 'U_ML_FULL']])
 # plot_dataset(cmb_iqu_syn)
-
-#########################
-###mother file#########################
-#########################
-# motherfile = {}
-# motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
-# for i in range(motherfile_data.shape[1]):
-#     motherfile[i] = motherfile_data[:, i]
-# plot_dataset(motherfile)
-
-motherfile = {}
-motherfile_data = np.fromfile("/home/omniscope/data/polarized foregrounds/motherfile_3145728_16_float64.bin", dtype='float64').reshape((3145728, 16))[hpf.nest2ring(512, range(3145728))]
-motherfile[.045] = motherfile_data[:, -9]
-motherfile[2.33] = motherfile_data[:, -1]
-# motherfile[.0345] = motherfile_data[:, -11]
-# motherfile[.408] = motherfile_data[:, -3]
-motherfile[.022] = motherfile_data[:, -13]
-motherfile[.82] = motherfile_data[:, -2]
-motherfile[.010] = motherfile_data[:, -16]
-if plot_individual:
-    plot_dataset(motherfile)
-
 
 
 
@@ -367,7 +406,7 @@ if plot_individual:
 #     d[:, -1] = d[:, 0]
 #     d[d > np.nanmax(d) * .8] = -1e9
 #     d[d <= 0] = -1e9
-#     d = equirectangular2heapix(d, extract_nside)
+#     d = sv.equirectangular2heapix(d)
 #     d[d <= 0] = np.nan
 #     iras[freq * 1.e3] = d
 #
@@ -386,8 +425,9 @@ theta_g, phi_g = hpf.pix2ang(1024, range(12*1024**2), nest=True)
 theta_e, phi_e = hpr.Rotator(coord='ge')(theta_g, phi_g)
 iris_zodiacal_mask_widths = [0, .2, .7, .7]
 for i, freq in enumerate([3.e3, 5.e3, 12.e3, 25.e3]):
-    iris[freq][np.abs(theta_e-np.pi/2) <= iris_zodiacal_mask_widths[i]] = np.nan
-
+    iris[freq][np.abs(theta_e-PI/2) <= iris_zodiacal_mask_widths[i]] = np.nan
+for key in iris.keys():
+    resolutions[key] = 4.3 * ARCMIN#imprecise: 3.8-4.3
 if plot_individual:
     plot_dataset(iris)
 
@@ -408,18 +448,13 @@ for freq in akari.keys():
 theta_g, phi_g = hpf.pix2ang(4096, range(12*4096**2), nest=True)
 theta_e, phi_e = hpr.Rotator(coord='ge')(theta_g, phi_g)
 # theta_z, phi_z = hpr.Rotator(rot=(0, 0, 90))(theta_e, phi_e)
-akari_zodiacal_mask = np.abs(theta_e-np.pi/2) <= .45
+akari_zodiacal_mask = np.abs(theta_e-PI/2) <= .45
 akari[3.e5/90][akari_zodiacal_mask] = np.nan
-
+for key in akari.keys():
+    resolutions[key] = 1.5 * ARCMIN#imprecise: 1-1.5
 if plot_individual:
     plot_dataset(akari)
-#########################
-###Haslam#########################
-#########################
-haslam = fit.read("/home/omniscope/data/polarized foregrounds/haslam408_dsds_Remazeilles2014.fits")['TEMPERATURE'].flatten()
-haslam = {.408: haslam[hpf.nest2ring(int((len(haslam)/12)**.5), range(len(haslam)))]}
-if plot_individual:
-    plot_dataset(haslam)
+
 
 
 ####PNM+87GB
@@ -433,25 +468,38 @@ if plot_individual:
 
 new_mother = {}
 for dict in [
+    parkes,
+    drao_low,
+    haslam,
+    dwingloo,
     motherfile,
     all_1400,
-    spass,
-    haslam,
+    # spass,
+    # stockert11cm,
     wmap_iqu,
     planck_iqu,
-    #parkes,
     #iras,
     iris,
     akari,
     ]:
     for f, data in dict.iteritems():
-        print f
-        sys.stdout.flush()
 
-        if data.ndim == 2:
-            new_mother[f] = np.array([preprocess(d, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width) for d in data])
+        if resolutions[f] < smoothing_fwhm * 1.1:
+            fwhm = smoothing_fwhm
+            if smoothing_fwhm <= resolutions[f] * 1.2:
+                fwhm = 0.
+            print f, resolutions[f], fwhm
+            sys.stdout.flush()
+
+            if data.ndim == 2:
+                if I_only:
+                    new_mother[f] = preprocess(data[0], mother_nside, fwhm=fwhm, edge_width=edge_width)
+                else:
+                    new_mother[f] = np.array([preprocess(d, mother_nside, fwhm=fwhm, edge_width=edge_width) for d in data])
+            else:
+                new_mother[f] = preprocess(data, mother_nside, fwhm=fwhm, edge_width=edge_width)
         else:
-            new_mother[f] = preprocess(data, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width)
+            print "skipping", f
 plot_dataset(new_mother)
 
 

@@ -41,20 +41,23 @@ fit_cas = True
 frac_cas = .9
 delay_compression = 15
 compress_method = 'average'
-pick_fs = [5]#range(delay_compression)
+pick_fs = range(delay_compression)
 
 freqs_dic = {
+    'qC0AL': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
+    'qC0CL': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
     'q0C': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
-    'q0CL': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
     'q0AL': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
     'q1A': np.arange(146., 133.5, -50./1024/delay_compression*256)[::-1],
     'q1AL': np.arange(146., 133.5, -50./1024/delay_compression*256)[::-1],
+    'qC1BL': np.arange(146., 133.5, -50./1024/delay_compression*256)[::-1],
     'q3A': np.arange(156., 168.5, 50./1024/delay_compression*256),
     'q3AL': np.arange(156., 168.5, 50./1024/delay_compression*256),
     'q4AL': np.arange(167., 179.5, 50./1024/delay_compression*256),
     'q4AL': np.arange(167., 179.5, 50./1024/delay_compression*256),
     'qC3A': np.arange(156., 168.5, 50./1024/delay_compression*256),
     'qC3B': np.arange(156., 168.5, 50./1024/delay_compression*256),
+    'qC3BL': np.arange(156., 168.5, 50./1024/delay_compression*256),
     'q2C': np.arange(145., 157.5, 50./1024/delay_compression*256),
     'q2CL': np.arange(145., 157.5, 50./1024/delay_compression*256),
     'q2AL': np.arange(145., 157.5, 50./1024/delay_compression*256),
@@ -77,7 +80,8 @@ flags = {}
 for pol in ['xx', 'yy']:
     flags[pol] = np.concatenate([np.fromfile(fname, dtype = 'bool').reshape((nTimes[i], nFrequencies[i])) for i, fname in enumerate(sorted(glob.glob("/home/omniscope/data/X5/2015calibration/*_%s_*%s.omniflag"%(Q, pol))))], axis=0)
 flag = flags['xx']|flags['yy']
-
+if 'qC0A' in Q:
+    flag[:400] = True
 
 for p, pol in enumerate(['xx', 'xy', 'yx', 'yy']):
     omnifits[pol] = np.concatenate([fit[..., 6::2] + 1.j*fit[..., 7::2] for fit in omnifits[pol]], axis=0).transpose((0,2,1))
@@ -638,6 +642,7 @@ for pick_f in psols.keys():
         (calibrated_results[pick_f][0]/TPI*24 + 1.j * freqs[pick_f]).astype('complex64').tofile(datadir + tag + '_%s_%i_%i.tf'%(pol, nt, nf))
         calibrated_results[pick_f][2][p].astype('complex64').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + datatag)
         calibrated_results[pick_f][3][p].astype('float32').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + vartag + '.var')
+        (100.*calibrated_results[pick_f][3][p]).astype('float32').tofile(datadir + tag + '_%s_%i_%i'%(pol, nt, nUBL) + vartag + 'x100.var')
         calibrated_results[pick_f][1].dot(correction_mat).astype('float32').tofile(datadir + tag + '_%s_%i_%i.ubl'%(pol, nUBL, 3))
 
 np.savez(datadir + 'cygcas_' + Q + datatag + vartag, cyg_cas_iquv=cyg_cas_iquv, cyg_cas_iquv_std=cyg_cas_iquv_std, freqs=freqs)

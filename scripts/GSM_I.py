@@ -85,15 +85,19 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
 ###OVER ALL PARAMETERS
 ###########################
 ###########################
-mother_nside = 64
+mother_nside = 128
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 3. * np.pi / 180.
-edge_width = 3. * np.pi / 180.
+smoothing_fwhm = 5 * np.pi / 180.
+edge_width = 5. * np.pi / 180.
 remove_cmb = True
+I_only = True
+version = 2.5
 
-n_principal_range = range(6, 7)
 
-include_visibility = True
+n_principal_range = range(6, 9)
+error_weighting = 'none'#'inv_error'#'remove_pt'
+
+include_visibility = False
 vis_Qs = ["q0AL_*_abscal", "q0C_*_abscal", "q1AL_*_abscal", "q2AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
 datatag = '_2016_01_20_avg_unpol'
 vartag = '_2016_01_20_avg_unpol'
@@ -103,7 +107,8 @@ for vis_Q in vis_Qs:
     filenames = glob.glob(datadir + vis_Q + '_xx*' + datatag)
     vis_tags = vis_tags + [os.path.basename(fn).split('_xx')[0] for fn in filenames]
 
-data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb)
+data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb, not I_only, version)
+
 
 
 data_file = np.load(data_file_name)
@@ -121,7 +126,7 @@ coverage_order = np.argsort(np.sum(~np.isnan(idata), axis=1))
 low_coverage_data = {}
 kick_candidate = 0#just increases from 0 to 1 to 2...
 removed_mask = np.zeros(len(freqs), dtype='bool')
-while np.sum(~np.isnan(idata[~removed_mask]).any(axis=0)) < mother_npix / 10:#when no region contains all frequencies
+while np.sum(~np.isnan(idata[~removed_mask]).any(axis=0)) < mother_npix / 20:#when no region contains all frequencies
     kick_f = coverage_order[kick_candidate]
     # kick_freq = freqs[kick_f]
     # low_coverage_data[kick_freq] = new_mother.pop(kick_freq)
@@ -238,12 +243,18 @@ for n_principal in n_principal_range:
     xbar_ni = np.copy(principal_maps)
 
     x_fit = np.transpose(w_nf).dot(xbar_ni)
-
-    for trial in range(1):#when trial goes to 1 we remove worst fitting pixels to remove point sources such as cyg and cas
+    point_source_mask = np.zeros(mother_npix, dtype=bool)
+    for trial in range(2):#when trial goes to 1 we remove worst fitting pixels to remove point sources such as cyg and cas
         if trial == 1:
             previous_error_map = np.nanmean((x_fit-x_fi)**2, axis=0)
-            all_idata[:, previous_error_map >= np.percentile(previous_error_map, 95)] = 0
-            xbar_ni[:, previous_error_map >= np.percentile(previous_error_map, 95)] = 0
+            if error_weighting == 'remove_pt':
+                point_source_mask = previous_error_map >= np.percentile(previous_error_map, 99)
+            elif error_weighting == 'inv_error':
+                x_fi = x_fi / previous_error_map**.5
+                x_fit = x_fit / previous_error_map**.5
+                xbar_ni = xbar_ni / previous_error_map**.5
+            elif error_weighting == 'none':
+                break
         errors = []
         current_error = 1#placeholder
         error = 1e12#placeholder
@@ -254,13 +265,13 @@ for n_principal in n_principal_range:
             sys.stdout.flush()
             current_error = error
 
-            normalization *= la.norm(x_fit, axis=1) / np.mean(la.norm(x_fit, axis=1))
+            normalization *= la.norm(x_fit[:, ~point_source_mask], axis=1) / np.mean(la.norm(x_fit[:, ~point_source_mask], axis=1))
             x_fi = all_idata / normalization[:, None]
 
             #for w
             w_nf_ideal = np.zeros_like(w_nf)
             for f in range(len(all_freqs)):
-                valid_mask = ~np.isnan(x_fi[f])
+                valid_mask = ~(np.isnan(x_fi[f]) | point_source_mask)
                 A = np.transpose(xbar_ni)[valid_mask]
                 b = x_fi[f, valid_mask]
                 w_nf_ideal[:, f] = la.inv(np.einsum('ki,kj->ij', A, A)).dot(np.transpose(A).dot(b))
@@ -285,9 +296,12 @@ for n_principal in n_principal_range:
             xbar_ni = xbar_ni_ideal * step_size + xbar_ni * (1 - step_size)
 
             x_fit = np.transpose(w_nf).dot(xbar_ni)
-            error = np.nansum((x_fit - x_fi).flatten()**2)
+            error = np.nansum((x_fit - x_fi)[:, ~point_source_mask].flatten()**2)
             errors.append(error)
-
+        if trial == 1:
+            x_fi = x_fi * previous_error_map**.5
+            x_fit = x_fit * previous_error_map**.5
+            xbar_ni = xbar_ni * previous_error_map**.5
     ev2, ec2 = la.eigh(np.einsum('ni,mi->nm', xbar_ni, xbar_ni))
     xbar_ni = la.inv(ec2).dot(xbar_ni)
     w_nf = np.transpose(ec2).dot(w_nf)
@@ -299,8 +313,8 @@ for n_principal in n_principal_range:
 
     w_estimates = [si.interp1d(np.log10(all_freqs), w_nf[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
 
-    result_filename = data_file_name.replace('data_', 'result_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f'%(n_principal, step_size))
-    np.savez(result_filename, w_nf=w_nf, x_ni=xbar_ni, normalization=normalization)
+    result_filename = data_file_name.replace('data_', 'result_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_err_%s'%(n_principal, step_size, error_weighting))
+    np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, M_for_w=np.eye(n_principal), normalization=normalization)
 
     ##################################################
     #####play with changing basis WMinv MX####################
@@ -376,7 +390,10 @@ for n_principal in n_principal_range:
         final_renorm = la.norm(w_nf_final, axis=-1)
         w_nf_final /= final_renorm[:, None]
         xbar_ni_final *= final_renorm[:, None]
+        M *= final_renorm[:, None]
+        Minv = la.inv(M)
         w_estimates_final = [si.interp1d(np.log10(all_freqs), w_nf_final[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
+        np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, M_for_w=np.transpose(Minv), normalization=normalization)
     #
     # ####auto-identifying ranges######
     # eigen_thresh = 0.05
@@ -422,12 +439,12 @@ for n_principal in n_principal_range:
     ##################################################
     #####make plots####################
     ##################################################
-    matplotlib.rcParams.update({'font.size': 5})
+    matplotlib.rcParams.update({'font.size': 15})
     plot_filename_base = result_filename.replace('result', 'plot')
 
-    make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, '_result_plot', n_principal, show_plots)
+    make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, '_result_plot_' + error_weighting, n_principal, show_plots)
     if n_principal == 6:
-        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_result_plot_M5', n_principal, show_plots)
+        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_result_plot_M5_' + error_weighting, n_principal, show_plots)
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
@@ -436,7 +453,7 @@ for n_principal in n_principal_range:
     plt.subplot(3, 1, 2)
     plt.plot(np.nanmean((x_fit-x_fi)**2, axis=1))
     hpv.mollview(np.log10(np.nanmean((x_fit-x_fi)**2, axis=0)), nest=True, sub=(3,1,3))
-    fig.savefig(plot_filename_base + '_error_plot.png', dpi=1000)
+    fig.savefig(plot_filename_base + '_error_plot_' + error_weighting + '.png', dpi=1000)
     if show_plots:
         plt.show()
     fig.clear()
@@ -446,7 +463,7 @@ for n_principal in n_principal_range:
     fig.set_canvas(plt.gcf().canvas)
     for f in range(len(all_freqs)):
         hpv.mollview(np.log10(np.abs(x_fit[f] - x_fi[f])), nest=True, title='%.3fGHz'%all_freqs[f], sub=(4, (len(all_freqs) - 1) / 4 + 1, f + 1), min=-5, max=-2)
-    fig.savefig(plot_filename_base + '_error_plot2.png', dpi=1000)
+    fig.savefig(plot_filename_base + '_error_plot2_' + error_weighting + '.png', dpi=1000)
     if show_plots:
         plt.show()
     fig.clear()
