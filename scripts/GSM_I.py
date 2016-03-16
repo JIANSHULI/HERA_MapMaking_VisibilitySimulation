@@ -321,86 +321,86 @@ for n_principal in n_principal_range:
     w_estimates = [si.interp1d(np.log10(all_freqs), w_nf[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
 
     result_filename = data_file_name.replace('data_', 'result_%i+%i_'%(len(idata), len(addon_idata))).replace('.npz', '_principal_%i_step_%.2f_err_%s'%(n_principal, step_size, error_weighting))
-    np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, M_for_w=np.eye(n_principal), normalization=normalization)
+    np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, M_for_w=np.eye(n_principal), normalization=normalization, ps_mask=point_source_mask)
 
     ##################################################
     #####play with changing basis WMinv MX####################
     ##################################################
 
     ###########manually isolate components###############
-    if n_principal == 6:
-        M = np.eye(n_principal)
-
-        M1inv = np.eye(n_principal)
-        manual_spike_freq_ranges = [[1, 2], [10, 1000], [0, 10], [50, 1e9], [500, 1e9]]
-        manual_spike_ranges = [np.arange(len(all_freqs))[(np.array(all_freqs) >= freq_range[0]) & (np.array(all_freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
-        # manual_spike_ranges = [np.arange(4, 8), np.arange(8, 22), np.arange(0, 8), np.arange(13, 29), np.arange(22, 29)]
-        manual_spike_principals = np.array([1, 0, 4, 2, 3]) - 6
-        for spike_fs, spike_principal in zip(manual_spike_ranges, manual_spike_principals):
-            if spike_principal >= -n_principal:
-                non_spike_fs = np.array([i for i in range(len(all_freqs)) if i not in spike_fs])
-                non_spike_principals = np.array([i for i in range(-n_principal, 0) if i != spike_principal])
-                spike_A = np.transpose(np.delete(w_nf[:, non_spike_fs], spike_principal, axis=0))
-                M1inv[non_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf[spike_principal, non_spike_fs]))
-        M1 = la.inv(M1inv)
-        w_nf1 = np.transpose(M1inv).dot(w_nf)
-        M = M1.dot(M)
-        print la.cond(M)
-
-
-        Minv2 = np.eye(n_principal)
-        for i in range(n_principal):
-            if i not in manual_spike_principals:
-                spike_principal = i
-                spike_fs = []
-                non_spike_fs = np.arange(len(all_freqs))
-                non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal])
-                spike_A = np.transpose(w_nf1[np.ix_(manual_spike_principals, non_spike_fs)])
-                Minv2[manual_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf1[spike_principal, non_spike_fs]))
-        M2 = la.inv(Minv2)
-        xbar_ni2 = M2.dot(M1.dot(xbar_ni))
-        M = M2.dot(M)
-        print la.cond(M)
-
-
-        M3 = np.eye(n_principal)
-        if n_principal >= 6:
-            galactic_plane_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) < np.pi/36
-            cmb_A = np.transpose(xbar_ni2[np.ix_(np.arange(-n_principal, 0) != -6, galactic_plane_mask)])
-            regulation = np.ones(n_principal - 1)
-            regulation[-5] = 100
-            regulation[-2] = 100
-            M3[-6, np.arange(-n_principal, 0) != -6] = -la.inv(np.transpose(cmb_A).dot(cmb_A) + np.diag(regulation)).dot(np.transpose(cmb_A).dot(xbar_ni2[0, galactic_plane_mask]))
-        Minv3 = la.inv(M3)
-        M = M3.dot(M)
-        w_nf3 = np.transpose(la.inv(M)).dot(w_nf)
-        xbar_ni3 = M3.dot(xbar_ni2)
-        print la.cond(M)
-
-
-        # for n in range(20):
-        #     M4 = np.eye(n_principal)
-        #     for p in [-4, -1]:
-        #         negative_mask = xbar_ni_final[p] < 0
-        #         if negative_mask.any():
-        #             negative_A = np.transpose(xbar_ni3[np.ix_(np.arange(-n_principal, 0) != p, negative_mask)])
-        #             regulation = np.zeros(n_principal - 1)
-        #             M4[p, np.arange(-n_principal, 0) != p] = -la.inv(np.transpose(negative_A).dot(negative_A) + np.diag(regulation)).dot(np.transpose(negative_A).dot(xbar_ni3[p, negative_mask]))
-        #     xbar_ni3 = M4.dot(xbar_ni3)
-        #     M = M4.dot(M)
-        #     print la.cond(M), la.norm(xbar_ni3[-4][xbar_ni3[-4] < 0]), la.norm(xbar_ni3[-1][xbar_ni3[-1] < 0])
-
-
-        Minv = la.inv(M)
-        w_nf_final = np.transpose(Minv).dot(w_nf)
-        xbar_ni_final = M.dot(xbar_ni)
-        final_renorm = la.norm(w_nf_final, axis=-1)
-        w_nf_final /= final_renorm[:, None]
-        xbar_ni_final *= final_renorm[:, None]
-        M *= final_renorm[:, None]
-        Minv = la.inv(M)
-        w_estimates_final = [si.interp1d(np.log10(all_freqs), w_nf_final[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
-        np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, M_for_w=np.transpose(Minv), normalization=normalization)
+    # if n_principal == 6:
+    #     M = np.eye(n_principal)
+    #
+    #     M1inv = np.eye(n_principal)
+    #     manual_spike_freq_ranges = [[1, 2], [10, 1000], [0, 10], [50, 1e9], [500, 1e9]]
+    #     manual_spike_ranges = [np.arange(len(all_freqs))[(np.array(all_freqs) >= freq_range[0]) & (np.array(all_freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
+    #     # manual_spike_ranges = [np.arange(4, 8), np.arange(8, 22), np.arange(0, 8), np.arange(13, 29), np.arange(22, 29)]
+    #     manual_spike_principals = np.array([1, 0, 4, 2, 3]) - 6
+    #     for spike_fs, spike_principal in zip(manual_spike_ranges, manual_spike_principals):
+    #         if spike_principal >= -n_principal:
+    #             non_spike_fs = np.array([i for i in range(len(all_freqs)) if i not in spike_fs])
+    #             non_spike_principals = np.array([i for i in range(-n_principal, 0) if i != spike_principal])
+    #             spike_A = np.transpose(np.delete(w_nf[:, non_spike_fs], spike_principal, axis=0))
+    #             M1inv[non_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf[spike_principal, non_spike_fs]))
+    #     M1 = la.inv(M1inv)
+    #     w_nf1 = np.transpose(M1inv).dot(w_nf)
+    #     M = M1.dot(M)
+    #     print la.cond(M)
+    #
+    #
+    #     Minv2 = np.eye(n_principal)
+    #     for i in range(n_principal):
+    #         if i not in manual_spike_principals:
+    #             spike_principal = i
+    #             spike_fs = []
+    #             non_spike_fs = np.arange(len(all_freqs))
+    #             non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal])
+    #             spike_A = np.transpose(w_nf1[np.ix_(manual_spike_principals, non_spike_fs)])
+    #             Minv2[manual_spike_principals, spike_principal] = -la.inv(np.transpose(spike_A).dot(spike_A)).dot(np.transpose(spike_A).dot(w_nf1[spike_principal, non_spike_fs]))
+    #     M2 = la.inv(Minv2)
+    #     xbar_ni2 = M2.dot(M1.dot(xbar_ni))
+    #     M = M2.dot(M)
+    #     print la.cond(M)
+    #
+    #
+    #     M3 = np.eye(n_principal)
+    #     if n_principal >= 6:
+    #         galactic_plane_mask = np.abs(hpf.pix2ang(mother_nside, range(mother_npix), nest=True)[0] - np.pi / 2) < np.pi/36
+    #         cmb_A = np.transpose(xbar_ni2[np.ix_(np.arange(-n_principal, 0) != -6, galactic_plane_mask)])
+    #         regulation = np.ones(n_principal - 1)
+    #         regulation[-5] = 100
+    #         regulation[-2] = 100
+    #         M3[-6, np.arange(-n_principal, 0) != -6] = -la.inv(np.transpose(cmb_A).dot(cmb_A) + np.diag(regulation)).dot(np.transpose(cmb_A).dot(xbar_ni2[0, galactic_plane_mask]))
+    #     Minv3 = la.inv(M3)
+    #     M = M3.dot(M)
+    #     w_nf3 = np.transpose(la.inv(M)).dot(w_nf)
+    #     xbar_ni3 = M3.dot(xbar_ni2)
+    #     print la.cond(M)
+    #
+    #
+    #     # for n in range(20):
+    #     #     M4 = np.eye(n_principal)
+    #     #     for p in [-4, -1]:
+    #     #         negative_mask = xbar_ni_final[p] < 0
+    #     #         if negative_mask.any():
+    #     #             negative_A = np.transpose(xbar_ni3[np.ix_(np.arange(-n_principal, 0) != p, negative_mask)])
+    #     #             regulation = np.zeros(n_principal - 1)
+    #     #             M4[p, np.arange(-n_principal, 0) != p] = -la.inv(np.transpose(negative_A).dot(negative_A) + np.diag(regulation)).dot(np.transpose(negative_A).dot(xbar_ni3[p, negative_mask]))
+    #     #     xbar_ni3 = M4.dot(xbar_ni3)
+    #     #     M = M4.dot(M)
+    #     #     print la.cond(M), la.norm(xbar_ni3[-4][xbar_ni3[-4] < 0]), la.norm(xbar_ni3[-1][xbar_ni3[-1] < 0])
+    #
+    #
+    #     Minv = la.inv(M)
+    #     w_nf_final = np.transpose(Minv).dot(w_nf)
+    #     xbar_ni_final = M.dot(xbar_ni)
+    #     final_renorm = la.norm(w_nf_final, axis=-1)
+    #     w_nf_final /= final_renorm[:, None]
+    #     xbar_ni_final *= final_renorm[:, None]
+    #     M *= final_renorm[:, None]
+    #     Minv = la.inv(M)
+    #     w_estimates_final = [si.interp1d(np.log10(all_freqs), w_nf_final[i], kind='slinear', assume_sorted=False) for i in range(n_principal)]
+    #     np.savez(result_filename, freqs=all_freqs, w_nf=w_nf, x_ni=xbar_ni, M_for_w=np.transpose(Minv), normalization=normalization)
     #
     # ####auto-identifying ranges######
     # eigen_thresh = 0.05
@@ -450,8 +450,8 @@ for n_principal in n_principal_range:
     plot_filename_base = result_filename.replace('result', 'plot')
 
     make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, '_result_plot_' + error_weighting, n_principal, show_plots)
-    if n_principal == 6:
-        make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_result_plot_M5_' + error_weighting, n_principal, show_plots)
+    # if n_principal == 6:
+    #     make_result_plot(all_freqs, w_nf_final, xbar_ni_final, w_estimates_final, normalization, '_result_plot_M5_' + error_weighting, n_principal, show_plots)
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)

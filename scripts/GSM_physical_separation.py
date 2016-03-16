@@ -28,11 +28,13 @@ def K_RJ2MJysr(K_RJ, nu):#in Kelvin and Hz
 
 ########################################
 #load data
-result_filename = '/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_remove_pt.npz'
+result_filename = '/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_none.npz'
 f = np.load(result_filename)
 w_nf = f['w_nf']#n_principal by frequency
 x_ni = f['x_ni']#n_principal by pixel
 freqs = f['freqs']#GHz
+# ps_mask = f['ps_mask']
+# x_ni *= (1-ps_mask)
 n_f = len(freqs)
 n_principal = len(w_nf)
 nside = hpf.npix2nside(x_ni.shape[1])
@@ -54,6 +56,7 @@ def plot_components(M=np.eye(n_principal)):
     for n in range(n_principal):
 
 
+        # sign_flip = np.sign(np.nanmedian(x_ni_local))
         sign_flip = np.sign(w_nf_local[n, np.argmax(np.abs(w_nf_local[n]))])
 
         plot_data_lin = x_ni_local[n] * sign_flip
@@ -195,7 +198,7 @@ manual_spike_freq_ranges[1] = [10, 1e3]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_freq_ranges[2] = [0, 10]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_freq_ranges[3] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_freq_ranges[4] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[5] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[5] = [10, 1e3]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
 w_nf_intermediate = M.dot(w_nf)
 M1 = np.eye(n_principal)
@@ -225,6 +228,7 @@ cmb_m[cmb_principal, non_cmb_principal_mask] = -la.inv(At_cmb.dot(np.transpose(A
 M2 = la.inv(cmb_m.transpose()).dot(M1.dot(M))
 M2 = M2 / la.norm(M2.dot(w_nf), axis=-1)[:, None]
 plot_components(M2)
+
 
 sys.exit(0)
 ######################################################
