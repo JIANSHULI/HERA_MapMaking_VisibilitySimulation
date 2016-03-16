@@ -131,7 +131,7 @@ while n_iter < 3:
         At = np.zeros((total_valid_npix, len(data)), dtype='float32')
         At[child_mask] = (np.fromfile(A_fn, dtype='float32').reshape((len(data)/2, valid_npix + 4*nUBL, 2))[:, :valid_npix]).transpose((1, 2, 0)).reshape((valid_npix, len(data)))
         if n_iter == 0:
-            weights[i] = (freq / standard_freq)**-2.7
+            weights[i] = (freq / standard_freq)**-2.5
         else:
             Ax = At.transpose().dot(result)
             weights[i] = np.sum(data * Ni * Ax) / np.sum(Ax * Ni * Ax)

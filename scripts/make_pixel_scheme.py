@@ -83,7 +83,7 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 thresh = .5#2.#.03125#
 valid_pix_thresh = 0
 nside_start = 64
-nside_standard = 256
+nside_standard = 64#256
 freq = 150.
 script_dir = os.path.dirname(os.path.realpath(__file__))
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'

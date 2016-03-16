@@ -39,10 +39,10 @@ def solve_phase_degen(data_xx, data_yy, model_xx, model_yy, ubls, plot=False):#d
     #sooolve
     return omni.solve_slope(np.array(A), np.array(b), 1)
 
-datatag = '_2016_01_20_avg'
-dataoptag = '_2016_01_20_avg_unpollock'
-vartag = '_2016_01_20_avg'
-varoptag = '_2016_01_20_avg_unpollock'
+datatag = '_2016_01_20_avg2'
+dataoptag = '_2016_01_20_avg2_unpollock'
+vartag = '_2016_01_20_avg2'
+varoptag = '_2016_01_20_avg2_unpollock'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 
 overwrite = True
@@ -51,7 +51,7 @@ for Q in ['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
     vis_Q = Q + '_*_abscal'
     filenames = glob.glob(datadir + vis_Q + '_xx*' + datatag)
     if len(filenames) > 16:
-        raise IOError('Too many files detected')
+        raise IOError('Too many files detected ' + Q)
     vis_tags = [os.path.basename(fn).split('_xx')[0] for fn in filenames]
 
     #############################

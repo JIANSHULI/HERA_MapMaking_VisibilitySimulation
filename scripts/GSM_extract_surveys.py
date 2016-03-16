@@ -170,16 +170,16 @@ ARCMIN = DEGREE / 60.
 ###OVER ALL PARAMETERS
 ###########################
 ###########################
-version = 2.5
+version = 3.0
 I_only = True
 mother_nside = 128
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 5 * DEGREE
-edge_width = 5 * DEGREE
+target_fwhm = 3.6 * DEGREE#5 * DEGREE
+min_edge_width = 3 * DEGREE
 remove_cmb = True
 
 #it's a pretty bad crime to not diffretiate file name based on what data set are included...
-data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb, not I_only, version)
+data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(mother_nside, target_fwhm, min_edge_width, remove_cmb, not I_only, version)
 
 
 if os.path.isfile(data_file_name):
@@ -187,9 +187,9 @@ if os.path.isfile(data_file_name):
 else:
     ns = mother_nside * 2
     while ns <= 4096:
-        larger_file_names = ['/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(ns, smoothing_fwhm, edge_width, remove_cmb, not I_only, version)]
+        larger_file_names = ['/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(ns, target_fwhm, min_edge_width, remove_cmb, not I_only, version)]
         if I_only:
-            larger_file_names.append('/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(ns, smoothing_fwhm, edge_width, remove_cmb, True, version))
+            larger_file_names.append('/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(ns, target_fwhm, min_edge_width, remove_cmb, True, version))
         for larger_file_name in larger_file_names:
             if os.path.isfile(larger_file_name):
                 print 'Found ' + larger_file_name
@@ -233,7 +233,8 @@ if plot_individual:
 #########################
 dwingloo = {.82: read_equirectangular('/home/omniscope/data/polarized foregrounds/fits19231_Dwingloo.bin', unit_scale=0.1)}
 resolutions[.82] = 1.2 * DEGREE
-
+if plot_individual:
+    plot_dataset(dwingloo)
 
 #########################
 ###Stockert 2.72#########################
@@ -242,14 +243,14 @@ data_x = np.arange(PI/2, -PI/2-.00001, -DEGREE/8)%(2*PI)
 data_y = np.arange(PI/2+DEGREE*50, PI/2-DEGREE*50-.00001, -DEGREE/8)%(2*PI)
 stockert11cm = fit.read('/home/omniscope/data/polarized foregrounds/fits27917_stockert11cm_180_100.bin')[0] * 1e-3
 stockert11cm_header = fit.read_header('/home/omniscope/data/polarized foregrounds/fits27917_stockert11cm_180_100.bin')
-stockert11cm[stockert11cm > stockert11cm_header['DATAMAX']] = -1e6 * stockert11cm_header['DATAMAX']
-stockert11cm[stockert11cm < stockert11cm_header['DATAMIN']] = -1e6 * stockert11cm_header['DATAMAX']
+stockert11cm[stockert11cm > stockert11cm_header['DATAMAX'] * 1e-3] = -1e6 * stockert11cm_header['DATAMAX']
+stockert11cm[stockert11cm < stockert11cm_header['DATAMIN'] * 1e-3] = -1e6 * stockert11cm_header['DATAMAX']
 stockert11cm = sv.equirectangular2heapix(stockert11cm, nside=1024, data_x=data_x, data_y=data_y)
 stockert11cm[stockert11cm < 0] = np.nan
 stockert11cm = {2.72: stockert11cm}
 resolutions[2.72] = 21 * ARCMIN#data website uses 21, paper says 4.3
-
-
+if plot_individual:
+    plot_dataset(stockert11cm)
 
 #########################
 ###mother file#########################
@@ -272,9 +273,9 @@ motherfile[2.33] = motherfile_data[:, -1]
 
 # resolutions[.010] = (2.6 * 1.9)**.5 * DEGREE
 # resolutions[.022] = (1.1 * 1.7)**.5 * DEGREE
-resolutions[.045] = 5*DEGREE#3.6 * DEGREE
+resolutions[.045] = 3.6 * DEGREE
 # resolutions[.82] = 1.2 * DEGREE
-resolutions[2.33] = 5*DEGREE#20 * ARCMIN
+resolutions[2.33] = 20 * ARCMIN
 if plot_individual:
     plot_dataset(motherfile)
 
@@ -464,8 +465,6 @@ if plot_individual:
 #########################
 ###Create new mother#########################
 #########################
-
-
 new_mother = {}
 for dict in [
     parkes,
@@ -475,7 +474,7 @@ for dict in [
     motherfile,
     all_1400,
     # spass,
-    # stockert11cm,
+    stockert11cm,
     wmap_iqu,
     planck_iqu,
     #iras,
@@ -483,21 +482,23 @@ for dict in [
     akari,
     ]:
     for f, data in dict.iteritems():
-
-        if resolutions[f] < smoothing_fwhm * 1.1:
-            fwhm = smoothing_fwhm
-            if smoothing_fwhm <= resolutions[f] * 1.2:
-                fwhm = 0.
-            print f, resolutions[f], fwhm
+        if resolutions[f] < target_fwhm * 1.1:
+            if target_fwhm <= resolutions[f]:
+                smoothing_fwhm = 0.
+            else:
+                smoothing_fwhm = (target_fwhm**2 - resolutions[f]**2)**.5
+            print f, resolutions[f], smoothing_fwhm
             sys.stdout.flush()
+
+            edge_width = np.max(min_edge_width, smoothing_fwhm)
 
             if data.ndim == 2:
                 if I_only:
-                    new_mother[f] = preprocess(data[0], mother_nside, fwhm=fwhm, edge_width=edge_width)
+                    new_mother[f] = preprocess(data[0], mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width)
                 else:
-                    new_mother[f] = np.array([preprocess(d, mother_nside, fwhm=fwhm, edge_width=edge_width) for d in data])
+                    new_mother[f] = np.array([preprocess(d, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width) for d in data])
             else:
-                new_mother[f] = preprocess(data, mother_nside, fwhm=fwhm, edge_width=edge_width)
+                new_mother[f] = preprocess(data, mother_nside, fwhm=smoothing_fwhm, edge_width=edge_width)
         else:
             print "skipping", f
 plot_dataset(new_mother)

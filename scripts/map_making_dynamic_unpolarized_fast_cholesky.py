@@ -140,8 +140,8 @@ if INSTRUMENT == 'miteor':
         datatag = '_2016_01_20_avg'#'_seccasa.rad'#
         vartag = '_2016_01_20_avgx100'#''#
     else:
-        datatag = '_2016_01_20_avg_unpollock'#'_seccasa.rad'#
-        vartag = '_2016_01_20_avg_unpollockx100'#''#
+        datatag = '_2016_01_20_avg2_unpollock'#'_2016_01_20_avg_unpollock'#'_seccasa.rad'#
+        vartag = '_2016_01_20_avg2_unpollock'#'_2016_01_20_avg_unpollockx100'#''#
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
     antpairs = None
     # deal with beam: create a callable function of the form y(freq) in MHz and returns 2 by npix
@@ -222,7 +222,8 @@ elif INSTRUMENT == 'paper':
     local_beam_unpol = si.interp1d(beam_freqs, beam_healpix, axis=0)
 
 
-
+if len(glob.glob(datadir + tag + '_xx_*_*' + datatag)) > 1:
+    raise ValueError("Found more than one files for %s."%(datadir + tag + '_xx_*_*' + datatag))
 A_version = 1.0
 nf = 1
 data_filename = glob.glob(datadir + tag + '_xx_*_*' + datatag)[0]
@@ -421,17 +422,17 @@ flux_func = {}
 flux_func['cas'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/casA2013.5out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/casA2013.5out')[:,2])
 flux_func['cyg'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,2])
 
-
 pt_sources = ['cyg', 'cas']
 pt_vis = np.zeros((len(pt_sources), 2, nUBL_used, nt_used), dtype='complex128')
-print "Simulating cyg casvisibilities, %s, expected time %.1f min"%(datetime.datetime.now(), 14.6 * (nUBL_used / 78.) * (nt_used / 193.) * (2. / 1.4e5)),
-sys.stdout.flush()
-timer = time.time()
-for p, beam_heal_equ in enumerate([beam_heal_equ_x, beam_heal_equ_y]):
-    for i, source in enumerate(pt_sources):
-        ra = southern_points[source]['body']._ra
-        dec = southern_points[source]['body']._dec
-        pt_vis[i, p] = jansky2kelvin * flux_func[source](freq) * vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=tlist) / 2
+if INSTRUMENT == 'miteor':
+    print "Simulating cyg casvisibilities, %s, expected time %.1f min"%(datetime.datetime.now(), 14.6 * (nUBL_used / 78.) * (nt_used / 193.) * (2. / 1.4e5)),
+    sys.stdout.flush()
+    timer = time.time()
+    for p, beam_heal_equ in enumerate([beam_heal_equ_x, beam_heal_equ_y]):
+        for i, source in enumerate(pt_sources):
+            ra = southern_points[source]['body']._ra
+            dec = southern_points[source]['body']._dec
+            pt_vis[i, p] = jansky2kelvin * flux_func[source](freq) * vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=tlist) / 2
 
 ################
 ####read data and N
@@ -715,6 +716,18 @@ if plot_pixelization:
 A_tag = 'A_dI'
 A_filename = A_tag + '_u%i_t%i_p%i_n%i_%i_b%i_%.3f_v%.1f' % (nUBL_used, nt_used, valid_npix, nside_start, nside_standard, bnside, thresh, A_version)
 A_path = datadir + tag + A_filename
+AtNiA_tag = 'AtNiA_N%s'%vartag
+if not fit_for_additive:
+    AtNiA_tag += "_noadd"
+elif crosstalk_type == 'autocorr':
+    AtNiA_tag += "_autocorr"
+if pre_ampcal:
+    AtNiA_tag += "_ampcal"
+AtNiA_filename = AtNiA_tag + A_filename
+AtNiA_path = datadir + tag + AtNiA_filename
+if os.path.isfile(AtNiA_path) and AtNiA_only and not force_recompute:
+    sys.exit(0)
+
 
 def get_A():
     if os.path.isfile(A_path) and not force_recompute:
@@ -935,15 +948,6 @@ if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_
     sys.stdout.flush()
     AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
 else:
-    AtNiA_tag = 'AtNiA_N%s'%vartag
-    if not fit_for_additive:
-        AtNiA_tag += "_noadd"
-    elif crosstalk_type == 'autocorr':
-        AtNiA_tag += "_autocorr"
-    if pre_ampcal:
-        AtNiA_tag += "_ampcal"
-    AtNiA_filename = AtNiA_tag + A_filename
-    AtNiA_path = datadir + tag + AtNiA_filename
     if os.path.isfile(AtNiA_path) and not force_recompute:
         print "Reading AtNiA...",
         sys.stdout.flush()

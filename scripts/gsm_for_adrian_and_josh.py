@@ -8,6 +8,22 @@ except:
     pass
 import matplotlib.pyplot as plt
 
+kB = 1.38065e-23
+c = 2.99792e8
+h = 6.62607e-34
+T = 2.725
+hoverk = h / kB
+
+def K_CMB2MJysr(K_CMB, nu):#in Kelvin and Hz
+    B_nu = 2 * (h * nu)* (nu / c)**2 / (np.exp(hoverk * nu / T) - 1)
+    conversion_factor = (B_nu * c / nu / T)**2 / 2 * np.exp(hoverk * nu / T) / kB
+    return  K_CMB * conversion_factor * 1e20#1e-26 for Jy and 1e6 for MJy
+
+def K_RJ2MJysr(K_RJ, nu):#in Kelvin and Hz
+    conversion_factor = 2 * (nu / c)**2 * kB
+    return  K_RJ * conversion_factor * 1e20#1e-26 for Jy and 1e6 for MJy
+
+
 ########################################
 #load data
 result_filename = '/mnt/data0/omniscope/polarized foregrounds/result_25+7_nside_128_smooth_6.28E-02_edge_8.73E-02_rmvcmb_1_UV0_v2.0_principal_6_step_1.00.npz'
@@ -21,7 +37,8 @@ n_principal = len(w_nf)
 ########################################
 #embarassing fact: I have not been able to unify the units between sub-CMB, CMB, and above_CMB frequencies. If you guys know how to put those 3 into the same unit, it'll be super helpful.
 normalization = f['normalization']
-
+normalization[freqs < 20] = K_RJ2MJysr(normalization[freqs < 20], freqs[freqs < 20] * 1e9)
+normalization[(freqs >= 20) & (freqs < 500)] = K_CMB2MJysr(normalization[(freqs >= 20) & (freqs < 500)], freqs[(freqs >= 20) & (freqs < 500)] * 1e9)
 ################################################
 #plot orthogonal results
 for n in range(n_principal):

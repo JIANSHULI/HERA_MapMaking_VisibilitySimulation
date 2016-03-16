@@ -87,15 +87,15 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
 ###########################
 mother_nside = 128
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 5 * np.pi / 180.
-edge_width = 5. * np.pi / 180.
+smoothing_fwhm = 3.6 * np.pi / 180.#5 * np.pi / 180.
+edge_width = 3. * np.pi / 180.
 remove_cmb = True
 I_only = True
-version = 2.5
+version = 3.0
 
 
-n_principal_range = range(6, 9)
-error_weighting = 'none'#'inv_error'#'remove_pt'
+n_principal_range = range(5, 10)
+error_weighting = 'remove_pt'#'none'#'inv_error'#'remove_pt'
 
 include_visibility = False
 vis_Qs = ["q0AL_*_abscal", "q0C_*_abscal", "q1AL_*_abscal", "q2AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
@@ -108,12 +108,12 @@ for vis_Q in vis_Qs:
     vis_tags = vis_tags + [os.path.basename(fn).split('_xx')[0] for fn in filenames]
 
 data_file_name = '/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(mother_nside, smoothing_fwhm, edge_width, remove_cmb, not I_only, version)
-
+print data_file_name
 
 
 data_file = np.load(data_file_name)
-freqs = data_file['freqs']
-idata = data_file['idata']
+freqs = np.concatenate((data_file['freqs'][:10], data_file['freqs'][11:-2]))
+idata = np.concatenate((data_file['idata'][:10], data_file['idata'][11:-2]))
 
 
 ##############################################
@@ -135,6 +135,14 @@ while np.sum(~np.isnan(idata[~removed_mask]).any(axis=0)) < mother_npix / 20:#wh
     kick_candidate += 1
 
 
+####seperate regions before separating data##
+region_indices_list, region_mask_list = find_regions(np.isnan(idata))
+
+region_illustration = np.empty(mother_npix)
+for i, mask in enumerate(region_mask_list):
+    region_illustration[mask] = len(region_mask_list) - i
+hpv.mollview(region_illustration, nest=True, title="Frequency Coverage Map")
+plt.show()
 
 ###put kicked data into add_on, and awkwardly change idata etc to smaller set, will merge back later. doing this awkward back and forth due to unfortunate coding order...
 addon_freqs = freqs[removed_mask]
@@ -149,8 +157,7 @@ region_indices_list, region_mask_list = find_regions(np.isnan(idata))
 region_illustration = np.empty(mother_npix)
 for i, mask in enumerate(region_mask_list):
     region_illustration[mask] = len(region_mask_list) - i
-hpv.mollview(region_illustration, nest=True, title="Frequency Coverage Map")
-plt.show()
+
 
 ####PCA to get rough estimates
 ####get eigen systems##

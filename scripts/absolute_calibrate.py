@@ -40,7 +40,7 @@ Q = sys.argv[1]#'q3AL'#'q0C'#'q3A'#'q2C'#
 fit_cas = True
 frac_cas = .9
 delay_compression = 15
-compress_method = 'average'
+compress_method = 'average2'#average2 does empirical noise estimate when compressing over t
 pick_fs = range(delay_compression)
 
 freqs_dic = {
@@ -446,7 +446,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
         ###############################################
         ##############compress in time dimension
         ############################################
-        tcompress_fac = int(np.round(6.22e-5 * 25 / np.mean(jds[1:]-jds[:-1])))#25
+        tcompress_fac = int(np.round(5.79e-5 * 25 / np.median(jds[1:]-jds[:-1])))#25
 
         if compress_method == 'deconvolve':
             tcompress = len(jds) / tcompress_fac / 2 * 2 + 1
@@ -461,7 +461,7 @@ for pick_f_i, pick_f in enumerate(pick_fs):
                     compressed2_flag = compressed2_flag | (compressed2_var[p,...,0] > 4 * np.nanmin(compressed2_var[p,...,0]))
                 else:
                     compressed2_flag = compressed2_flag | (compressed2_var[p,...,0] > 1.1 * np.nanmedian(compressed2_var[p,...,0]))
-        else:#plain average.
+        elif compress_method == 'average':#plain average.
             tcompress = len(jds) / tcompress_fac
             # compressed2_data = np.empty((4, tcompress, compressed_data.shape[-1]), dtype = 'complex64')
             # compressed2_var = np.empty((4, tcompress, compressed_data.shape[-1]), dtype = 'float32')
@@ -478,14 +478,43 @@ for pick_f_i, pick_f in enumerate(pick_fs):
             compressed2_data = np.sum(pre_average_data.reshape((4, tcompress, tcompress_fac, pre_average_data.shape[-1])), axis=2) / pre_average_count[None, :, None]
             compressed2_var = np.sum(pre_average_var.reshape((4, tcompress, tcompress_fac, pre_average_data.shape[-1])), axis=2) / pre_average_count[None, :, None]**2
             compressed2_flag = (pre_average_count == 0)
+        elif compress_method == 'average2':#plain average.
+            tcompress = len(jds) / tcompress_fac
+            compressed2_data = np.zeros((4, tcompress, compressed_data.shape[-1]), dtype = 'complex64')
+            compressed2_var = np.zeros((4, tcompress, compressed_data.shape[-1]), dtype = 'float32') + np.inf
 
-        # compressed2_jds = np.arange(jds[0], jds[-1], np.min(jds[1:]-jds[:-1]) * len(jds) / tcompress)
+            pre_average_data = np.copy(compressed_data[:, :tcompress * tcompress_fac, pick_f]).reshape((4, tcompress, tcompress_fac, compressed_data.shape[-1]))
+            reshaped_flag = compr_flag[:tcompress * tcompress_fac, pick_f].reshape((tcompress, tcompress_fac))
+            pre_average_count = np.sum(~reshaped_flag, axis=1)
+            compressed2_flag = (pre_average_count <= tcompress_fac / 2)
+            matrix_dict = {}
+            A_template = np.ones((tcompress_fac, 2))
+            A_template[:, 0] = np.arange(tcompress_fac) - (tcompress_fac - 1.) / 2.
+            for t in np.arange(tcompress)[~compressed2_flag]:
+                flaglet = reshaped_flag[t]
+                if tuple(flaglet) in matrix_dict:
+                    A, AtA, AtAi, AtAiAt = matrix_dict[tuple(flaglet)]
+                else:
+                    A = A_template[~flaglet]
+                    AtA = np.transpose(A).dot(A)
+                    AtAi = la.inv(AtA)
+                    AtAiAt = AtAi.dot(A.transpose())
+                    matrix_dict[tuple(flaglet)] = (A, AtA, AtAi, AtAiAt)
+
+                datalet = pre_average_data[:, t, ~flaglet]
+                slope_interc = AtAiAt.dot(datalet)
+                noise_estimate = la.norm(A.dot(slope_interc.transpose(1,0,2)).transpose(1,0,2) - datalet, axis=-2)**2 / (np.sum(~flaglet) - A.shape[1])
+                compressed2_data[:, t] = slope_interc[1]
+                compressed2_var[:, t] = AtAi[1, 1] * noise_estimate
+
         compressed2_jds = jds[tcompress_fac/2::tcompress_fac][:tcompress]
         compressed2_lsts = []
         for jd in compressed2_jds[~compressed2_flag]:
             sa.date = jd - omni.julDelta
             compressed2_lsts = compressed2_lsts + [float(sa.sidereal_time())]
         compressed2_lsts = np.array(compressed2_lsts)
+
+
 
         #######################################
         ########apply amp and phase to all 4 pols
@@ -513,6 +542,12 @@ for pick_f_i, pick_f in enumerate(pick_fs):
 
             plt.show()
 
+            for iplot, u in enumerate(np.argsort(la.norm(info['ubl'], axis=-1))[::10]):
+                plt.subplot(3, 4, iplot + 1)
+                plt.errorbar((compressed2_lsts - 1)%TPI+1, calibrated_data[0, :, u], yerr=calibrated_var[0, :, u]**.5)
+                plt.errorbar((lsts - 1)%TPI+1, ampcals['xx'] * compressed_data[0, ~compr_flag[:, pick_f], pick_f, u], yerr=ampcals['xx'] * compr_var[0, ~compr_flag[:, pick_f], pick_f, u]**.5)
+                plt.title(info['ubl'][u])
+            plt.show()
         ###simulate polarized##############
         vs = sv.Visibility_Simulator()
         vs.initial_zenith = np.array([0, sa.lat])  # self.zenithequ
@@ -631,8 +666,8 @@ for pick_f in psols.keys():
     #######output data
     ###################################
     tag = "%s_%i_abscal"%(Q, pick_f)
-    datatag = '_2016_01_20_avg'
-    vartag = '_2016_01_20_avg'
+    datatag = '_2016_01_20_avg2'
+    vartag = '_2016_01_20_avg2'
     datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
     nt = calibrated_results[pick_f][2].shape[1]
     nf = 1

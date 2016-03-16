@@ -23,14 +23,20 @@ def fit_power(freq, amp):
     error = A.dot(x) - b
     noise = la.norm(error) / (len(freq) - 2)**.5
     return x[0], AtAi[0, 0]**.5 * noise
-
+def add_diag_in_place(M, diag):
+    if M.shape[0] != M.shape[1] or M.shape[0] != len(diag):
+        raise ValueError('Shape Mismatch: %s and %i'%(M.shape, len(diag)))
+    M.shape = (len(diag) ** 2)
+    M[::len(diag) + 1] += diag
+    M.shape = (len(diag), len(diag))
+    return
 
 PI = np.pi
 TPI = PI * 2
 
 nside_standard = 256
 standard_freq = 150.
-nside = 32
+nside = 64
 total_valid_npix = 12*nside**2
 pixel_dir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 Qs = []
@@ -39,9 +45,9 @@ AtNiA_fns = []
 data_fns = []
 
 INSTRUMENTS = ['miteor']#, 'miteor_compact']#'paper']#, 'miteor']
-valid_npixs = {'paper': 14896, 'miteor': 10428, 'miteor_compact': 12997}
-datatags = {'paper': '_lstbineven_avg4', 'miteor': '_2016_01_20_avg_unpollock', 'miteor_compact': '_2016_01_20_avg'}
-vartags = {'paper': '_lstbineven_avg4', 'miteor': '_2016_01_20_avg_unpollockx100', 'miteor_compact': '_2016_01_20_avgx100'}
+valid_npixs = {'miteor': 41832}#{'paper': 14896, 'miteor': 10428, 'miteor_compact': 12997}
+datatags = {'paper': '_lstbineven_avg4', 'miteor': '_2016_01_20_avg2_unpollock', 'miteor_compact': '_2016_01_20_avg'}
+vartags = {'paper': '_lstbineven_avg4', 'miteor': '_2016_01_20_avg2_unpollock', 'miteor_compact': '_2016_01_20_avgx100'}
 datadirs = {'paper': '/home/omniscope/data/PAPER/lstbin_fg/even/', 'miteor': '/home/omniscope/data/GSM_data/absolute_calibrated_data/', 'miteor_compact': '/home/omniscope/data/GSM_data/absolute_calibrated_data/'}
 bnsides = {'paper': 64, 'miteor': 256, 'miteor_compact': 256}
 noise_scales = {'paper': 10., 'miteor': 1., 'miteor_compact': 1.}
@@ -70,6 +76,17 @@ for instrument in INSTRUMENTS:
             AtNiA_fn = AtNiA_candidates[0]
         A_fns.append(A_fn)
         AtNiA_fns.append(AtNiA_fn)
+
+###get metadata
+tlists = {}
+ubls = {}
+freqs = np.zeros(len(data_fns))
+for i, (data_fn, Q) in enumerate(zip(data_fns, Qs)):
+    data_file = np.load(data_fn)
+    freqs[i] = data_file['freq']
+    ubls[Q] = data_file['ubls']
+    tlists[Q] = data_file['tlist']
+print freqs
 
 ###pixel scheme
 pixel_scheme_file = np.load(pixel_dir + 'pixel_scheme_%i.npz'%total_valid_npix)
@@ -112,96 +129,135 @@ def plot_IQU(solution, title, col, shape=(1, 1), coord='C', std=False, min=0, ma
     if col == shape[0] * shape[1]:
         plt.show()
 
-###start calculations
 
-tlists = {}
-ubls = {}
+
+##################
+###start calculations
+###############
 n_iter = 0
-max_iter = 3
+max_iter = 2
 
 ###re-weighting iteration
 while n_iter < max_iter:
+    AtNiA_filename = datadirs['miteor'] + 'mega_AtNiA_n%i_iter%i'%(total_valid_npix, n_iter)
 
-    AtNidata_sum = np.zeros(total_valid_npix, dtype='float64')
-    AtNiptdata_sum = np.zeros((2, total_valid_npix), dtype='float64')
-    AtNisimdata_sum = np.zeros(total_valid_npix, dtype='float64')
-    AtNiA_sum = np.zeros((total_valid_npix, total_valid_npix), dtype='float64')
-    weights = np.zeros(len(data_fns))#synchrotron scaling, [divide data by weight and mult Ni and AtNiA by weight**2], or [multiply A by weight and AtNiA by weight**2]
-    freqs = np.zeros(len(data_fns))
-
-    for i, (Q, data_fn, A_fn, AtNiA_fn) in enumerate(zip(Qs, data_fns, A_fns, AtNiA_fns)):
-        child_mask = None
-        for instrument in INSTRUMENTS:
-            if datatags[instrument] in data_fn:
-                child_mask = child_masks[instrument]
-                valid_npix = valid_npixs[instrument]
-                break
-        if child_mask is None:
-            raise Exception('Logic error instrument not found.')
-        print Q, np.sum(child_mask), len(child_mask)
-        sys.stdout.flush()
-
-        data_file = np.load(data_fn)
-        freq = data_file['freq']
-        freqs[i] = freq
-        data = data_file['data']
+    AtNid_filename = datadirs['miteor'] + 'mega_AtNid_n%i_iter%i'%(total_valid_npix, n_iter)
+    AtNisimd_filename = datadirs['miteor'] + 'mega_AtNisimd_n%i_iter%i'%(total_valid_npix, n_iter)
+    weight_filename = datadirs['miteor'] + 'mega_weight_n%i_iter%i'%(total_valid_npix, n_iter)
+    if os.path.isfile(AtNiA_filename) and os.path.isfile(AtNid_filename) and os.path.isfile(AtNisimd_filename):
+        AtNiA_sum = np.fromfile(AtNiA_filename, dtype='float64')
+        AtNiA_sum.shape = (total_valid_npix, total_valid_npix)
+        AtNidata_sum = np.fromfile(AtNid_filename, dtype='float64')
         if n_iter == 0:
-            ubls[Q] = data_file['ubls']
-            tlists[Q] = data_file['tlist']
-        nUBL = len(ubls[Q])
-        nt = len(tlists[Q])
-        Ni = data_file['Ni'] / noise_scales[instrument]**2
-
-
-        # nUBL = int(A_fn.split(Q + 'A_dI_u')[1].split('_')[0])
-        At = np.zeros((total_valid_npix, len(data)), dtype='float32')
-        At[child_mask] = (np.fromfile(A_fn, dtype='float32').reshape((len(data)/2, valid_npix + 4*nUBL, 2))[:, :valid_npix]).transpose((1, 2, 0)).reshape((valid_npix, len(data)))
-        if n_iter == 0:
-            weights[i] = (freq / standard_freq)**-2.5
+            weights = np.array([(freq / standard_freq)**-2.5 for freq in freqs])
         else:
-            Ax = At.transpose().dot(result)
-            weights[i] = np.sum(data * Ni * Ax) / np.sum(Ax * Ni * Ax)
-        AtNidata_sum += At.dot(data * Ni) * weights[i]
-        AtNiA_sum[np.ix_(child_mask, child_mask)] += np.fromfile(AtNiA_fn, dtype='float64').reshape((valid_npix, valid_npix)) * weights[i]**2 / noise_scales[instrument]**2
+            weights = np.fromfile(weight_filename, dtype='float64')
+    else:
+        AtNidata_sum = np.zeros(total_valid_npix, dtype='float64')
+        # AtNiptdata_sum = np.zeros((2, total_valid_npix), dtype='float64')
+        AtNisimdata_sum = np.zeros(total_valid_npix, dtype='float64')
+        AtNiA_sum = np.zeros((total_valid_npix, total_valid_npix), dtype='float64')
+        weights = np.zeros(len(data_fns), dtype='float64')#synchrotron scaling, [divide data by weight and mult Ni and AtNiA by weight**2], or [multiply A by weight and AtNiA by weight**2]
 
-        if n_iter == 0 or n_iter == max_iter - 1:
-            for n, pt_data in enumerate(data_file['psdata']):
-                AtNiptdata_sum[n] += At.dot(pt_data * Ni) * weights[i]
-            AtNisimdata_sum += At.dot(data_file['simdata'] * Ni) * weights[i]
-    if n_iter == 0:
-        AtNiA_sum0 = np.copy(AtNiA_sum)
-        AtNidata_sum0 = np.copy(AtNidata_sum)
-        AtNiptdata_sum0 = np.copy(AtNiptdata_sum)
-        AtNisimdata_sum0 = np.copy(AtNisimdata_sum)
-
-    plt.plot(sorted(freqs), weights[np.argsort(freqs)])
-    if n_iter != max_iter - 1:
-        for reg in 10.**np.arange(-9, -6, .5):
-            print "trying", reg
+        for i, (Q, data_fn, A_fn, AtNiA_fn) in enumerate(zip(Qs, data_fns, A_fns, AtNiA_fns)):
+            child_mask = None
+            for instrument in INSTRUMENTS:
+                if datatags[instrument] in data_fn:
+                    child_mask = child_masks[instrument]
+                    valid_npix = valid_npixs[instrument]
+                    break
+            if child_mask is None:
+                raise Exception('Logic error instrument not found.')
+            print Q, np.sum(child_mask), len(child_mask)
             sys.stdout.flush()
-            try:
-                AtNiAi = sv.InverseCholeskyMatrix(AtNiA_sum + np.eye(total_valid_npix) * reg)
+
+            data_file = np.load(data_fn)
+            data = data_file['data']
+            nUBL = len(ubls[Q])
+            nt = len(tlists[Q])
+            Ni = data_file['Ni'] / noise_scales[instrument]**2
+
+
+            # nUBL = int(A_fn.split(Q + 'A_dI_u')[1].split('_')[0])
+            At = np.zeros((total_valid_npix, len(data)), dtype='float32')
+            At[child_mask] = (np.fromfile(A_fn, dtype='float32').reshape((len(data)/2, valid_npix + 4*nUBL, 2))[:, :valid_npix]).transpose((1, 2, 0)).reshape((valid_npix, len(data)))
+            if n_iter == 0:
+                weights[i] = (freqs[i] / standard_freq)**-2.5
+            else:
+                Ax = At.transpose().dot(result)
+                weights[i] = np.sum(data * Ni * Ax) / np.sum(Ax * Ni * Ax)
+            AtNidata_sum += At.dot(data * Ni) * weights[i]
+            AtNiA_sum[np.ix_(child_mask, child_mask)] += np.fromfile(AtNiA_fn, dtype='float64').reshape((valid_npix, valid_npix)) * weights[i]**2 / noise_scales[instrument]**2
+
+            if n_iter == 0 or n_iter == max_iter - 1:
+                # for n, pt_data in enumerate(data_file['psdata']):
+                #     AtNiptdata_sum[n] += At.dot(pt_data * Ni) * weights[i]
+                AtNisimdata_sum += At.dot(data_file['simdata'] * Ni) * weights[i]
+        # if n_iter == 0:
+            # AtNiA_sum0 = np.copy(AtNiA_sum)
+            # AtNidata_sum0 = np.copy(AtNidata_sum)
+            # #AtNiptdata_sum0 = np.copy(AtNiptdata_sum)
+            # AtNisimdata_sum0 = np.copy(AtNisimdata_sum)
+
+        AtNiA_sum.tofile(AtNiA_filename)
+        AtNidata_sum.tofile(AtNid_filename)
+        AtNisimdata_sum.tofile(AtNisimd_filename)
+        weights.tofile(weight_filename)
+    if n_iter != 0:
+        plt.plot(sorted(freqs), weights[np.argsort(freqs)])
+    if n_iter != max_iter - 1:
+        for reg in 10.**np.arange(-6, -5, .5):
+            AtNiAi_filename = datadirs['miteor'] + 'mega_AtNiAi_n%i_iter%i_reg%.3e'%(total_valid_npix, n_iter, reg)
+            if os.path.isfile(AtNiAi_filename):
+                AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_filename, total_valid_npix, 'float64')
                 break
-            except TypeError:
-                continue
+            else:
+                print "trying", reg, datetime.datetime.now()
+                sys.stdout.flush()
+                timer = time.time()
+                try:
+                    add_diag_in_place(AtNiA_sum, np.ones(total_valid_npix) * reg)
+                    AtNiAi = sv.InverseCholeskyMatrix(AtNiA_sum)
+                    print "%f minutes used" % (float(time.time() - timer) / 60.)
+                    sys.stdout.flush()
+                    AtNiAi.tofile(AtNiAi_filename)
+                    del AtNiA_sum
+                    break
+                except TypeError:
+                    continue
+
         result = AtNiAi.dotv(AtNidata_sum)
     n_iter += 1
-plt.show()
+if max_iter != 1:
+    plt.show()
 
-for reg in 10.**np.arange(-7, -6, .5):
-    print "trying", reg
-    sys.stdout.flush()
-    try:
-        AtNiAi = sv.InverseCholeskyMatrix(AtNiA_sum + np.eye(total_valid_npix) * reg)
-        AtNiAi0 = sv.InverseCholeskyMatrix(AtNiA_sum0 + np.eye(total_valid_npix) * reg)
+
+for reg in 10.**np.arange(-3, -2, .5):
+    AtNiAi_filename = datadirs['miteor'] + 'mega_AtNiAi_n%i_iter%i_reg%.3e'%(total_valid_npix, max_iter - 1, reg)
+    if os.path.isfile(AtNiAi_filename):
+        AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_filename, total_valid_npix, 'float64')
         break
-    except TypeError:
-        continue
+    else:
+        print "trying", reg, datetime.datetime.now()
+        sys.stdout.flush()
+        timer = time.time()
+        try:
+            add_diag_in_place(AtNiA_sum, np.ones(total_valid_npix) * reg)
+            AtNiAi = sv.InverseCholeskyMatrix(AtNiA_sum)
+            print "%f minutes used" % (float(time.time() - timer) / 60.)
+            sys.stdout.flush()
+            AtNiAi.tofile(AtNiAi_filename)
+            del AtNiA_sum
+            # AtNiAi0 = sv.InverseCholeskyMatrix(AtNiA_sum0 + np.eye(total_valid_npix) * reg)
+            break
+        except TypeError:
+            continue
+
 result = AtNiAi.dotv(AtNidata_sum)
-result0 = AtNiAi0.dotv(AtNidata_sum0)
-pt_results = np.array([AtNiAi.dotv(AtNiptdata) for AtNiptdata in AtNiptdata_sum])
+# result0 = AtNiAi0.dotv(AtNidata_sum0)
+# pt_results = np.array([AtNiAi.dotv(AtNiptdata) for AtNiptdata in AtNiptdata_sum])
 sim_result = AtNiAi.dotv(AtNisimdata_sum)
-sim_result0 = AtNiAi0.dotv(AtNisimdata_sum0)
+# sim_result0 = AtNiAi0.dotv(AtNisimdata_sum0)
 
 #####################################
 ####error analysis and spectral index change
@@ -228,7 +284,6 @@ for i, (Q, data_fn, A_fn, AtNiA_fn) in enumerate(zip(Qs, data_fns, A_fns, AtNiA_
 
     data_file = np.load(data_fn)
     freq = data_file['freq']
-    freqs[i] = freq
     data = data_file['data']
     nUBL = len(ubls[Q])
     nt = len(tlists[Q])
@@ -251,16 +306,41 @@ for i, (Q, data_fn, A_fn, AtNiA_fn) in enumerate(zip(Qs, data_fns, A_fns, AtNiA_
         real_data.shape = input_shape
         return result
 
+    def get_complex_data(real_data, chi2=False):
+        if len(real_data.flatten()) != 2 * nUBL * 2 * nt:
+            raise ValueError("Incorrect dimensions: data has length %i where nubl %i and nt %i together require length of %i."%(len(real_data), nUBL, nt, 2 * nUBL * 2 * nt))
+        input_shape = real_data.shape
+        real_data.shape = (2, nUBL, 2, nt)
+        if chi2:
+            result = np.copy(real_data)
+        else:
+            result = real_data[0] + 1.j * real_data[1]
+        real_data.shape = input_shape
+        return result
 
-    amp_fit = np.array([d.dot(ft) / ft.dot(ft) for d, ft in zip(reshape_data(data), reshape_data(fit))])
+
+    amp_fit = np.array([d.dot(ni * ft) / ft.dot(ni * ft) for d, ft, ni in zip(reshape_data(data), reshape_data(fit), reshape_data(Ni))]) * weights[i]
 
 
-    errors[Q] = error
-    chi2s[Q] = chi2
-    fits[Q] = fit
-    Nis[Q] = Ni
-    datas[Q] = data
+    errors[Q] = get_complex_data(error)
+    chi2s[Q] = get_complex_data(chi2, chi2=True)
+    fits[Q] = get_complex_data(fit)
+    Nis[Q] = get_complex_data(Ni)
+    datas[Q] = get_complex_data(data)
     amp_fits[Q] = amp_fit
+
+    ubl_len = la.norm(ubls[Q], axis=-1)
+    ubl_sort = np.argsort(ubl_len)
+    plt.subplot(2, 2, 1)
+    plt.plot(sorted(ubl_len), la.norm(la.norm(errors[Q], axis=-1), axis=-1)[ubl_sort], label=Q)
+    plt.subplot(2, 2, 2)
+    plt.plot(sorted(ubl_len), np.sum(np.sum(np.sum(chi2s[Q], axis=-1), axis=-1), axis=0)[ubl_sort], label=Q)
+    plt.subplot(2, 2, 3)
+    plt.plot((tlists[Q] - 5)%24 + 5, la.norm(reshape_data(error), axis=-1), label=Q)
+    plt.subplot(2, 2, 4)
+    plt.plot((tlists[Q] - 5)%24 + 5, np.sum(reshape_data(chi2), axis=-1), label=Q)
+plt.legend()
+plt.show()
 
 ###grid amp_fit into a dictionary
 amp_tf_grid = {}
@@ -289,10 +369,14 @@ while t < 24.:
         spectral_index_list.append([t, spectral, spectral_error])
     t += t_grid_size
 plt.legend()
+plt.xlabel('Freq (MHz)')
+plt.ylabel('Amplitude ratio')
 
 plt.subplot(1, 2, 2)
 spectral_index_list = np.array(spectral_index_list)
 plt.errorbar(spectral_index_list[:, 0], spectral_index_list[:, 1], fmt='g+', yerr=spectral_index_list[:, 2])
+plt.xlabel('LST (hour)')
+plt.ylabel('Spectral index')
 plt.show()
 
 ########################
@@ -301,25 +385,26 @@ plt.show()
 rescale = (nside_standard / nside)**2
 plot_IQU(result / rescale, '+'.join(INSTRUMENTS), 1, shape=(3, 4), coord='CG')
 plot_IQU(sim_result / rescale, 'noiseless simulation', 5, shape=(3, 4), coord='CG')
-plot_IQU(result0 / rescale, '+'.join(INSTRUMENTS) + ' 0iter', 10, shape=(3, 4), coord='CG')
-plot_IQU(sim_result0 / rescale, 'noiseless simulation 0iter', 11, shape=(3, 4), coord='CG')
-for i, pt_result in enumerate(pt_results):
-    plot_IQU(pt_result / rescale, data_file['pt_sources'][i], 6 + 2*i, shape=(3, 4), coord='CG')
-    plot_IQU(np.abs(pt_result) / rescale, 'abs '+data_file['pt_sources'][i], 7 + 2*i, shape=(3, 4), coord='CG')
-#####GSM reg version
-I_supress = 25.
-S_diag = (fake_solution_map * rescale)** 2 / I_supress
-#add S inverse to AtNiA in a messy way to save memory usage
-AtNiASi = np.copy(AtNiA_sum)
-AtNiASi.shape = (len(AtNiASi) ** 2)
-AtNiASi[::len(S_diag) + 1] += 1./S_diag
-AtNiASi.shape = (len(S_diag), len(S_diag))
-AtNiASii = sv.InverseCholeskyMatrix(AtNiASi)
-AtNiSidata = AtNidata_sum + fake_solution_map * rescale / S_diag
-combined_result = AtNiASii.dotv(AtNiSidata)
+# plot_IQU(result0 / rescale, '+'.join(INSTRUMENTS) + ' 0iter', 10, shape=(3, 4), coord='CG')
+# plot_IQU(sim_result0 / rescale, 'noiseless simulation 0iter', 11, shape=(3, 4), coord='CG')
+# for i, pt_result in enumerate(pt_results):
+#     plot_IQU(pt_result / rescale, data_file['pt_sources'][i], 6 + 2*i, shape=(3, 4), coord='CG')
+#     plot_IQU(np.abs(pt_result) / rescale, 'abs '+data_file['pt_sources'][i], 7 + 2*i, shape=(3, 4), coord='CG')
 
-plot_IQU(combined_result / rescale, '+'.join(INSTRUMENTS) + '+GSM', 2, shape=(3, 4), coord='CG')
-
+# #####GSM reg version
+# I_supress = 25.
+# S_diag = (fake_solution_map * rescale)** 2 / I_supress
+# #add S inverse to AtNiA in a messy way to save memory usage
+# AtNiASi = np.copy(AtNiA_sum)
+# AtNiASi.shape = (len(AtNiASi) ** 2)
+# AtNiASi[::len(S_diag) + 1] += 1./S_diag
+# AtNiASi.shape = (len(S_diag), len(S_diag))
+# AtNiASii = sv.InverseCholeskyMatrix(AtNiASi)
+# AtNiSidata = AtNidata_sum + fake_solution_map * rescale / S_diag
+# combined_result = AtNiASii.dotv(AtNiSidata)
+#
+# plot_IQU(combined_result / rescale, '+'.join(INSTRUMENTS) + '+GSM', 2, shape=(3, 4), coord='CG')
+#
 
 
 ###parkes
@@ -348,14 +433,16 @@ def smoothing(m, fwhm, nest=True):
     else:
         return hp.smoothing(m, fwhm=fwhm)
 
-clean = False
+clean = ('miteor' in INSTRUMENTS)
 
 if clean:#take abt 10 min, not quite working. ringing seems not caused by wiener filter??
     bright_points = {'cyg':{'ra': '19:59:28.3', 'dec': '40:44:02'},
                         'cas':{'ra': '23:23:26', 'dec': '58:48:00'}}
     pt_source_range = PI / 45
+    pt_source_neighborhood_range = PI / 9
     smooth_scale = PI / 45
     bright_pt_mask = np.zeros(total_valid_npix, dtype=bool)
+    bright_pt_neighborhood_mask = np.zeros(total_valid_npix, dtype=bool)
     for source in bright_points.keys():
         bright_points[source]['body'] = ephem.FixedBody()
         bright_points[source]['body']._ra = bright_points[source]['ra']
@@ -364,6 +451,7 @@ if clean:#take abt 10 min, not quite working. ringing seems not caused by wiener
         phi = bright_points[source]['body']._ra
         pt_coord = np.array([np.sin(theta) * np.cos(phi), np.sin(theta) * np.sin(phi), np.cos(theta)])
         bright_pt_mask = bright_pt_mask | (la.norm(hpf.pix2vec(nside, np.arange(hpf.nside2npix(nside)), nest=True) - pt_coord[:, None], axis=0) < pt_source_range)
+        bright_pt_neighborhood_mask = bright_pt_neighborhood_mask | (la.norm(hpf.pix2vec(nside, np.arange(hpf.nside2npix(nside)), nest=True) - pt_coord[:, None], axis=0) < pt_source_neighborhood_range)
     print "Computing PSFs..."
     sys.stdout.flush()
     psf = AtNiAi.dotM(AtNiA_sum[:, bright_pt_mask])
@@ -396,12 +484,14 @@ if clean:#take abt 10 min, not quite working. ringing seems not caused by wiener
     plot_IQU(cleaned_result / rescale, 'cleaned result', 2 * ncol + icol + 1, shape=(4, ncol), coord='CG')
 
 
+    Apsf = psf[cold_mask&good_mask&bright_pt_neighborhood_mask]
     for i in range(50):
+
         smooth_result = smoothing(cleaned_result * ~bright_pt_mask, smooth_scale)
-        bpsf = result[cold_mask&good_mask] - smooth_result[cold_mask&good_mask]
+        bpsf = (cleaned_result - smooth_result)[cold_mask&good_mask&bright_pt_neighborhood_mask]
         xpsf = la.inv(np.transpose(Apsf).dot(Apsf)).dot(np.transpose(Apsf).dot(bpsf))
         fitpsf = Apsf.dot(xpsf)
-        cleaned_result = result - psf.dot(xpsf)
+        cleaned_result = cleaned_result - psf.dot(xpsf)
 
     plot_IQU(cleaned_result / rescale, 'iterated cleaned result', 3 * ncol + icol + 1, shape=(4, ncol), coord='CG')
 

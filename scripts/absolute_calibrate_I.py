@@ -39,10 +39,10 @@ def solve_phase_degen(data_xx, data_yy, model_xx, model_yy, ubls, plot=False):#d
     #sooolve
     return omni.solve_slope(np.array(A), np.array(b), 1)
 
-datatag = '_2016_01_20_avg'
-dataoptag = '_2016_01_20_avg_unpol'
-vartag = '_2016_01_20_avg'
-varoptag = '_2016_01_20_avg_unpol'
+datatag = '_2016_01_20_avg2'
+dataoptag = '_2016_01_20_avg2_unpol'
+vartag = '_2016_01_20_avg2'
+varoptag = '_2016_01_20_avg2_unpol'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 
 overwrite = True
