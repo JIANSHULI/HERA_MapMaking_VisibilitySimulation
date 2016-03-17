@@ -28,7 +28,7 @@ def K_RJ2MJysr(K_RJ, nu):#in Kelvin and Hz
 
 ########################################
 #load data
-result_filename = '/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_none.npz'
+result_filename = '/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_remove_pt.npz'
 f = np.load(result_filename)
 w_nf = f['w_nf']#n_principal by frequency
 x_ni = f['x_ni']#n_principal by pixel
@@ -56,8 +56,8 @@ def plot_components(M=np.eye(n_principal)):
     for n in range(n_principal):
 
 
-        # sign_flip = np.sign(np.nanmedian(x_ni_local))
-        sign_flip = np.sign(w_nf_local[n, np.argmax(np.abs(w_nf_local[n]))])
+        sign_flip = np.sign(np.nanmedian(x_ni_local[n]))
+        # sign_flip = np.sign(w_nf_local[n, np.argmax(np.abs(w_nf_local[n]))])
 
         plot_data_lin = x_ni_local[n] * sign_flip
         # if i == 0:
@@ -73,8 +73,8 @@ def plot_components(M=np.eye(n_principal)):
         plt.plot(np.log10(freqs), sign_flip * w_nf_local[n], 'r+')
         plt.ylim([-1, 1])
         plt.subplot(3, n_principal, 2 * n_principal + n + 1)
-        plt.plot(np.log10(freqs), np.log10(sign_flip * w_nf_local[n] * normalization))
-        plt.plot(np.log10(freqs), np.log10(sign_flip * w_nf_local[n] * normalization), 'r+')
+        plt.plot(np.log10(freqs), np.log10(np.abs(w_nf_local[n] * normalization * la.norm(plot_data_lin))))
+        plt.plot(np.log10(freqs), np.log10(np.abs(w_nf_local[n] * normalization * la.norm(plot_data_lin))), 'r+')
 
     plt.show()
 
@@ -189,32 +189,8 @@ plot_components(M)
 #     fs_intermediate = np.concatenate((fs_intermediate[:project_range[0]], fs_intermediate[project_range[1]+1:]))
 # plot_components(M)
 
-
-
-
-#STep 4: manual
-manual_spike_freq_ranges = [[10,-10]] * n_principal
-manual_spike_freq_ranges[1] = [10, 1e3]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[2] = [0, 10]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[3] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[4] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[5] = [10, 1e3]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
-w_nf_intermediate = M.dot(w_nf)
-M1 = np.eye(n_principal)
-for spike_principal, spike_fs in enumerate(manual_spike_ranges):
-    if len(spike_fs) > 0:
-        non_spike_fs = np.array([i for i in range(len(freqs)) if i not in spike_fs])
-        non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal])
-        spike_A = np.transpose(np.delete(w_nf_intermediate[:, non_spike_fs], spike_principal, axis=0))
-        M1[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * .0001).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
-M1 = M1 / la.norm(M1.dot(M).dot(w_nf), axis=-1)[:, None]
-plot_components(M1.dot(M))
-
-
-
 #LAST STEP: cmb
-x_ni_intermediate = np.transpose(la.inv(M1.dot(M))).dot(x_ni)
+x_ni_intermediate = np.transpose(la.inv(M)).dot(x_ni)
 cmb_m = np.eye(n_principal)#remove foreground in CMB
 cmb_principal = 1
 non_cmb_principal_mask = np.array([False, False, False, True, True, True])#np.arange(n_principal) != cmb_principal
@@ -225,10 +201,36 @@ else:
 At_cmb = x_ni_intermediate[np.ix_(non_cmb_principal_mask, plane_mask)]
 cmb_m[cmb_principal, non_cmb_principal_mask] = -la.inv(At_cmb.dot(np.transpose(At_cmb))).dot(At_cmb.dot(x_ni_intermediate[cmb_principal, plane_mask]))
 
-M2 = la.inv(cmb_m.transpose()).dot(M1.dot(M))
-M2 = M2 / la.norm(M2.dot(w_nf), axis=-1)[:, None]
-plot_components(M2)
+M = la.inv(cmb_m.transpose()).dot(M)
+M = M / la.norm(M.dot(w_nf), axis=-1)[:, None]
+plot_components(M)
 
+
+#STep 4: manual
+manual_spike_freq_ranges = [[10,-10]] * n_principal
+# manual_spike_freq_ranges[0] = [0, 30]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[2] = [0, 10]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[3] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[4] = [10, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[5] = [10, 1e3]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
+w_nf_intermediate = M.dot(w_nf)
+M1 = np.eye(n_principal)
+for spike_principal, spike_fs in enumerate(manual_spike_ranges):
+    if len(spike_fs) > 0:
+        non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
+        non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
+        spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
+        M1[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * .0001).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
+M1 = M1 / la.norm(M1.dot(M).dot(w_nf), axis=-1)[:, None]
+plot_components(M1.dot(M))
+
+# M2 = np.eye(n_principal)
+# qaz = M1.dot(M).dot(w_nf)[-3:, 10:]
+# M2[-3:, -3:] = la.eigh(qaz.dot(qaz.transpose()))[1].transpose()
+# M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
+# plot_components(M2.dot(M1).dot(M))
+#
 
 sys.exit(0)
 ######################################################
