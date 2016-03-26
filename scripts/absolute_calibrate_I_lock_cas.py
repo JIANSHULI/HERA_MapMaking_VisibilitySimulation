@@ -47,13 +47,13 @@ datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 
 overwrite = True
 
-for Q in ['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
+for Q in ['q3AL']:#['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
     vis_Q = Q + '_*_abscal'
     filenames = glob.glob(datadir + vis_Q + '_xx*' + datatag)
     if len(filenames) > 16:
         raise IOError('Too many files detected ' + Q)
-    vis_tags = [os.path.basename(fn).split('_xx')[0] for fn in filenames]
-
+    #vis_tags = [os.path.basename(fn).split('_xx')[0] for fn in filenames]
+    vis_tags = ['q0AL_14_abscal']
     #############################
     ###get PS model
     ##############################
@@ -275,3 +275,13 @@ for Q in ['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
                 new_var.astype('float32').tofile(op_var_filename)
                 (new_var * 100.).astype('float32').tofile(op_var100_filename)
 
+####dbg max 1.8rad to east from south
+for i in range(40):
+    plt.subplot(5, 8, i+1)
+    th = i*np.pi/40
+    qaz = np.argsort(np.abs(ubls[cal_ubl_mask].dot([np.cos(th),np.sin(th),0])))
+    ratio = la.norm(np.abs(b_noadditive[qaz, 0]) - np.abs(bfit_noadditive[qaz, 0]), axis=-1) / la.norm(np.abs(bfit_noadditive[qaz, 0]), axis=-1)
+    plt.plot(ratio)
+    plt.ylim([0,.5])
+    plt.title("%.1f, %.1f"%(th, la.norm(ratio[:10])/la.norm(ratio[10:])))
+plt.show()

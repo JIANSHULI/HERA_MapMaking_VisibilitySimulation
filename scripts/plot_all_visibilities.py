@@ -14,7 +14,7 @@ import omnical.calibration_omni as omni
 
 
 vis_Qs = ["q0AL_*_abscal", "q0C_*_abscal", "q1AL_*_abscal", "q2AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
-datatag = '_2016_01_20_avg_unpol'
+datatag = '_2016_01_20_avg2_unpollock'
 datadir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 vis_tags = []
 for vis_Q in vis_Qs:
@@ -57,20 +57,33 @@ for p in ['x']:#, 'y']:
     f_step = 1.
     f_start = 126.
     nf = 50
-
-    for u, big_ubl in enumerate(np.array([[0., 3., 0.], [3., -3., 0.], [3., 3., 0.], [6., 6., 0.], [8., 12., 0.]])):
+    print ubls['q0C_10_abscal'][np.argsort(la.norm(ubls['q0C_10_abscal'], axis=-1))]
+    for u, big_ubl in enumerate(np.array([[0,0,0], [0., 3., 0.], [9., 9., 0.], [0., 21., 0.]])):
         big_data = np.zeros((nt, nf), dtype='complex64') + np.nan
         for tag in sorted(vis_tags):
             t_is = np.round(((ts[tag]-1)%24+1 - t_start) / t_step).astype(int)
             f_i = np.round((freqs[tag] - f_start) / f_step).astype(int)
-            if la.norm(ubls[tag][np.argmin(la.norm(ubls[tag] - big_ubl, axis=-1))] - big_ubl) < 1.:
-                big_data[t_is, f_i] = vis_data[tag][:, np.argmin(la.norm(ubls[tag] - big_ubl, axis=-1))]
-        plt.subplot(1, 5, u + 1)
+            if u == 0:
+                Q = tag.split('_')[0]
+                big_data[t_is, f_i] = {'q0AL':30, 'q0C':31, 'q1AL':29, 'q2AL':26, 'q2C':30, 'q3AL':27, 'q4AL':28, }[Q]
+            else:
+                if la.norm(ubls[tag][np.argmin(la.norm(ubls[tag] - big_ubl, axis=-1))] - big_ubl) < 1.:
+                    big_data[t_is, f_i] = vis_data[tag][:, np.argmin(la.norm(ubls[tag] - big_ubl, axis=-1))]
+        plt.subplot(1, 4, u + 1)
         # big_data[:, :3] = np.nan#TODO hack
         # big_data[:, 9] = np.nan#TODO hack
         # big_data[:, 18] = np.nan#TODO hack
-        plt.imshow(np.real(big_data[::-1]), vmin=-10000, vmax=10000, interpolation='none', extent=[f_start, f_start + nf*f_step, t_start, t_start + nt*t_step], aspect='auto')
+        if u==0:
+            plt.imshow(np.real(big_data[::-1]), interpolation='none', extent=[f_start, f_start + nf*f_step, t_start, t_start + nt*t_step], aspect='auto')
+            plt.ylabel('Local Sidereal Time (Hour)')
+            plt.title("Observing Schedule")
+        else:
+            plt.imshow(np.real(big_data[::-1]), vmin=-10000, vmax=10000, interpolation='none', extent=[f_start, f_start + nf*f_step, t_start, t_start + nt*t_step], aspect='auto')
+            plt.title("(%im S, %im E)"%(big_ubl[0], big_ubl[1]))
         plt.xlabel('Frequency (MHz)')
-        plt.ylabel('Local Sidereal Time (Hour)')
-        plt.title("(%im S, %im E)"%(big_ubl[0], big_ubl[1]))
+
+
+
+
+
     plt.show()

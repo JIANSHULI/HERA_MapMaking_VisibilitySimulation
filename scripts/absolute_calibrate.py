@@ -41,7 +41,7 @@ fit_cas = True
 frac_cas = .9
 delay_compression = 15
 compress_method = 'average2'#average2 does empirical noise estimate when compressing over t
-pick_fs = range(delay_compression)
+pick_fs = [5]#range(delay_compression)
 
 freqs_dic = {
     'qC0AL': np.arange(136., 123.5, -50./1024/delay_compression*256)[::-1],
