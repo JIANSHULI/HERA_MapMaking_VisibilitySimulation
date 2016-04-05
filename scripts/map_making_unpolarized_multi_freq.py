@@ -61,6 +61,7 @@ pixel_dir = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 selfcal = True
 empirical_noise = False
 
+version = 2.0
 
 instrument= 'miteor'#, 'miteor_compact']#'paper']#, 'miteor']
 valid_npixs = {'miteor': 41832}#{'paper': 14896, 'miteor': 10428, 'miteor_compact': 12997}
@@ -161,14 +162,14 @@ fits = {}
 amp_fits = {}
 
 def check_existense(n_iter, npix_nonzero):
-    AtNiA_filename = datadirs['miteor'] + 'mega_AtNiA_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
-    AtNid_filename = datadirs['miteor'] + 'mega_AtNid_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
-    AtNisimd_filename = datadirs['miteor'] + 'mega_AtNisimd_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
+    AtNiA_filename = datadirs['miteor'] + 'mega_v%.1f_AtNiA_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
+    AtNid_filename = datadirs['miteor'] + 'mega_v%.1f_AtNid_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
+    AtNisimd_filename = datadirs['miteor'] + 'mega_v%.1f_AtNisimd_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
     return os.path.isfile(AtNiA_filename) and os.path.isfile(AtNid_filename) and (os.path.isfile(AtNisimd_filename) or n_iter != max_iter - 1)
 
 
 ###re-weighting iteration
-while n_iter < max_iter and max_angle > 1. / nside / 10.:
+while n_iter < max_iter and (n_iter == 1 or max_angle > 1. / nside / 10.):
     print '================================================='
     print '================ITER #%i=========================='%n_iter
     sys.stdout.flush()
@@ -176,16 +177,16 @@ while n_iter < max_iter and max_angle > 1. / nside / 10.:
         n_iter += 1
         continue
 
-    AtNiA_filename = datadirs['miteor'] + 'mega_AtNiA_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
-    AtNid_filename = datadirs['miteor'] + 'mega_AtNid_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
-    datas_filename = datadirs['miteor'] + 'mega_d_n%i_iter%i.npz'%(npix_nonzero, n_iter) + file_tag + '.npz'
-    errors_filename = datadirs['miteor'] + 'mega_err_n%i_iter%i.npz'%(npix_nonzero, n_iter) + file_tag + '.npz'
-    chi2s_filename = datadirs['miteor'] + 'mega_chi2_n%i_iter%i.npz'%(npix_nonzero, n_iter) + file_tag + '.npz'
-    relative_noise_scales_filename = datadirs['miteor'] + 'mega_rnoise_n%i_iter%i.npz'%(npix_nonzero, n_iter) + file_tag + '.npz'
-    fits_filename = datadirs['miteor'] + 'mega_fit_n%i_iter%i.npz'%(npix_nonzero, n_iter) + file_tag + '.npz'
-    amp_fits_filename = datadirs['miteor'] + 'mega_ampfit_n%i_iter%i.npz'%(npix_nonzero, n_iter) + file_tag + '.npz'
-    AtNisimd_filename = datadirs['miteor'] + 'mega_AtNisimd_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
-    weight_filename = datadirs['miteor'] + 'mega_weight_n%i_iter%i'%(npix_nonzero, n_iter) + file_tag
+    AtNiA_filename = datadirs['miteor'] + 'mega_v%.1f_AtNiA_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
+    AtNid_filename = datadirs['miteor'] + 'mega_v%.1f_AtNid_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
+    datas_filename = datadirs['miteor'] + 'mega_v%.1f_d_n%i_iter%i.npz'%(version, npix_nonzero, n_iter) + file_tag + '.npz'
+    errors_filename = datadirs['miteor'] + 'mega_v%.1f_err_n%i_iter%i.npz'%(version, npix_nonzero, n_iter) + file_tag + '.npz'
+    chi2s_filename = datadirs['miteor'] + 'mega_v%.1f_chi2_n%i_iter%i.npz'%(version, npix_nonzero, n_iter) + file_tag + '.npz'
+    relative_noise_scales_filename = datadirs['miteor'] + 'mega_v%.1f_rnoise_n%i_iter%i.npz'%(version, npix_nonzero, n_iter) + file_tag + '.npz'
+    fits_filename = datadirs['miteor'] + 'mega_v%.1f_fit_n%i_iter%i.npz'%(version, npix_nonzero, n_iter) + file_tag + '.npz'
+    amp_fits_filename = datadirs['miteor'] + 'mega_v%.1f_ampfit_n%i_iter%i.npz'%(version, npix_nonzero, n_iter) + file_tag + '.npz'
+    AtNisimd_filename = datadirs['miteor'] + 'mega_v%.1f_AtNisimd_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
+    weight_filename = datadirs['miteor'] + 'mega_v%.1f_weight_n%i_iter%i'%(version, npix_nonzero, n_iter) + file_tag
     if os.path.isfile(AtNiA_filename) and os.path.isfile(AtNid_filename) and (os.path.isfile(AtNisimd_filename) or n_iter != max_iter - 1):
         AtNiA_sum = np.fromfile(AtNiA_filename, dtype='float64')
         AtNiA_sum.shape = (npix_nonzero, npix_nonzero)
@@ -241,7 +242,7 @@ while n_iter < max_iter and max_angle > 1. / nside / 10.:
             nt = len(tlists[Q])
             Ni = Nis[Q]
 
-            A = (np.fromfile(A_fn, dtype='float32').reshape((len(data)/2, valid_npix + 4*nUBL, 2))[:, :valid_npix][:, non_zero_mask]).transpose((2, 0, 1)).reshape((len(data), npix_nonzero))
+            A = (np.fromfile(A_fn, dtype='float32').reshape((len(data)/2, valid_npix + 4*nUBL, 2))[:, :valid_npix][:, non_zero_mask]).transpose((2, 0, 1)).reshape((len(data), npix_nonzero)).astype('float64')
             if n_iter == 0:
                 weights[i] = (freqs[i] / standard_freq)**-2.5
             else:#selfcal
@@ -345,7 +346,7 @@ while n_iter < max_iter and max_angle > 1. / nside / 10.:
         plt.plot(sorted(freqs), weights[np.argsort(freqs)])
 
     for reg in 10.**np.arange(-6, -5, .5):
-        AtNiAi_filename = datadirs['miteor'] + 'mega_AtNiAi_n%i_iter%i_reg%.3e'%(npix_nonzero, n_iter, reg) + file_tag
+        AtNiAi_filename = datadirs['miteor'] + 'mega_v%.1f_AtNiAi_n%i_iter%i_reg%.3e'%(version, npix_nonzero, n_iter, reg) + file_tag
         if os.path.isfile(AtNiAi_filename):
             AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_filename, npix_nonzero, 'float64')
             break
@@ -462,7 +463,7 @@ print np.sum(spectral_index_list[:, 1] / spectral_index_list[:,2]**2) / np.sum(1
 AtNiA_sum = np.fromfile(AtNiA_filename, dtype='float64')
 AtNiA_sum.shape = (npix_nonzero, npix_nonzero)
 for reg in 10.**np.arange(-4.5, -2, .5):
-    AtNiAi_filename = datadirs['miteor'] + 'mega_AtNiAfi_n%i_iter%i_reg%.3e'%(npix_nonzero, max_iter - 1, reg) + file_tag
+    AtNiAi_filename = datadirs['miteor'] + 'mega_v%.1f_AtNiAfi_n%i_iter%i_reg%.3e'%(version, npix_nonzero, max_iter - 1, reg) + file_tag
     if os.path.isfile(AtNiAi_filename):
         AtNiAi = np.fromfile(AtNiAi_filename, dtype='float64')
         AtNiAi.shape = (npix_nonzero, npix_nonzero)
@@ -524,7 +525,7 @@ def plot_IQU(solution, title, col, shape=(1, 1), coord='C', std=False, log=True,
 
 pixel_rescale = (nside_standard / nside)**2
 print fit_power(sorted(freqs * 1e6), weights[np.argsort(freqs)], relative_error=np.array([relative_noise_scales[Q] * len(datas[Q])**-.5 for Q in Qs]))
-weight_rescale = 1. / fit_power_interp(sorted(freqs * 1e6), weights[np.argsort(freqs)], standard_freq*1e6, relative_error=np.array([relative_noise_scales[Q] * len(datas[Q])**-.5 for Q in Qs]))#TODO should be weighted
+weight_rescale = 1. / fit_power_interp(sorted(freqs * 1e6), weights[np.argsort(freqs)], standard_freq*1e6, relative_error=np.array([relative_noise_scales[Q] * len(datas[Q])**-.5 for Q in Qs]))
 plot_IQU(result / pixel_rescale / weight_rescale, instrument, 1, shape=(2, 2), coord='CG')
 plot_IQU(sim_result / pixel_rescale / weight_rescale, 'noiseless simulation', 2, shape=(2, 2), coord='CG')
 # plot_IQU(result0 / rescale, '+'.join(INSTRUMENTS) + ' 0iter', 10, shape=(3, 4), coord='CG')
@@ -659,9 +660,23 @@ else:
 # # plot_IQU(cleaned_result / pixel_rescale, 'iterated cleaned result', 3 * ncol + icol + 1, shape=(4, ncol), coord='CG')
 
 ###traditional clean
+# for i, stop_fac in enumerate(range(10, 55, 3)):
+#     cleaned_result = np.copy(result[bright_pt_mask])
+#     cleaned_accumulate = np.zeros_like(cleaned_result)
+#     clean_stop = stop_fac * np.min(np.abs(cleaned_result))#20 is best
+#     step_size = 0.02
+#     while np.max(np.abs(cleaned_result)) > clean_stop:
+#         clean_pix = np.argmax(np.abs(cleaned_result))
+#         cleaned_accumulate[clean_pix] += step_size * cleaned_result[clean_pix]
+#         cleaned_result -= step_size * cleaned_result[clean_pix] * raw_psf[bright_pt_mask, clean_pix]
+#     cleaned_result = result - raw_psf.dot(cleaned_accumulate)
+#     plot_IQU(cleaned_result / pixel_rescale, 'iterated cleaned result', i + 1, shape=(3, 5), coord='CG')
+# sys.exit(0)
+
+stop_fac = 20
 cleaned_result = np.copy(result[bright_pt_mask])
 cleaned_accumulate = np.zeros_like(cleaned_result)
-clean_stop = 10 * np.min(np.abs(cleaned_result))
+clean_stop = stop_fac * np.min(np.abs(cleaned_result))#20 is best
 step_size = 0.02
 while np.max(np.abs(cleaned_result)) > clean_stop:
     clean_pix = np.argmax(np.abs(cleaned_result))
@@ -669,7 +684,6 @@ while np.max(np.abs(cleaned_result)) > clean_stop:
     cleaned_result -= step_size * cleaned_result[clean_pix] * raw_psf[bright_pt_mask, clean_pix]
 cleaned_result = result - raw_psf.dot(cleaned_accumulate)
 plot_IQU(cleaned_result / pixel_rescale, 'iterated cleaned result', 1, shape=(1, 1), coord='CG')
-# sys.exit(0)
 
 ########################resolution##########################
 #############################################
@@ -745,8 +759,6 @@ smoothed_map_rescale = hpf.reorder(hp.smoothing(hpf.reorder(map_rescale, n2r=Tru
 map_rescale_full = hpf.get_interp_val(smoothed_map_rescale, thetas, phis, nest=True)
 map_rescale_full[~total_mask] = np.nan
 map_rescale_full.astype('float64').tofile(AtNiAi_filename + '_rescale_nside%i'%low_nside)
-####
-rescale = map_rescale_full[total_mask] * pixel_rescale * weight_rescale
 
 ##error bar
 print "Computing partial AtNiAi, predicted %.1fmin."%(8. * np.sum(low_sub_mask) / 50), datetime.datetime.now()
@@ -761,27 +773,36 @@ map_noise_full = hpf.get_interp_val(map_noise, thetas, phis, nest=True)
 map_noise_full[~total_mask] = np.nan
 map_noise_full.astype('float64').tofile(AtNiAi_filename + '_noise_nside%i'%low_nside)
 
-#####plot resolution and noise
-import matplotlib
-matplotlib.rcParams.update({'font.size':22})
-plot_IQU(map_noise_full[total_mask] / rescale * absolute_noise_scale, 'Uncertainty (K)', 1, shape=(1, 1), log=False, min=10, max=50, coord='CG')
-plot_IQU(map_resolution_full[total_mask]*180./PI, 'Angular resolution (degree)', 1, shape=(1, 1), coord='CG', min=1., max=3., log=False)
-plot_IQU(cleaned_result / rescale, 'log10(Sky Temperature) (K)', 1, shape=(1, 1),  coord='CG')
-hpv.mollview(np.log10(parkes_150), title='log10(Sky Temperature) (K)', min=0, max=4,  coord='CG', nest=True); plt.show()
-###rough way: produces much better noise map?
-# map_noise = np.diagonal(AtNiA_sum)**-.5 * absolute_noise_scale
 snr_mask = map_resolution_full[total_mask] < 3 / 180. * PI#np.abs(map_noise / np.median(cleaned_result)) < 1
 
+##rescale
+ratio_tries = np.arange(1, 1.3, 0.001)
+common_parkes_mask = snr_mask & (parkes_150[total_mask] > 0)
+# result_to_parkes_ratio = (cleaned_result / rescale)[common_parkes_mask].dot(parkes_150[total_mask][common_parkes_mask] / map_noise_full[total_mask][common_parkes_mask]**2) / la.norm(parkes_150[total_mask][common_parkes_mask] / map_noise_full[total_mask][common_parkes_mask])**2
+result_to_parkes_ratio = ratio_tries[np.argmin([np.percentile(np.abs(result / (map_rescale_full[total_mask] * pixel_rescale * weight_rescale) - ratio_try * parkes_150[total_mask])[common_parkes_mask], 50) for ratio_try in ratio_tries])]
+print "the ratio between result and parkes is", result_to_parkes_ratio
+
+####
+rescale = map_rescale_full[total_mask] * pixel_rescale * weight_rescale * result_to_parkes_ratio
 gsm = AtNiAi.dot(AtNiA_sum.dot(fake_solution_map[total_mask])) / map_rescale_full[total_mask]
-result_to_gsm_ratio = (result / rescale)[snr_mask].dot(gsm[snr_mask] / map_noise_full[total_mask][snr_mask]**2) / la.norm(gsm[snr_mask] / map_noise_full[total_mask][snr_mask])**2
+
+# result_to_gsm_ratio = (result / rescale)[snr_mask].dot(gsm[snr_mask] / map_noise_full[total_mask][snr_mask]**2) / la.norm(gsm[snr_mask] / map_noise_full[total_mask][snr_mask])**2
+result_to_gsm_ratio = ratio_tries[np.argmin([np.percentile(np.abs(result / rescale - ratio_try * gsm)[snr_mask], 50) for ratio_try in ratio_tries])]
 print "the ratio between result and gsm is", result_to_gsm_ratio
 plot_IQU(np.abs(result / rescale - result_to_gsm_ratio * gsm) / map_noise_full[total_mask] * rescale / absolute_noise_scale, 'log10(Chi)', 1, shape=(1, 1),  coord='CG', min=-1, max=1)
 print "the median of diff between result and gsm over noise is", np.median((np.abs(result / rescale - result_to_gsm_ratio * gsm) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[snr_mask])
+print "the median of diff between result and parkes over noise is", np.median((np.abs(cleaned_result / rescale - parkes_150[total_mask]) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[common_parkes_mask])
 
-common_parkes_mask = snr_mask & (parkes_150[total_mask] > 0)
-result_to_parkes_ratio = (cleaned_result / rescale)[common_parkes_mask].dot(parkes_150[total_mask][common_parkes_mask] / map_noise_full[total_mask][common_parkes_mask]**2) / la.norm(parkes_150[total_mask][common_parkes_mask] / map_noise_full[total_mask][common_parkes_mask])**2
-print "the ratio between result and parkes is", result_to_parkes_ratio
-print "the median of diff between result and parkes over noise is", np.median((np.abs(cleaned_result / rescale - result_to_parkes_ratio * parkes_150[total_mask]) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[common_parkes_mask])
+#####plot resolution and noise
+import matplotlib
+matplotlib.rcParams.update({'font.size':22})
+hpv.mollview(np.arcsinh(sol2map(cleaned_result / rescale)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
+hpv.mollview(np.arcsinh(sol2map(gsm)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
+hpv.mollview(np.arcsinh(sol2map(result / rescale)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
+plot_IQU(map_noise_full[total_mask] / rescale * absolute_noise_scale, 'Uncertainty (K)', 1, shape=(1, 1), log=False, min=10, max=50, coord='CG')
+plot_IQU(map_resolution_full[total_mask]*180./PI, 'Angular resolution (degree)', 1, shape=(1, 1), coord='CG', min=1., max=3., log=False)
+hpv.mollview(np.log10(parkes_150), title='log10(Sky Temperature) (K)', min=0, max=4,  coord='CG', nest=True); plt.show()
+
 
 plot_IQU(np.abs(cleaned_result / rescale / parkes_150[total_mask] - 1) * 100 * common_parkes_mask, 'error percent', 1, coord='cg')
 plot_IQU(np.abs(cleaned_result / rescale / gsm - 1) * 100 * common_parkes_mask, 'error percent', 1, coord='cg')

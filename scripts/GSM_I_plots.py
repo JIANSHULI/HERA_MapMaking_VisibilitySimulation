@@ -53,6 +53,38 @@ data_file = np.load(data_file_name)
 freqs = np.concatenate((data_file['freqs'][:10], data_file['freqs'][11:-2]))
 idata = np.concatenate((data_file['idata'][:10], data_file['idata'][11:-2]))
 
+
+kB = 1.38065e-23
+c = 2.99792e8
+h = 6.62607e-34
+T = 2.725
+hoverk = h / kB
+
+def K_CMB2MJysr(K_CMB, nu):#in Kelvin and Hz
+    B_nu = 2 * (h * nu)* (nu / c)**2 / (np.exp(hoverk * nu / T) - 1)
+    conversion_factor = (B_nu * c / nu / T)**2 / 2 * np.exp(hoverk * nu / T) / kB
+    return  K_CMB * conversion_factor * 1e20#1e-26 for Jy and 1e6 for MJy
+
+def K_RJ2MJysr(K_RJ, nu):#in Kelvin and Hz
+    conversion_factor = 2 * (nu / c)**2 * kB
+    return  K_RJ * conversion_factor * 1e20#1e-26 for Jy and 1e6 for MJy
+
+########################################
+#normalization
+########################################
+data_file2 = np.load('/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_remove_pt.npz')
+normalization = data_file2['normalization']
+normalization[freqs < 20] = K_RJ2MJysr(normalization[freqs < 20], freqs[freqs < 20] * 1e9)
+normalization[(freqs >= 20) & (freqs < 500)] = K_CMB2MJysr(normalization[(freqs >= 20) & (freqs < 500)], freqs[(freqs >= 20) & (freqs < 500)] * 1e9)
+
+plt.plot(np.log10(freqs), np.log10(normalization), '+')
+plt.xlabel('Frequency (GHz)')
+plt.ylabel('Surface brightness (MJy/sr)')
+plt.ylim([0, 5])
+plt.show()
+
+
+##start plotting
 cmap = cm.gist_rainbow_r
 cmap.set_under('w')
 cmap.set_bad('gray')
@@ -67,4 +99,3 @@ for i, f in enumerate(freqs):
         title = '%.1f THz'%(f * 1e-3)
     hpv.mollview(plot_data, nest=True, sub=(5, 6, i + 1), min=np.percentile(plot_data[~np.isnan(plot_data)], 2), max=np.percentile(plot_data[~np.isnan(plot_data)], 98), cmap=cmap, title=title, cbar=False)
 plt.show()
-

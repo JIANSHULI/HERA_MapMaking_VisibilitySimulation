@@ -94,7 +94,7 @@ if len(sys.argv) > 3 and sys.argv[3][:5] == 'atnia':
     pixel_scheme_number = int(sys.argv[3][5:])
 
 plotcoord = 'CG'
-baseline_safety_factor = 10.#max_ubl = 1.4*lambda/baseline_safety_factor
+baseline_safety_factor = 2.5#max_ubl = lambda/baseline_safety_factor
 crosstalk_type = 'autocorr'
 pixel_directory = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 
@@ -259,9 +259,9 @@ nf = 1
 
 
 common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])#useless since both pol have same ubls
-
 #manually filter UBLs
-cal_ubl_mask = (la.norm(common_ubls, axis=-1) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor)&(la.norm(common_ubls, axis=-1) > 2)
+cal_ubl_mask = (la.norm(common_ubls, axis=-1) / (C / freq) <= nside_start / baseline_safety_factor)&(la.norm(common_ubls, axis=-1) > 2)
+# cal_ubl_mask = (la.norm(common_ubls, axis=-1) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor)&(la.norm(common_ubls, axis=-1) > 2)
 used_common_ubls = common_ubls[cal_ubl_mask]#[np.argsort(la.norm(common_ubls, axis=-1))[10:]]     #remove shorted 10
 redundancy = redundancy[cal_ubl_mask]
 nUBL_used = len(used_common_ubls)
@@ -525,8 +525,6 @@ if INSTRUMENT == 'miteor':
 ################
 ####read data and N
 ################
-# data = {}
-# Ni = {}
 data_shape = {}
 ubl_sort = {}
 for p in ['x', 'y']:
@@ -534,43 +532,10 @@ for p in ['x', 'y']:
     print "%i UBLs to include, longest baseline is %i wavelengths" % (
     nUBL_used, np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / freq))
 
-
-    # get Ni (1/variance) and data
-    # var_filename = datadir + tag + '_%s%s_%i_%i' % (p, p, nt, nUBL) + vartag + '.var'
-    # data_filename = datadir + tag + '_%s%s_%i_%i' % (p, p, nt, nUBL) + datatag
-    # if INSTRUMENT == 'mwa':
-    #     Ni[pol] = 1. / (np.fromfile(var_filename, dtype='float32').reshape((nUBL, nt))[abs(ubl_index[p]) - 1].flatten() * jansky2kelvin ** 2)
-    #     data[pol] = np.fromfile(data_filename, dtype='complex64').reshape((nUBL, nt))[abs(ubl_index[p]) - 1]
-    #     data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
-    #     data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
-    #     data_shape[pol] = (nUBL_used, nt)
-    # elif INSTRUMENT == 'paper':
-    #     Ni[pol] = 1. / (np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[
-    #                         abs(ubl_index[p]) - 1].flatten() * jansky2kelvin ** 2)
-    #     data[pol] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[
-    #         abs(ubl_index[p]) - 1]
-    #     data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
-    #     data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
-    #     data_shape[pol] = (nUBL_used, nt_used)
-    # else:
-    #     Ni[pol] = 1. / (np.fromfile(var_filename, dtype='float32').reshape((nt, nUBL))[tmask].transpose()[
-    #                         abs(ubl_index[p]) - 1].flatten() * jansky2kelvin ** 2)
-    #     data[pol] = np.fromfile(data_filename, dtype='complex64').reshape((nt, nUBL))[tmask].transpose()[
-    #         abs(ubl_index[p]) - 1]
-    #     data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
-    #     data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
-    #     data_shape[pol] = (nUBL_used, nt_used)
     ubl_sort[p] = np.argsort(la.norm(used_common_ubls, axis=1))
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
 
-# Merge data
-# data = np.array([data['xx'], data['yy']]).reshape([2] + list(data_shape['xx'])).transpose(
-#     (1, 0, 2)).flatten()
-# data = np.concatenate((np.real(data), np.imag(data))).astype('float32')
-# Ni = np.concatenate((Ni['xx'], Ni['yy'])).reshape([2] + list(data_shape['xx'])).transpose(
-#     (1, 0, 2)).flatten()
-# Ni = np.concatenate((Ni * 2, Ni * 2))
 
 def get_complex_data(real_data, nubl=nUBL_used, nt=nt_used):
     if len(real_data.flatten()) != 2 * nubl * 2 * nt:
@@ -645,7 +610,7 @@ def get_A():
         A[:, valid_npix:] = additive_A[:, 1:]
     # Merge A
     try:
-        return np.concatenate((np.real(A), np.imag(A)))
+        return np.concatenate((np.real(A), np.imag(A))).astype('float64')
     except MemoryError:
         print "Not enough memory, concatenating A on disk ", A_path + 'tmpre', A_path + 'tmpim',
         sys.stdout.flush()
@@ -661,7 +626,7 @@ def get_A():
         os.system("rm %s" % (A_path + 'tmpre'))
         print "done."
         sys.stdout.flush()
-        return A
+        return A.astype('float64')
 
 
 A = get_A()
@@ -686,64 +651,8 @@ def get_vis_normalization(data, clean_sim_data):
 ##############
 # simulate visibilities according to the pixelized A matrix
 ##############
-clean_sim_data = A.dot(fake_solution.astype(A.dtype))
-#
-# if plot_data_error:
-#     cdata = get_complex_data(data)
-#     cdynamicmodel = get_complex_data(clean_sim_data)
-#     cNi = get_complex_data(Ni)
-#     if pre_calibrate:
-#         cadd = get_complex_data(additive_term)
-#
-#     fun = np.imag
-#     srt = sorted((tlist - lst_offset)%24.+lst_offset)
-#     asrt = np.argsort((tlist - lst_offset)%24.+lst_offset)
-#     pncol = min(int(60. / (srt[-1] - srt[0])), 12)
-#     us = ubl_sort['x'][::len(ubl_sort['x'])/pncol]
-#     for p in range(2):
-#         for nu, u in enumerate(us):
-#
-#             plt.subplot(2, len(us), len(us) * p + nu + 1)
-#             plt.plot(srt, fun(cdata[u, p][asrt]))
-#             plt.plot(srt, fun(fullsim_vis[u, p][asrt]))
-#             plt.plot(srt, fun(cdynamicmodel[u, p][asrt]))
-#             plt.plot(srt, fun(cNi[u, p][asrt])**-.5)
-#             if pre_calibrate:
-#                 plt.plot(srt, fun(cadd[u, p][asrt]))
-#             data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p]))), 5 * np.max(np.abs(fun(cNi[u, p])))])
-#             plt.title("%.1f,%.1f"%(used_common_ubls[u, 0], used_common_ubls[u, 1]))
-#             plt.ylim([-1.05*data_range, 1.05*data_range])
-#
-#     print "total deviation between dynamic and full sim compared to sim", la.norm(fullsim_vis - cdynamicmodel) / la.norm(fullsim_vis)
-#     print "total deviation between dynamic and full sim compared to data noise", la.norm(fullsim_vis - cdynamicmodel) / np.sum(Ni**-1)**.5
-#     plt.show()
-#
-#     try:
-#         fullsim_vis2 = 4 * np.fromfile(datadir + tag + '_p2_u%i_t%i_nside%i_bnside%i.simvis'%(nUBL_used+1, nt_used, nside_standard / 2, bnside), dtype='complex64').reshape((2, nUBL_used+1, nt_used))[:, :-1].transpose((1, 0 ,2))
-#         plt.plot(la.norm(used_common_ubls, axis=-1)*freq/C, la.norm(fullsim_vis - fullsim_vis2, axis=-1)[:, 0] / la.norm(fullsim_vis, axis=-1)[:, 0], 'g+', label='nside error')
-#     except:
-#         try:
-#             fullsim_vis2 = .25 * np.fromfile(datadir + tag + '_p2_u%i_t%i_nside%i_bnside%i.simvis'%(nUBL_used+1, nt_used, nside_standard * 2, bnside), dtype='complex64').reshape((2, nUBL_used+1, nt_used))[:, :-1].transpose((1, 0 ,2))
-#             plt.plot(la.norm(used_common_ubls, axis=-1)*freq/C, la.norm(fullsim_vis - fullsim_vis2, axis=-1)[:, 0] / la.norm(fullsim_vis, axis=-1)[:, 0], 'g+', label='nside error')
-#         except:
-#             pass
-#     plt.plot(la.norm(used_common_ubls, axis=-1)*freq/C, np.sum(2. / np.real(get_complex_data(Ni)), axis=-1)[:, 0]**.5 / la.norm(fullsim_vis, axis=-1)[:, 0], 'b+', label='noise error')
-#     plt.plot(la.norm(used_common_ubls, axis=-1)*freq/C, la.norm(fullsim_vis - cdynamicmodel, axis=-1)[:, 0] / la.norm(fullsim_vis, axis=-1)[:, 0], 'r+', label='dynamic pixel error')
-#     plt.legend()
-#     plt.xlabel('Baseline Length (wavelength)')
-#     plt.ylabel('Relative RMS Error')
-#     plt.show()
-#
-#
-#
-# vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis))
-# print "Normalization from visibilities", vis_normalization
-#
-#
-# ##renormalize the model
-# fake_solution *= vis_normalization
-# clean_sim_data *= vis_normalization
-# fullsim_vis *= vis_normalization
+clean_sim_data = A.dot(fake_solution.astype('float64'))
+
 sim_data = stitch_complex_data(fullsim_vis) + np.random.randn(len(Ni)) / Ni ** .5
 #add additive term
 # if fit_for_additive:
@@ -754,8 +663,14 @@ sim_data = stitch_complex_data(fullsim_vis) + np.random.randn(len(Ni)) / Ni ** .
 
 # compute AtNi.y
 # AtNi_data = np.transpose(A).dot((data * Ni).astype(A.dtype))
-AtNi_sim_data = np.transpose(A).dot((sim_data * Ni).astype(A.dtype))
-AtNi_clean_sim_data = np.transpose(A).dot((clean_sim_data * Ni).astype(A.dtype))
+AtNi_sim_data = np.transpose(A).dot((sim_data * Ni).astype('float64'))
+AtNi_clean_sim_data = np.transpose(A).dot((clean_sim_data * Ni).astype('float64'))
+
+for AtNid_type, AtNid in zip(['AtNisd', 'AtNicsd'], [AtNi_sim_data, AtNi_clean_sim_data]):
+    AtNid_tag = AtNiA_tag.replace('AtNiA', AtNid_type)
+    AtNid_filename = AtNid_tag + A_filename
+    AtNid_path = datadir + tag + AtNid_filename
+    AtNid.tofile(AtNid_path)
 
 # compute S
 print "computing S...",
@@ -793,7 +708,7 @@ else:
     AtNiAi_version = 0.1
 if pre_ampcal:
     AtNiAi_version += 1.
-start_try = {'mwa': -12, 'miteor': -7}[INSTRUMENT]
+start_try = {'mwa': -10, 'miteor': -9}[INSTRUMENT]
 rcond_list = 10.**np.arange(start_try + 2, -2., 1.)
 
 AtNiAi_candidate_files = glob.glob(datadir + tag + AtNiAi_tag + '_S%s_RE*_N%s_v%.1f'%(S_type, vartag, AtNiAi_version) + A_filename)
@@ -944,51 +859,53 @@ for coord in ['C', 'CG']:
 ################
 ###look for best rcond
 # ################
-AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
-for i, p in enumerate(np.arange(start_try, start_try + 7)):
-    rcond = 10**p
-    maxAtNiA = np.max(AtNiA)
-    AtNiA.shape = (len(AtNiA) ** 2)
-    # AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
-    # AtNiAi_path = datadir + tag + AtNiAi_filename
-    AtNiA[::Ashape1 + 1] += maxAtNiA * rcond
-    AtNiA.shape = (Ashape1, Ashape1)
-    AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(precision)
-    # del(AtNiA)
-    # AtNiAi.tofile(AtNiAi_path, overwrite=True)
-    print "%f minutes used" % (float(time.time() - timer) / 60.)
-    print "regularization stength", (maxAtNiA * rcond)**-.5 / np.median(sizes), "median GSM ranges between", np.median(equatorial_GSM_standard)
-
-    #####apply wiener filter##############
-    print "Applying Regularized AtNiAi...",
-    sys.stdout.flush()
-    # w_solution = AtNiAi.dotv(AtNi_data)
-    w_GSM = AtNiAi.dotv(AtNi_clean_sim_data)
-    w_sim_sol = AtNiAi.dotv(AtNi_sim_data)
-    print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-    sys.stdout.flush()
-    plot_IQU(w_GSM, 'wienered GSM', i+1, shape=(2, 7), coord='cg')
-    plot_IQU(w_sim_sol, 'wienered simulated solution', i+8, shape=(2, 7), coord='cg')
-    AtNiA.shape = (len(AtNiA) ** 2)
-    # AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
-    # AtNiAi_path = datadir + tag + AtNiAi_filename
-    AtNiA[::Ashape1 + 1] -= maxAtNiA * rcond
-    AtNiA.shape = (Ashape1, Ashape1)
+# AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
+# for i, p in enumerate(np.arange(start_try, start_try + 7)):
+#     rcond = 10**p
+#     maxAtNiA = np.max(AtNiA)
+#     AtNiA.shape = (len(AtNiA) ** 2)
+#     # AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
+#     # AtNiAi_path = datadir + tag + AtNiAi_filename
+#     AtNiA[::Ashape1 + 1] += maxAtNiA * rcond
+#     AtNiA.shape = (Ashape1, Ashape1)
+#     AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(precision)
+#     # del(AtNiA)
+#     # AtNiAi.tofile(AtNiAi_path, overwrite=True)
+#     print "%f minutes used" % (float(time.time() - timer) / 60.)
+#     print "regularization stength", (maxAtNiA * rcond)**-.5 / np.median(sizes), "median GSM ranges between", np.median(equatorial_GSM_standard)
+#
+#     #####apply wiener filter##############
+#     print "Applying Regularized AtNiAi...",
+#     sys.stdout.flush()
+#     # w_solution = AtNiAi.dotv(AtNi_data)
+#     w_GSM = AtNiAi.dotv(AtNi_clean_sim_data)
+#     w_sim_sol = AtNiAi.dotv(AtNi_sim_data)
+#     print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+#     sys.stdout.flush()
+#
+#     AtNiA.shape = (len(AtNiA) ** 2)
+#     # AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
+#     # AtNiAi_path = datadir + tag + AtNiAi_filename
+#     AtNiA[::Ashape1 + 1] -= maxAtNiA * rcond
+#     AtNiA.shape = (Ashape1, Ashape1)
+#     plot_IQU(w_GSM, 'wienered GSM', i+1, shape=(2, 7), coord='cg')
+#     plot_IQU(w_sim_sol, 'wienered simulated solution', i+8, shape=(2, 7), coord='cg')
 ################
 ###full inverse
 ################
-rcond = {'mwa': 1e-9, 'miteor': 1e-4}[INSTRUMENT]
+rcond = {'mwa': 10**-8, 'miteor': 1e-7}[INSTRUMENT]
 AtNiAi_filename = 'AtNiASifi' + '_S%s_RE%.1f_N%s_v%.1f'%(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
 AtNiAi_path = datadir + tag + AtNiAi_filename
-
-
 AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
 maxAtNiA = np.max(AtNiA)
 AtNiA.shape = (len(AtNiA) ** 2)
 
 AtNiA[::Ashape1 + 1] += maxAtNiA * rcond
 AtNiA.shape = (Ashape1, Ashape1)
-AtNiAi = sla.inv(AtNiA)
+AtNiAi = la.inv(AtNiA)
+print  '###########check they are 1#################'
+print AtNiAi[0].dot(AtNiA[:, 0]), AtNiAi[-1].dot(AtNiA[:, -1])
+print  '###################################'
 del(AtNiA)
 AtNiAi.tofile(AtNiAi_path)
 print "%f minutes used" % (float(time.time() - timer) / 60.)
@@ -1008,6 +925,9 @@ sys.stdout.flush()
 
 AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
 psf = np.einsum('ij,jk->ik', AtNiAi, AtNiA)
+print '############check first one is 0###########'
+print la.norm(psf.dot(fake_solution) - w_GSM), la.norm(psf.dot(fake_solution) - w_sim_sol)
+print '#######################################'
 def fwhm2(psf, verbose=False):
     spreaded = np.abs(psf) / np.max(np.abs(psf))
     fwhm_mask = spreaded >= .5
@@ -1015,26 +935,27 @@ def fwhm2(psf, verbose=False):
 resolution = np.array([fwhm2(pf) for pf in psf.transpose()])
 
 rescale = np.sum(psf, axis=-1)
-noise = np.sum(psf * np.transpose(AtNiAi), axis=-1)**.5 / rescale
+noise = np.sum(psf * np.transpose(AtNiAi), axis=-1)**.5 / np.abs(rescale)
 result = w_sim_sol / rescale
 import matplotlib
 matplotlib.rcParams.update({'font.size':16})
 plot_IQU(fake_solution, 'GSM (Log(K))', 1, shape=(4, 1), coord='cg')
 plot_IQU(result, 'Simulated Result (Log(K))', 2, shape=(4, 1), coord='cg')
-plot_IQU(noise, 'Uncertainty (K)', 3, shape=(4, 1), coord='cg', log=False, min=1, max=4)
+plot_IQU(noise, 'Uncertainty (K)', 3, shape=(4, 1), coord='cg')
 # plot_IQU(noise, 'Uncertainty (Log(K))', 3, shape=(4, 1), coord='cg')
 plot_IQU(resolution * 180/PI, 'Resolution', 4, shape=(4, 1), coord='cg', log=False, resize=False, min=2, max=5)
 
 
 matplotlib.rcParams.update({'font.size':22})
-plot_IQU(fake_solution, 'GSM (Log(K))', 1, shape=(1, 1), coord='cg')
-plot_IQU(result, 'Simulated Dirty Map (Log(K))', 1, shape=(1, 1), coord='cg')
-plot_IQU(noise, 'Uncertainty (Log(K))', 1, shape=(1, 1), coord='cg', min=-1, max=1)
-# plot_IQU(noise, 'Uncertainty (Log(K))', 3, shape=(4, 1), coord='cg')
+plot_IQU(result, 'Simulated Dirty Map (Log(K))', 1, shape=(1, 1), coord='cg', min=2)
+plot_IQU(w_GSM / rescale, 'Regulated GSM', 1, shape=(1, 1), coord='cg', min=2)
+plot_IQU(noise, 'Uncertainty (Log(K))', 1, shape=(1, 1), coord='cg', min=1, max=3)
+plot_IQU(np.abs(w_GSM - w_sim_sol) / np.sum(psf * np.transpose(AtNiAi), axis=-1)**.5, 'chi', 1, shape=(1, 1), coord='cg', resize=False, min=0, max=2, log=False)
 plot_IQU(resolution * 180/PI, 'Resolution (degree)', 1, shape=(1, 1), coord='cg', log=False, resize=False, min=2, max=5)
 
-#clean
 
+
+###CLEAN
 bright_points = {'cyg':{'ra': '19:59:28.3', 'dec': '40:44:02'}, 'cas':{'ra': '23:23:26', 'dec': '58:48:00'}}
 pt_source_range = PI / 40
 smooth_scale = PI / 30
@@ -1064,5 +985,5 @@ while np.max(np.abs(cleaned_result2)) > np.median(np.abs(cleaned_result2)) * 1.1
     cleaned_result2 -= step_size * cleaned_result2[clean_pix] * raw_psf[bright_pt_mask, clean_pix]
 cleaned_result2 = result - raw_psf.dot(cleaned_accumulate)
 plot_IQU(result, 'Simulated Dirty Map (Log(K))', 1, shape=(2, 1), coord='cg')
-plot_IQU(cleaned_result2, 'Simulated CLEANed Map (Log(K))', 2, shape=(1, 1), coord='cg')
+plot_IQU(cleaned_result2, 'Simulated CLEANed Map (Log(K))', 2, shape=(2, 1), coord='cg')
 plot_IQU(cleaned_result2, 'Simulated CLEANed Map (Log(K))', 1, shape=(1, 1), coord='CG')

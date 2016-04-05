@@ -70,9 +70,6 @@ for p in ['x']:#, 'y']:
                 if la.norm(ubls[tag][np.argmin(la.norm(ubls[tag] - big_ubl, axis=-1))] - big_ubl) < 1.:
                     big_data[t_is, f_i] = vis_data[tag][:, np.argmin(la.norm(ubls[tag] - big_ubl, axis=-1))]
         plt.subplot(1, 4, u + 1)
-        # big_data[:, :3] = np.nan#TODO hack
-        # big_data[:, 9] = np.nan#TODO hack
-        # big_data[:, 18] = np.nan#TODO hack
         if u==0:
             plt.imshow(np.real(big_data[::-1]), interpolation='none', extent=[f_start, f_start + nf*f_step, t_start, t_start + nt*t_step], aspect='auto')
             plt.ylabel('Local Sidereal Time (Hour)')
