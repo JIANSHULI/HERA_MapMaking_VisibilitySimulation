@@ -85,17 +85,17 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, tag, 
 ###OVER ALL PARAMETERS
 ###########################
 ###########################
-mother_nside = 128
+mother_nside = 64#128
 mother_npix = hpf.nside2npix(mother_nside)
-smoothing_fwhm = 3.6 * np.pi / 180.#5 * np.pi / 180.
+smoothing_fwhm = 5 * np.pi / 180.#3.6 * np.pi / 180.#5 * np.pi / 180.
 edge_width = 3. * np.pi / 180.
 remove_cmb = True
 I_only = True
 version = 3.0
 
 
-n_principal_range = range(5, 10)
-error_weighting = 'remove_pt'#'none'#'inv_error'#'remove_pt'
+n_principal_range = range(6, 7)
+error_weighting = 'remove_pt'#'remove_pt'#'none'#'inv_error'#'remove_pt'
 
 include_visibility = False
 vis_Qs = ["q0AL_*_abscal", "q0C_*_abscal", "q1AL_*_abscal", "q2AL_*_abscal", "q2C_*_abscal", "q3AL_*_abscal", "q4AL_*_abscal"]  # L stands for lenient in flagging
@@ -305,7 +305,7 @@ for n_principal in n_principal_range:
             x_fit = np.transpose(w_nf).dot(xbar_ni)
             error = np.nansum((x_fit - x_fi)[:, ~point_source_mask].flatten()**2)
             errors.append(error)
-        if trial == 1:
+        if trial == 1 and error_weighting == 'inv_error':
             x_fi = x_fi * previous_error_map**.5
             x_fit = x_fit * previous_error_map**.5
             xbar_ni = xbar_ni * previous_error_map**.5
@@ -455,11 +455,13 @@ for n_principal in n_principal_range:
 
     fig = plt.Figure(figsize=(200, 100))
     fig.set_canvas(plt.gcf().canvas)
-    plt.subplot(3, 1, 1)
+    plt.subplot(2, 2, 1)
     plt.plot(errors)
-    plt.subplot(3, 1, 2)
+    plt.subplot(2, 2, 2)
     plt.plot(np.nanmean((x_fit-x_fi)**2, axis=1))
-    hpv.mollview(np.log10(np.nanmean((x_fit-x_fi)**2, axis=0)), nest=True, sub=(3,1,3))
+    plt.subplot(2, 2, 4)
+    plt.plot((np.nanmean((x_fit-x_fi)**2, axis=1) / np.nanmean(x_fi**2, axis=1))**.5)
+    hpv.mollview(np.log10(np.nanmean((x_fit-x_fi)**2, axis=0)), nest=True, sub=(2,2,3))
     fig.savefig(plot_filename_base + '_error_plot_' + error_weighting + '.png', dpi=1000)
     if show_plots:
         plt.show()

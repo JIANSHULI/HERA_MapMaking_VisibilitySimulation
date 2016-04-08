@@ -172,9 +172,9 @@ ARCMIN = DEGREE / 60.
 ###########################
 version = 3.0
 I_only = True
-mother_nside = 128
+mother_nside = 64
 mother_npix = hpf.nside2npix(mother_nside)
-target_fwhm = 3.6 * DEGREE#5 * DEGREE
+target_fwhm = 5 * DEGREE#3.6 * DEGREE#
 min_edge_width = 3 * DEGREE
 remove_cmb = True
 
