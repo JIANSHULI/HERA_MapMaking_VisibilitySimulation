@@ -174,7 +174,7 @@ version = 3.0
 I_only = True
 mother_nside = 1024#64
 mother_npix = hpf.nside2npix(mother_nside)
-target_fwhm = 14 * ARCMIN#5 * DEGREE#3.6 * DEGREE#
+target_fwhm = .8 * DEGREE#3.6 * DEGREE#
 min_edge_width = 3 * DEGREE
 remove_cmb = True
 
@@ -204,37 +204,6 @@ else:
 
 resolutions = {}
 
-
-###########################
-###DRAO 10MHZ and 22MHz
-#########################
-drao_low = {.01: read_equirectangular("/home/omniscope/data/polarized foregrounds/fits23904_DRAO10.bin"),
-          .022: read_equirectangular("/home/omniscope/data/polarized foregrounds/fits23937_DRAO22.bin"),
-          }
-resolutions[.010] = (2.6 * 1.9)**.5 * DEGREE
-resolutions[.022] = (1.1 * 1.7)**.5 * DEGREE
-if plot_individual:
-    plot_dataset(drao_low)
-
-###########################
-###parkes 85 and 150mhz
-#########################
-parkes = {.085: read_equirectangular("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin"),
-          .15: read_equirectangular("/home/omniscope/data/polarized foregrounds/parkes_150mhz.bin"),
-          }
-resolutions[.085] = (3.8 * 3.5)**.5 * DEGREE
-resolutions[.15] = 2.2 * DEGREE
-if plot_individual:
-    plot_dataset(parkes)
-
-
-#########################
-###Dwingloo#########################
-#########################
-dwingloo = {.82: read_equirectangular('/home/omniscope/data/polarized foregrounds/fits19231_Dwingloo.bin', unit_scale=0.1)}
-resolutions[.82] = 1.2 * DEGREE
-if plot_individual:
-    plot_dataset(dwingloo)
 
 #########################
 ###Stockert 2.72#########################
@@ -344,145 +313,17 @@ if plot_individual:
 # resolutions[2.3] = 9 * ARCMIN
 # if plot_individual:
 #     plot_dataset(spass)
-###########################
-###CMB######
-###############
-T_CMB = 2.725 * (1 - remove_cmb) #if remove cmb, dont add cmb temp into wmap/planck
-dipole_correction = {'I_Stokes': T_CMB, 'Q_Stokes': 0, 'U_Stokes': 0, 'I_STOKES': T_CMB, 'Q_STOKES': 0, 'U_STOKES': 0, 'TEMPERATURE': T_CMB, 'Q_POLARISATION': 0, 'U_POLARISATION': 0}
-
-####planck
-planck_iqu = {}
-planck_iqu[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_030_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
-planck_iqu[44.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_044_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
-planck_iqu[70.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/LFI_SkyMap_070_1024_R2.01_full.fits")[key] + dipole_correction[key] for key in ['I_Stokes', 'Q_Stokes', 'U_Stokes']])
-planck_iqu[100.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_100_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[143.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_143_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[217.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_217_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[353.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_353_2048_R2.02_full.fits")[key] + dipole_correction[key] for key in ['I_STOKES', 'Q_STOKES', 'U_STOKES']])
-planck_iqu[545.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_545_2048_R2.02_full.fits")['I_STOKES']
-planck_iqu[857.0] = fit.read("/home/omniscope/data/polarized foregrounds/HFI_SkyMap_857_2048_R2.02_full.fits")['I_STOKES']
-resolutions[30.0] = 33 * ARCMIN
-resolutions[44.0] = 24 * ARCMIN
-resolutions[70.0] = 14 * ARCMIN
-resolutions[100.0] = 10 * ARCMIN
-resolutions[143.0] = 7.1 * ARCMIN
-resolutions[217.0] = 5.5 * ARCMIN
-resolutions[353.0] = 5 * ARCMIN
-resolutions[545.0] = 5 * ARCMIN
-resolutions[857.0] = 5 * ARCMIN
-if plot_individual:
-    plot_dataset(planck_iqu)
-
-#####wmap
-wmap_iqu = {}
-wmap_iqu[22.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_K_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[33.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Ka_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[40.7] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_Q_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[60.8] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_V_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-wmap_iqu[93.5] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_band_iqumap_r9_9yr_W_v5.fits")[key] + dipole_correction[key] for key in ['TEMPERATURE', 'Q_POLARISATION', 'U_POLARISATION']]) / 1.e3
-resolutions[22.8] = 49.2 * ARCMIN
-resolutions[33.0] = 37.2 * ARCMIN
-resolutions[40.7] = 29.4 * ARCMIN
-resolutions[60.8] = 19.8 * ARCMIN
-resolutions[93.5] = 12.6 * ARCMIN
-if plot_individual:
-    plot_dataset(wmap_iqu)
-
-# ###WMAP POL 22G
-# cmb_iqu_syn = {}
-# cmb_iqu_syn[22.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/wmap_mcmc_base_k_synch_%s_9yr_v5.fits"%key)['BESTFIT'] for key in ['temp', 'stk_q', 'stk_u']])
-#
-# ###PLANCK POL 30G
-# cmb_iqu_syn[30.0] = np.array([fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_Synchrotron-commander_0256_R2.00.fits")['I_ML']]
-#                                 + [fit.read("/home/omniscope/data/polarized foregrounds/COM_CompMap_SynchrotronPol-commander_0256_R2.00.fits")[key] for key in ['Q_ML_FULL', 'U_ML_FULL']])
-# plot_dataset(cmb_iqu_syn)
-
-
-
-###########################
-###high freq THz
-#########################
-# iras = {}
-# for freq in [3, 5]:#, 12]:
-#     d = np.zeros((5401, 10801)) - 1e9
-#     d[(5401-3)/2:(5401-3)/2+301] = fit.read("/home/omniscope/data/polarized foregrounds/iras_%ithz.bin"%freq)[0]
-#     d[:, :-1] = np.roll(d[:, :-1], 5400, axis=1)[:, ::-1]
-#     d[:, -1] = d[:, 0]
-#     d[d > np.nanmax(d) * .8] = -1e9
-#     d[d <= 0] = -1e9
-#     d = sv.equirectangular2heapix(d)
-#     d[d <= 0] = np.nan
-#     iras[freq * 1.e3] = d
-#
-#
-# if plot_individual:
-#     plot_dataset(iras)
-
-############
-###iris####
-############
-iris = {}
-for i, freq in enumerate([3.e3, 5.e3, 12.e3, 25.e3]):
-    iris[freq] = fit.read("/home/omniscope/data/polarized foregrounds/IRIS_nohole_%i_1024.fits"%(4-i))['f0'].flatten()[hpf.nest2ring(1024, range(hpf.nside2npix(1024)))]
-
-theta_g, phi_g = hpf.pix2ang(1024, range(12*1024**2), nest=True)
-theta_e, phi_e = hpr.Rotator(coord='ge')(theta_g, phi_g)
-iris_zodiacal_mask_widths = [0, .2, .7, .7]
-for i, freq in enumerate([3.e3, 5.e3, 12.e3, 25.e3]):
-    iris[freq][np.abs(theta_e-PI/2) <= iris_zodiacal_mask_widths[i]] = np.nan
-for key in iris.keys():
-    resolutions[key] = 4.3 * ARCMIN#imprecise: 3.8-4.3
-if plot_individual:
-    plot_dataset(iris)
-
-############
-####akari####
-############
-akari = {}
-for i, freq in enumerate([3.e5/160, 3.e5/140, 3.e5/90]):#, 3.e5/65]):
-    akari[freq] = fit.read("/home/omniscope/data/polarized foregrounds/akari_%s_1_4096.fits"%(['160', 'WideL', 'WideS', '65'][i]))['UNKNOWN1'].flatten()
-    akari[freq][akari[freq] == 0] = np.nan
-###common mask for akari scan patterns
-common_akari_mask = np.zeros(len(akari[akari.keys()[0]]), dtype='bool')
-for freq, data in akari.iteritems():
-    common_akari_mask = common_akari_mask|np.isnan(data)
-for freq in akari.keys():
-    akari[freq][common_akari_mask] = np.nan
-###remove zodiacal light contaminated region for 90um (and 65um, but it's excluded anyways)
-theta_g, phi_g = hpf.pix2ang(4096, range(12*4096**2), nest=True)
-theta_e, phi_e = hpr.Rotator(coord='ge')(theta_g, phi_g)
-# theta_z, phi_z = hpr.Rotator(rot=(0, 0, 90))(theta_e, phi_e)
-akari_zodiacal_mask = np.abs(theta_e-PI/2) <= .45
-akari[3.e5/90][akari_zodiacal_mask] = np.nan
-for key in akari.keys():
-    resolutions[key] = 1.5 * ARCMIN#imprecise: 1-1.5
-if plot_individual:
-    plot_dataset(akari)
-
-
-
-####PNM+87GB
-#plt.imshow(np.log10(fit.read("/home/omniscope/data/polarized foregrounds/PMN+87GB.fits")[0,0]));plt.show()
-
 
 #########################
 ###Create new mother#########################
 #########################
 new_mother = {}
 for dict in [
-    parkes,
-    drao_low,
     haslam,
-    dwingloo,
     motherfile,
     all_1400,
     # spass,
     stockert11cm,
-    wmap_iqu,
-    planck_iqu,
-    #iras,
-    iris,
-    akari,
     ]:
     for f, data in dict.iteritems():
         if resolutions[f] < target_fwhm * 1.1:

@@ -15,7 +15,7 @@ import glob
 import fitsio
 import omnical.calibration_omni as omni
 
-def fit_power(freq, amp, relative_error=None):
+def fit_power(freq, amp, relative_error=None, plot=False, log=False):
     if relative_error is None:
         relative_error = np.ones_like(amp)
     b = np.log10(amp)
@@ -26,6 +26,14 @@ def fit_power(freq, amp, relative_error=None):
     x = AtAi.dot((A.transpose() * Ni).dot(b))
     error = (A.dot(x) - b) * Ni**.5
     noise = la.norm(error) / (len(freq) - 2)**.5
+    if plot:
+        if log:
+            plt_x = 10**A[:, 0]
+        else:
+            plt_x = A[:, 0]
+        plt.errorbar(plt_x, b, yerr=noise * relative_error, fmt='bo')
+        plt.plot(plt_x, A.dot(x), 'g-')
+        plt.show()
     return x[0], AtAi[0, 0]**.5 * noise
 
 def fit_power_interp(freq, amp, interp_freq, relative_error=None):
@@ -458,6 +466,21 @@ plt.ylim(-4, -1)
 plt.show()
 print np.sum(spectral_index_list[:, 1] / spectral_index_list[:,2]**2) / np.sum(1 / spectral_index_list[:,2]**2), np.sum(1 / spectral_index_list[:,2]**2)**-.5
 
+#gal latitudes
+equ2013_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=2013.58))
+zen_phis = np.arange(16., 25., .1) / 24. * 2 * np.pi
+zen_thetas = np.ones_like(zen_phis) * 45.297728 / 180 * PI
+z_ang0, z_ang1 = hp.rotator.rotateDirection(equ2013_to_gal_matrix, zen_thetas, zen_phis)
+zen_gal_lats = hpf.get_interp_val(PI/2 - hpf.pix2ang(nside, range(hpf.nside2npix(nside)))[0], z_ang0, z_ang1)
+
+plt.errorbar((spectral_index_list[:, 0] - 5)%24 + 5, spectral_index_list[:, 1], fmt='g+', yerr=spectral_index_list[:, 2])
+plt.xlabel('LST (hour)')
+plt.ylabel('Spectral index')
+plt.ylim(-4, -1)
+plt.plot(zen_phis / (2 * np.pi) * 24, zen_gal_lats * 180. / np.pi / 40. - 3)
+plt.show()
+
+
 ##############################################
 ###make pretty maps with heavy regularization
 AtNiA_sum = np.fromfile(AtNiA_filename, dtype='float64')
@@ -496,8 +519,8 @@ sim_result = AtNiAi.dot(AtNisimdata_sum)
 #########################
 total_mask = np.copy(child_mask)
 total_mask[total_mask] = non_zero_mask
-def sol2map(sol, std=False):
-    full_sol = np.zeros(npix) + np.nan
+def sol2map(sol, std=False, fill=np.nan):
+    full_sol = np.zeros(npix) + fill
 
     full_sol[total_mask] = sol
     if std:
@@ -524,7 +547,7 @@ def plot_IQU(solution, title, col, shape=(1, 1), coord='C', std=False, log=True,
 
 
 pixel_rescale = (nside_standard / nside)**2
-print fit_power(sorted(freqs * 1e6), weights[np.argsort(freqs)], relative_error=np.array([relative_noise_scales[Q] * len(datas[Q])**-.5 for Q in Qs]))
+print fit_power(sorted(freqs * 1e6), weights[np.argsort(freqs)], relative_error=np.array([relative_noise_scales[Q] * len(datas[Q])**-.5 for Q in Qs]), plot=True)
 weight_rescale = 1. / fit_power_interp(sorted(freqs * 1e6), weights[np.argsort(freqs)], standard_freq*1e6, relative_error=np.array([relative_noise_scales[Q] * len(datas[Q])**-.5 for Q in Qs]))
 plot_IQU(result / pixel_rescale / weight_rescale, instrument, 1, shape=(2, 2), coord='CG')
 plot_IQU(sim_result / pixel_rescale / weight_rescale, 'noiseless simulation', 2, shape=(2, 2), coord='CG')
@@ -559,9 +582,27 @@ parkes_150[parkes_150 > parkes_header['DATAMAX']] = -parkes_header['DATAMAX']
 parkes_150[parkes_150 < parkes_header['DATAMIN']] = -parkes_header['DATAMAX']
 parkes_150 = sv.equirectangular2heapix(parkes_150, nside, nest=False)
 parkes_150[parkes_150 <= 0] = np.nan
-equ2013_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=2013.58))
 ang0, ang1 = hp.rotator.rotateDirection(equ2013_to_gal_matrix, hpf.pix2ang(nside, range(12 * nside ** 2), nest=True))
 parkes_150 = hpf.get_interp_val(parkes_150, ang0, ang1)
+
+parkes_header = fitsio.read_header("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin")
+parkes_85 = fitsio.read("/home/omniscope/data/polarized foregrounds/parkes_85mhz.bin")[0]
+parkes_85[:, :-1] = np.roll(parkes_85[:, :-1], 180, axis=1)[:, ::-1]
+parkes_85[:, -1] = parkes_85[:, 0]
+parkes_85[parkes_85 > parkes_header['DATAMAX']] = -parkes_header['DATAMAX']
+parkes_85[parkes_85 < parkes_header['DATAMIN']] = -parkes_header['DATAMAX']
+parkes_85 = sv.equirectangular2heapix(parkes_85, nside, nest=False)
+parkes_85[parkes_85 <= 0] = np.nan
+equ2013_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=2013.58))
+ang0, ang1 = hp.rotator.rotateDirection(equ2013_to_gal_matrix, hpf.pix2ang(nside, range(12 * nside ** 2), nest=True))
+parkes_85 = hpf.get_interp_val(parkes_85, ang0, ang1)
+
+haslam = hp.ud_grade(hp.smoothing(fitsio.read("/home/omniscope/data/polarized foregrounds/haslam408_dsds_Remazeilles2014.fits")['TEMPERATURE'].flatten(), fwhm=(1 - 0.8**2)**.5 * PI/180.), nside_out=nside)
+smooth_haslam = hp.ud_grade(hp.smoothing(fitsio.read("/home/omniscope/data/polarized foregrounds/haslam408_dsds_Remazeilles2014.fits")['TEMPERATURE'].flatten(), fwhm=(3.8**2 - 0.8**2)**.5 * PI/180.), nside_out=nside)
+haslam = hpf.get_interp_val(haslam, ang0, ang1)
+smooth_haslam = hpf.get_interp_val(smooth_haslam, ang0, ang1)
+
+gal_lats = hpf.get_interp_val(PI/2 - hpf.pix2ang(nside, range(hpf.nside2npix(nside)))[0], ang0, ang1)
 
 hpv.mollview(np.log10(parkes_150), nest=True, min=0, max=4, sub=(2, 2, 3), title='parkes150MHz', coord='CG')
 
@@ -773,44 +814,123 @@ map_noise_full = hpf.get_interp_val(map_noise, thetas, phis, nest=True)
 map_noise_full[~total_mask] = np.nan
 map_noise_full.astype('float64').tofile(AtNiAi_filename + '_noise_nside%i'%low_nside)
 
-snr_mask = map_resolution_full[total_mask] < 3 / 180. * PI#np.abs(map_noise / np.median(cleaned_result)) < 1
-
+snr_mask = (map_resolution_full[total_mask] < 3 / 180. * PI)# & (map_noise_full[total_mask] / (map_rescale_full[total_mask] * pixel_rescale * weight_rescale) * absolute_noise_scale < 40)
+plt_mask = map_resolution_full[total_mask] < 3.5*PI/180
+plt_nan = np.zeros_like(result)
+plt_nan[~plt_mask] = np.nan
 ##rescale
 ratio_tries = np.arange(1, 1.3, 0.001)
 common_parkes_mask = snr_mask & (parkes_150[total_mask] > 0)
 # result_to_parkes_ratio = (cleaned_result / rescale)[common_parkes_mask].dot(parkes_150[total_mask][common_parkes_mask] / map_noise_full[total_mask][common_parkes_mask]**2) / la.norm(parkes_150[total_mask][common_parkes_mask] / map_noise_full[total_mask][common_parkes_mask])**2
-result_to_parkes_ratio = ratio_tries[np.argmin([np.percentile(np.abs(result / (map_rescale_full[total_mask] * pixel_rescale * weight_rescale) - ratio_try * parkes_150[total_mask])[common_parkes_mask], 50) for ratio_try in ratio_tries])]
+result_to_parkes_ratio = ratio_tries[np.argmin([np.percentile(np.abs(cleaned_result / (map_rescale_full[total_mask] * pixel_rescale * weight_rescale) - ratio_try * parkes_150[total_mask])[common_parkes_mask], 50) for ratio_try in ratio_tries])]
 print "the ratio between result and parkes is", result_to_parkes_ratio
 
 ####
 rescale = map_rescale_full[total_mask] * pixel_rescale * weight_rescale * result_to_parkes_ratio
-gsm = AtNiAi.dot(AtNiA_sum.dot(fake_solution_map[total_mask])) / map_rescale_full[total_mask]
 
-# result_to_gsm_ratio = (result / rescale)[snr_mask].dot(gsm[snr_mask] / map_noise_full[total_mask][snr_mask]**2) / la.norm(gsm[snr_mask] / map_noise_full[total_mask][snr_mask])**2
-result_to_gsm_ratio = ratio_tries[np.argmin([np.percentile(np.abs(result / rescale - ratio_try * gsm)[snr_mask], 50) for ratio_try in ratio_tries])]
-print "the ratio between result and gsm is", result_to_gsm_ratio
-plot_IQU(np.abs(result / rescale - result_to_gsm_ratio * gsm) / map_noise_full[total_mask] * rescale / absolute_noise_scale, 'log10(Chi)', 1, shape=(1, 1),  coord='CG', min=-1, max=1)
-print "the median of diff between result and gsm over noise is", np.median((np.abs(result / rescale - result_to_gsm_ratio * gsm) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[snr_mask])
-print "the median of diff between result and parkes over noise is", np.median((np.abs(cleaned_result / rescale - parkes_150[total_mask]) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[common_parkes_mask])
+
+cleaned_gsm = fake_solution_map[total_mask]
+cleaned_gsm[bright_pt_mask] = np.min(cleaned_gsm[bright_pt_mask])
+cleaned_psf_gsm = AtNiAi.dot(AtNiA_sum.dot(cleaned_gsm)) / map_rescale_full[total_mask]
+# gsm = AtNiAi.dot(AtNiA_sum.dot(fake_solution_map[total_mask])) / map_rescale_full[total_mask]
+
+# result_to_gsm_ratio = (result / rescale)[snr_mask].dot(cleaned_psf_gsm[snr_mask] / map_noise_full[total_mask][snr_mask]**2) / la.norm(cleaned_psf_gsm[snr_mask] / map_noise_full[total_mask][snr_mask])**2
+result_to_gsm_ratio = ratio_tries[np.argmin([np.percentile(np.abs(cleaned_result / rescale - ratio_try * cleaned_psf_gsm)[snr_mask], 50) for ratio_try in ratio_tries])]
+print "the ratio between cleaned_result and cleaned_psf_gsm is", result_to_gsm_ratio
+plot_IQU(plt_nan + np.abs(cleaned_result / rescale - result_to_gsm_ratio * cleaned_psf_gsm) / map_noise_full[total_mask] * rescale / absolute_noise_scale, 'log10(Chi)', 1, shape=(1, 1),  coord='CG', min=-1, max=1)
+print "the median of diff between cleaned_result and cleaned_psf_gsm over noise is", np.median((np.abs(cleaned_result / rescale - result_to_gsm_ratio * cleaned_psf_gsm) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[snr_mask])
+print "the median of diff between cleaned_result and parkes over noise is", np.median((np.abs(cleaned_result / rescale - parkes_150[total_mask]) / map_noise_full[total_mask] * rescale / absolute_noise_scale)[common_parkes_mask])
 
 #####plot resolution and noise
 import matplotlib
 matplotlib.rcParams.update({'font.size':22})
-hpv.mollview(np.arcsinh(sol2map(cleaned_result / rescale)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
-hpv.mollview(np.arcsinh(sol2map(gsm)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
-hpv.mollview(np.arcsinh(sol2map(result / rescale)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
-plot_IQU(map_noise_full[total_mask] / rescale * absolute_noise_scale, 'Uncertainty (K)', 1, shape=(1, 1), log=False, min=10, max=50, coord='CG')
-plot_IQU(map_resolution_full[total_mask]*180./PI, 'Angular resolution (degree)', 1, shape=(1, 1), coord='CG', min=1., max=3., log=False)
-hpv.mollview(np.log10(parkes_150), title='log10(Sky Temperature) (K)', min=0, max=4,  coord='CG', nest=True); plt.show()
+hpv.mollview(np.arcsinh(sol2map(plt_nan + cleaned_result / rescale)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
+hpv.mollview(np.arcsinh(sol2map(plt_nan + cleaned_psf_gsm)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
+# hpv.mollview(np.arcsinh(sol2map(plt_nan + result / rescale)) / np.log(10), nest=True, title='log10(Sky Temperature) (K)',  coord='CG', min=2, max=4); plt.show()
+plot_IQU(plt_nan + map_noise_full[total_mask] / rescale * absolute_noise_scale, 'Uncertainty (K)', 1, shape=(1, 1), log=False, min=10, max=50, coord='CG')
+plot_IQU(plt_nan + map_resolution_full[total_mask]*180./PI, 'Angular resolution (degree)', 1, shape=(1, 1), coord='CG', min=1., max=3., log=False)
 
+plt_nan2 = np.copy(plt_nan)
+plt_nan2[map_noise_full[total_mask] / rescale * absolute_noise_scale > 20] = np.nan
+plt_nan2[map_resolution_full[total_mask] > 2.5*PI/180] = np.nan
 
-plot_IQU(np.abs(cleaned_result / rescale / parkes_150[total_mask] - 1) * 100 * common_parkes_mask, 'error percent', 1, coord='cg')
-plot_IQU(np.abs(cleaned_result / rescale / gsm - 1) * 100 * common_parkes_mask, 'error percent', 1, coord='cg')
-
-plt.subplot(1, 2, 1)
-plt.title('Parkes chi^2')
-_,_,_ = plt.hist(((cleaned_result / rescale - 1.171 * parkes_150[total_mask]) / (map_noise_full[total_mask] / rescale * absolute_noise_scale))[common_parkes_mask]**2, np.arange(0,5,.01))
-plt.subplot(1, 2, 2)
-plt.title('GSM chi^2')
-_,_,_ = plt.hist(((cleaned_result / rescale - 1.214 * gsm) / (map_noise_full[total_mask] / rescale * absolute_noise_scale))[snr_mask]**2, np.arange(0,5,.01))
+smooth_cleaned_result = hp.reorder(hp.smoothing(hp.reorder(sol2map(cleaned_result / rescale, fill=10), n2r=True), fwhm=(3.8**2-2.**2)**.5 * PI/180.), r2n=True)[total_mask]
+cleaned_haslam = haslam[total_mask]
+cleaned_haslam[bright_pt_mask] = np.min(cleaned_haslam[bright_pt_mask])
+psf_haslam = AtNiAi.dot(AtNiA_sum.dot(cleaned_haslam)) / map_rescale_full[total_mask]
+psf_parkes_85 = np.copy(parkes_85)[total_mask]
+psf_parkes_85[np.isnan(psf_parkes_85)] = np.nanmin(psf_parkes_85)
+psf_parkes_85 = AtNiAi.dot(AtNiA_sum.dot(psf_parkes_85)) / map_rescale_full[total_mask]
+spec_min = -3
+spec_max = -2
+plot_IQU(plt_nan2 + np.log10(parkes_85[total_mask] / smooth_cleaned_result) / np.log10(85. / 150.), 'Parkes 85 vs MITEoR', 1, shape=(3, 1), coord='cg', log=False, min=spec_min, max=spec_max)
+plot_IQU(plt_nan2 + np.log10(psf_haslam / (cleaned_result / rescale)) / np.log10(408. / 150.), 'Haslam vs MITEoR', 2, shape=(3, 1), coord='cg', log=False, min=spec_min, max=spec_max)
+hpv.mollview(np.log10(smooth_haslam / parkes_85) / np.log10(408. / 85.), coord='cg', title="Parkes 85 vs Haslam", min=spec_min, max=spec_max, nest=True, sub=(3, 1, 3))
 plt.show()
+
+#overall median
+parkes_trials = []
+haslam_trials = []
+for i in range(1000):
+    sim_map_noise = np.random.randn(np.sum(total_mask)) * map_noise_full[total_mask] * absolute_noise_scale / rescale
+    parkes_trials.append(np.nanmedian(plt_nan2 + np.log10(parkes_85[total_mask] / (sim_map_noise + smooth_cleaned_result)) / np.log10(85. / 150.)))
+    haslam_trials.append(np.nanmedian(plt_nan2 + np.log10(psf_haslam / (sim_map_noise + cleaned_result / rescale)) / np.log10(408. / 150.)))
+print np.nanmedian(plt_nan2 + np.log10(parkes_85[total_mask] / smooth_cleaned_result) / np.log10(85. / 150.)), np.std(parkes_trials)
+print np.nanmedian(plt_nan2 + np.log10(psf_haslam / (cleaned_result / rescale)) / np.log10(408. / 150.)), np.std(haslam_trials)
+
+##galactic plane spec ind
+gal_plane_mask = (~np.isnan(parkes_85[total_mask] + plt_nan2)) & (np.abs(gal_lats[total_mask]) < 5. * np.pi / 180)
+print 'galactic plane', np.median((np.log10(parkes_85[total_mask] / smooth_cleaned_result) / np.log10(85. / 150.))[gal_plane_mask]), np.median((np.log10(psf_haslam / (sim_map_noise + cleaned_result / rescale)) / np.log10(408. / 150.))[gal_plane_mask]), np.median((np.log10(smooth_haslam / parkes_85) / np.log10(408. / 85.))[gal_plane_mask])
+
+##galactic latitude vs spec ind
+plt.subplot(3, 1, 1)
+plt.plot(gal_lats[total_mask], plt_nan2 + np.log10(parkes_85[total_mask] / smooth_cleaned_result) / np.log10(85. / 150.), 'bo')
+plt.title('Parkes 85 vs MITEoR')
+plt.xlim([-1, 1])
+plt.ylim([spec_min, spec_max])
+plt.subplot(3, 1, 2)
+plt.plot(gal_lats[total_mask], plt_nan2 + np.log10(psf_haslam / (cleaned_result / rescale)) / np.log10(408. / 150.), 'bo')
+plt.title('Haslam vs MITEoR')
+plt.xlim([-1, 1])
+plt.ylim([spec_min, spec_max])
+plt.subplot(3, 1, 3)
+plt.plot(gal_lats, np.log10(smooth_haslam / parkes_85) / np.log10(408. / 85.), 'bo')
+plt.title("Parkes 85 vs Haslam")
+plt.xlim([-1, 1])
+plt.ylim([spec_min, spec_max])
+plt.show()
+
+sys.exit(0)
+
+
+
+plt.subplot(4, 1, 1)
+plt.plot(np.log10(cleaned_result / rescale)[snr_mask], np.log10(cleaned_psf_gsm)[snr_mask], 'b+'); plt.plot([-10,10], [-10,10], 'g'); plt.xlim([1.5,4.5]); plt.ylim([1.5,4.5]);
+plt.ylabel("gsm")
+plt.subplot(4, 1, 2)
+plt.plot(np.log10(cleaned_result / rescale)[common_parkes_mask], np.log10(parkes_150)[total_mask][common_parkes_mask], 'b+'); plt.plot([-10,10], [-10,10], 'g'); plt.xlim([1.5,4.5]); plt.ylim([1.5,4.5]);
+plt.ylabel("Parkes 150")
+
+sindex=-2.5
+plt.subplot(4, 1, 3)
+freq_ratio = 85./150.
+offset = sindex * np.log10(freq_ratio)
+plt.plot(np.log10(cleaned_result / rescale)[common_parkes_mask], np.log10(parkes_85)[total_mask][common_parkes_mask], 'b+'); plt.plot([-10,10], offset + np.array([-10,10]), 'g'); plt.xlim([1.5,4.5]); plt.ylim(offset + np.array([1.5,4.5]));
+plt.ylabel("Parkes 85")
+
+plt.subplot(4, 1, 4)
+freq_ratio = 408./150.
+offset = sindex * np.log10(freq_ratio)
+plt.plot(np.log10(cleaned_result / rescale)[snr_mask], np.log10(haslam)[total_mask][snr_mask], 'b+'); plt.plot([-10,10], offset + np.array([-10,10]), 'g'); plt.xlim([1.5,4.5]); plt.ylim(offset + np.array([1.5,4.5]));
+plt.ylabel("Haslam 408")
+plt.show()
+# plot_IQU(np.abs(cleaned_result / rescale / parkes_150[total_mask] - 1) * 100 * common_parkes_mask, 'error percent', 1, coord='cg')
+# plot_IQU(np.abs(cleaned_result / rescale / gsm - 1) * 100 * common_parkes_mask, 'error percent', 1, coord='cg')
+#
+# plt.subplot(1, 2, 1)
+# plt.title('Parkes chi^2')
+# _,_,_ = plt.hist(((cleaned_result / rescale - 1.171 * parkes_150[total_mask]) / (map_noise_full[total_mask] / rescale * absolute_noise_scale))[common_parkes_mask]**2, np.arange(0,5,.01))
+# plt.subplot(1, 2, 2)
+# plt.title('GSM chi^2')
+# _,_,_ = plt.hist(((cleaned_result / rescale - 1.214 * gsm) / (map_noise_full[total_mask] / rescale * absolute_noise_scale))[snr_mask]**2, np.arange(0,5,.01))
+# plt.show()

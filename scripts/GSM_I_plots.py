@@ -72,15 +72,21 @@ def K_RJ2MJysr(K_RJ, nu):#in Kelvin and Hz
 ########################################
 #normalization
 ########################################
-data_file2 = np.load('/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_remove_pt.npz')
+data_file2 = np.load('/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_64_smooth_8.73E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_remove_pt.npz')
+# data_file2 = np.load('/mnt/data0/omniscope/polarized foregrounds/result_25+4_nside_128_smooth_6.28E-02_edge_5.24E-02_rmvcmb_1_UV0_v3.0_principal_6_step_1.00_err_remove_pt.npz')
 normalization = data_file2['normalization']
 normalization[freqs < 20] = K_RJ2MJysr(normalization[freqs < 20], freqs[freqs < 20] * 1e9)
 normalization[(freqs >= 20) & (freqs < 500)] = K_CMB2MJysr(normalization[(freqs >= 20) & (freqs < 500)], freqs[(freqs >= 20) & (freqs < 500)] * 1e9)
 
-plt.plot(np.log10(freqs), np.log10(normalization), '+')
+
+print
+plt.plot(np.log10(freqs), np.log10(normalization * la.norm(np.transpose(data_file2['w_nf']).dot(data_file2['x_ni']), axis=-1)), 'b-')
+for i in range(len(freqs)):
+    plt.plot(np.log10(freqs[i]), np.log10((normalization * la.norm(np.transpose(data_file2['w_nf']).dot(data_file2['x_ni']), axis=-1))[i]), 'bo', fillstyle='none', markersize=(100. * np.sum(~np.isnan(idata[i])) / idata.shape[1])**.5)
 plt.xlabel('Frequency (GHz)')
 plt.ylabel('Surface brightness (MJy/sr)')
-plt.ylim([0, 5])
+plt.xlim([-2.2, 3.9])
+plt.ylim([0.6, 4.6])
 plt.show()
 
 
@@ -97,5 +103,5 @@ for i, f in enumerate(freqs):
         title = '%.1f GHz'%(f)
     else:
         title = '%.1f THz'%(f * 1e-3)
-    hpv.mollview(plot_data, nest=True, sub=(5, 6, i + 1), min=np.percentile(plot_data[~np.isnan(plot_data)], 2), max=np.percentile(plot_data[~np.isnan(plot_data)], 98), cmap=cmap, title=title, cbar=False)
+    hpv.mollview(plot_data, nest=True, sub=(6, 5, i + 1), min=np.percentile(plot_data[~np.isnan(plot_data)], 2), max=np.percentile(plot_data[~np.isnan(plot_data)], 98), cmap=cmap, title=title, cbar=False)
 plt.show()

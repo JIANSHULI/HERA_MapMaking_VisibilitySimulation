@@ -80,12 +80,18 @@ def make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, n_pri
     fig.clear()
     plt.gcf().clear()
 
-def get_estimated_idata(w_estimates, norm_estimate, xbar_ni, removed_freq):
+# def get_estimated_idata(w_nf, normalization, xbar_ni, removed_freq):
+#     w_estimates = [si.InterpolatedUnivariateSpline(np.log10(all_freqs), np.arcsinh(normalization * w_nf[i]), k=spline_k) for i in range(n_principal)]
+#     logf = np.log10(removed_freq)
+#     ws = [np.sinh(w_estimate(logf)) for w_estimate in w_estimates]
+#     return xbar_ni.transpose().dot(ws)
+def get_estimated_idata(w_nf, normalization, xbar_ni, removed_freq):
+    w_estimates = [si.InterpolatedUnivariateSpline(np.log10(all_freqs), w_nf[i], k=spline_k) for i in range(n_principal)]
+    norm_estimate = si.InterpolatedUnivariateSpline(np.log10(all_freqs), np.log10(normalization), k=spline_k)
     logf = np.log10(removed_freq)
     norm = 10.**(norm_estimate(logf))
     ws = [w_estimate(logf) for w_estimate in w_estimates]
     return norm * xbar_ni.transpose().dot(ws)
-
 ###########################
 ###########################
 ###OVER ALL PARAMETERS
@@ -103,14 +109,15 @@ step_size = 1.#.2
 max_iter = 500
 
 n_principal = 6
-gsm1_mask = np.array([True] * 29)
+pick_map_mask = np.array([True] * 29)
 error_weighting = 'remove_pt'#'none'#'inv_error'#'remove_pt'
 rm_percentile = 99
 n_trial = 2
 common_coverage_fraction = 20
 
+gsm1_mask = np.array([True] * 3 + [False,False,True,False,False] + [True] * 3 + [False,True,True,False,True,False,True] + [False]*10)
 # n_principal = 5
-# gsm1_mask = np.array([True] * 3 + [False,False,True,False,False] + [True] * 3 + [False,True,True,False,True,False,True] + [False]*10)
+# pick_map_mask = gsm1_mask
 # error_weighting = 'remove_pt'#'none'#'inv_error'#'remove_pt'
 # n_trial = 0
 # common_coverage_fraction = 2000
@@ -120,8 +127,8 @@ print data_file_name
 
 
 data_file = np.load(data_file_name)
-original_freqs = np.concatenate((data_file['freqs'][:10], data_file['freqs'][11:-2]))[gsm1_mask]
-original_idata = np.concatenate((data_file['idata'][:10], data_file['idata'][11:-2]))[gsm1_mask]
+original_freqs = np.concatenate((data_file['freqs'][:10], data_file['freqs'][11:-2]))[pick_map_mask]
+original_idata = np.concatenate((data_file['idata'][:10], data_file['idata'][11:-2]))[pick_map_mask]
 
 ###############################
 #give data correct units
@@ -339,11 +346,13 @@ for remove_f in range(-1, len(original_idata)):
     w_estimates = [si.InterpolatedUnivariateSpline(np.log10(all_freqs), w_nf[i], k=spline_k) for i in range(n_principal)]
 
     if remove_f >= 0:
-        estimated_removal = get_estimated_idata(w_estimates, norm_estimate, xbar_ni, removed_freq)
+        estimated_removal = get_estimated_idata(w_nf, normalization, xbar_ni, removed_freq)
 
         for l, lat_mask in enumerate(latitude_masks):
             mask = lat_mask&~(point_source_mask|np.isnan(removed_idata)|np.isnan(estimated_removal))
-            estimated_removal2 = estimated_removal * np.sum((estimated_removal * removed_idata)[mask]) / np.sum(estimated_removal * estimated_removal * mask)
+            renorm = np.sum((estimated_removal * removed_idata)[mask]) / np.sum(estimated_removal * estimated_removal * mask)
+            estimated_removal2 = estimated_removal * renorm
+
 
             estimation_error = la.norm((removed_idata - estimated_removal)[mask]) / la.norm(removed_idata[mask])
             estimation_renorm_error = la.norm((removed_idata - estimated_removal2)[mask]) / la.norm(removed_idata[mask])
@@ -351,7 +360,7 @@ for remove_f in range(-1, len(original_idata)):
             estimation_errors[l].append(estimation_error)
             estimation_renorm_errors[l].append(estimation_renorm_error)
         # estimated_data.append(estimated_removal)
-        print removed_freq, estimation_error, estimation_renorm_error
+        print removed_freq, estimation_error, estimation_renorm_error, renorm
     else:
         make_result_plot(all_freqs, w_nf, xbar_ni, w_estimates, normalization, n_principal)
         systematic_errors = [(np.nanmean((x_fit-x_fi)[:, lat_mask&~point_source_mask]**2, axis=1) / np.nanmean(x_fi[:, lat_mask&~point_source_mask]**2, axis=1))**.5 for lat_mask in latitude_masks]
@@ -366,10 +375,24 @@ for remove_f in range(-1, len(original_idata)):
                 # tm = time.time(); sys.stdout.flush()
 
             removed_idata = original_idata[rm_f]
-            estimated_removal = get_estimated_idata(w_estimates, norm_estimate, xbar_ni_rm1, original_freqs[rm_f])
+            estimated_removal = get_estimated_idata(w_nf, normalization, xbar_ni_rm1, original_freqs[rm_f])
             for l, lat_mask in enumerate(latitude_masks):
                 estimation_error = (np.nansum((removed_idata - estimated_removal)[lat_mask&~point_source_mask]**2) / np.nansum(removed_idata[lat_mask&~point_source_mask]**2))**.5
                 pseudo_estimation_errors[l].append(estimation_error)
+
+        import matplotlib
+        matplotlib.rcParams.update({'font.size': 25})
+        for plot_i, logfreq in enumerate(np.arange(-1.7, 4., .03)):
+            if logfreq < 0:
+                title = '%.1f MHz'%(1e3 * 10**logfreq)
+            elif logfreq < 3:
+                title = '%.1f GHz'%(10**logfreq)
+            else:
+                title = '%.1f THz'%(1e-3 * 10**logfreq)
+            pltdata = np.arcsinh(np.transpose(xbar_ni).dot([w_estimates[i](logfreq) for i in range(n_principal)]) / np.percentile(np.abs(np.transpose(xbar_ni).dot([w_estimates[i](logfreq) for i in range(n_principal)])), .2))
+            hpv.mollview(pltdata, nest=True, title=title, min=np.percentile(pltdata, 1), max=np.percentile(pltdata, 99), cbar=False)
+            plt.savefig('/home/omniscope/gif_dir/%04i.png'%plot_i)
+            plt.clf()
 
 def cplot(x, y, fmt, mksize, fillstyle='none'):
     for a, b, msize in zip(x, y, mksize):
@@ -383,7 +406,7 @@ for i in range(1 + n_latitude_regions):
     cplot(np.log10(original_freqs), systematic_errors[i], 'bo', mksize)
     plt.plot(np.log10(original_freqs), pseudo_estimation_errors[i], 'g-', label='pseudo estimation error')
     cplot(np.log10(original_freqs), pseudo_estimation_errors[i], 'go', mksize)
-    plt.plot(np.log10(original_freqs), estimation_renorm_errors[i], 'm-', label='renormed estimation errors')
+    plt.plot(np.log10(original_freqs), estimation_renorm_errors[i], 'm--', label='renormed estimation errors')
     cplot(np.log10(original_freqs), estimation_renorm_errors[i], 'mo', mksize)
     plt.plot(np.log10(original_freqs), estimation_errors[i], 'k--', label='estimation errors')
     cplot(np.log10(original_freqs), estimation_errors[i], 'ko', mksize)
@@ -392,6 +415,106 @@ for i in range(1 + n_latitude_regions):
     plt.title((['all'] + (np.arange(n_latitude_regions) * np.pi / 2 / n_latitude_regions).tolist())[i])
     plt.legend()
 plt.show()
+
+gsm1_errs=np.array([
+0.091,
+0.080,
+0.094,
+0.084,
+0.187,
+0.147,
+0.111,
+0.062,
+0.091,
+0.270,
+0.766,
+0.099,
+0.082,
+0.102,
+0.088,
+0.133,
+0.160,
+0.070,
+0.022,
+0.052,
+0.067,
+0.164,
+0.094,
+0.136,
+0.095,
+0.072,
+0.144,
+0.158,
+0.083,
+0.013,
+0.042,
+0.071,
+0.095,
+0.148,
+0.210,
+0.108,
+0.125,
+0.180,
+0.165,
+0.073,
+0.012,
+0.039,
+0.082,
+0.124,
+0.111,
+0.306,
+0.158,
+0.170,
+0.157,
+0.170,
+0.062,
+0.011,
+0.034,
+0.079,
+0.136,
+np.nan,
+0.451,
+0.202,
+0.190,
+0.129,
+0.167,
+0.050,
+0.011,
+0.028,
+0.067,
+0.135,
+0.098,
+0.144,
+0.109,
+0.115,
+0.144,
+0.155,
+0.062,
+0.013,
+0.032,
+0.068,
+0.121
+
+]).reshape((7, 11))# 6 sky regions clean to dirty, then overall
+
+i = 0
+mksize = (400. * np.sum(~np.isnan(original_idata), axis=-1) / mother_npix)**.5
+lw = 3
+
+# plt.plot(original_freqs, estimation_errors[i], 'k--', label='estimation errors')
+# cplot(original_freqs, estimation_errors[i], 'ko', mksize)
+plt.plot(original_freqs, systematic_errors[i], 'b-', label='systematic error', linewidth=lw)
+cplot(original_freqs, systematic_errors[i], 'bo', mksize)
+plt.plot(original_freqs, pseudo_estimation_errors[i], 'g-', label='pseudo estimation error', linewidth=lw)
+cplot(original_freqs, pseudo_estimation_errors[i], 'go', mksize)
+plt.plot(original_freqs, estimation_renorm_errors[i], 'm-', label='renormed estimation errors', linewidth=lw)
+cplot(original_freqs, estimation_renorm_errors[i], 'mo', mksize)
+
+plt.plot(original_freqs[gsm1_mask], gsm1_errs[-1].transpose(), 'g--', linewidth=lw)
+plt.ylim([0,.3])
+plt.xlim([.5e-3, 8e3])
+plt.show()
+
 #
 # hpv.mollview(np.log10(removed_idata * ~point_source_mask), nest=True, sub=(2,1,1))#, min=1, max=3)
 # hpv.mollview(np.log10(estimated_removal * ~point_source_mask), nest=True, sub=(2,1,2))#, min=1, max=3)
