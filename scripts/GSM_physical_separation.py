@@ -254,101 +254,124 @@ plot_components(M)
 
 manual_spike_freq_ranges = [[10,-10]] * n_principal
 # manual_spike_freq_ranges[0] = [0, 30]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[2] = [0, 10]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[3] = [50, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[4] = [1000, 1e6]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[5] = [10, 1e3]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[2] = [.5, 3]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[3] = [1e3, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[4] = [100, 1e3]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+manual_spike_freq_ranges[5] = [10, 100]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
-w_nf_intermediate = M.dot(w_nf)
-M1 = np.eye(n_principal)
-reg = 0#.0001
-for spike_principal, spike_fs in enumerate(manual_spike_ranges):
-    if len(spike_fs) > 0:
-        non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
-        non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
-        spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
-        M1[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
-M1 = M1 / la.norm(M1.dot(M).dot(w_nf), axis=-1)[:, None]
+
+for i1, p1 in enumerate([0]):#, 1, 2, 3, 4, 5]):
+    for i2, p2 in enumerate([0]):#, 1, 2, 3, 4, 5]):
+
+        M1 = np.diag(la.norm(la.inv(M).transpose().dot(x_ni),axis=-1))
+        niter = 0
+        while niter < 500 and (niter == 0 or la.norm(M2 - np.eye(n_principal)) > 1e-3 * n_principal):
+            niter += 1
+            w_nf_intermediate = M1.dot(M).dot(w_nf)
+            M2 = np.eye(n_principal)
+            reg = 0#.0001
+            step = .2
+            for spike_principal, spike_fs in enumerate(manual_spike_ranges):
+                if len(spike_fs) > 0:
+                    non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
+                    non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
+                    spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
+
+                    importance_weight = (np.abs(w_nf_intermediate[spike_principal, non_spike_fs]) / np.sum(np.abs(w_nf_intermediate[:, non_spike_fs]), axis=0))
+                    distance_weight = np.min(np.abs([np.log10(freqs) - np.log10(manual_spike_freq_ranges[spike_principal][0]), np.log10(freqs) - np.log10(manual_spike_freq_ranges[spike_principal][1])]), axis=0)[non_spike_fs] / 4.
+                    Ni = importance_weight**p1 * distance_weight**p2
+                    # Ni = np.ones(len(non_spike_fs))
+                    M2[spike_principal, non_spike_principals] = -step * la.inv((np.transpose(spike_A)*Ni).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs] * Ni))
+            M2 = M2 * la.norm(la.inv(M2.dot(M1).dot(M)).transpose().dot(x_ni), axis=-1)[:, None]
+            M1 = M2.dot(M1)
+        print niter
+        plt.subplot(6, 6, i1 * 6 + i2 + 1)
+        plt.plot(np.log10(freqs), np.log10(np.abs(M1.dot(M).dot(w_nf).transpose() * normalization[:, None])))
+        plt.title((p1, p2))
+        plt.ylim([-1, 5])
+plt.show()
+
 plot_components(M1.dot(M))
+# #
+# # manual_spike_freq_ranges = [[10,-10]] * n_principal
+# # manual_spike_freq_ranges[2] = [100, 1e6]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+# # manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
+# # w_nf_intermediate = M1.dot(M).dot(w_nf)
+# # M2 = np.eye(n_principal)
+# # reg = 0#.0001
+# # for spike_principal, spike_fs in enumerate(manual_spike_ranges):
+# #     if len(spike_fs) > 0:
+# #         non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
+# #         non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
+# #         spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
+# #         M2[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
+# # M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
+# # plot_components(M2.dot(M1).dot(M))
+# #
+# # second_der_w = np.array([get_derivative2(w) for w in M1.dot(M).dot(w_nf)])
+# # manual_spike_freq_ranges = [[10,-10]] * n_principal
+# # manual_spike_freq_ranges[3] = [100, 400]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+# # manual_spike_freq_ranges[5] = [100, 400]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+# # manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) < freq_range[0]) | (np.array(freqs) > freq_range[1])] for freq_range in manual_spike_freq_ranges]
+# # w_nf_intermediate = second_der_w
+# # M2 = np.eye(n_principal)
+# # reg = 0
+# # for spike_principal, spike_fs in enumerate(manual_spike_ranges):
+# #     if len(spike_fs) < len(freqs):
+# #         non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
+# #         non_spike_principals = [4]#np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
+# #         spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
+# #         M2[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
+# # M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
+# # M2[3,4] *= 4
+# # M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
+# # plot_components(M2.dot(M1).dot(M))
+# #
+# # manual_spike_freq_ranges = [[10,-10]] * n_principal
+# # # manual_spike_freq_ranges[0] = [0, 30]#, [1, 1000], [10, 1e5], [-10, -10]]
+# # manual_spike_freq_ranges[4] = [10, 1e6]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
+# # manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
+# # w_nf_intermediate = M2.dot(M1).dot(M).dot(w_nf)
+# # M3 = np.eye(n_principal)
+# # reg = 0#.0001
+# # for spike_principal, spike_fs in enumerate(manual_spike_ranges):
+# #     if len(spike_fs) > 0:
+# #         non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
+# #         non_spike_principals = [0, 2]#np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
+# #         spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
+# #         M3[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
+# # M3 = M3 / la.norm(M3.dot(M2).dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
+# # plot_components(M3.dot(M2).dot(M1).dot(M))
 #
-# manual_spike_freq_ranges = [[10,-10]] * n_principal
-# manual_spike_freq_ranges[2] = [100, 1e6]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-# manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
-# w_nf_intermediate = M1.dot(M).dot(w_nf)
-# M2 = np.eye(n_principal)
-# reg = 0#.0001
-# for spike_principal, spike_fs in enumerate(manual_spike_ranges):
-#     if len(spike_fs) > 0:
-#         non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
-#         non_spike_principals = np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
-#         spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
-#         M2[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
-# M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
-# plot_components(M2.dot(M1).dot(M))
+# MM = np.eye(n_principal);
+# MM[3, 4] = 1.1; MM[4, 5] = .48; MM[4,3] = .06; MM[0, 2] = .03;
+# MM2 = np.eye(n_principal);
+# MM2[3, 4] = -.98; MM2[5,4] = .2; MM2[4, 0] = .2; MM2[4,2] = -.05; MM2[5, 2] = .01;
+# # semifinal_M = MM2.dot(MM).dot(M1).dot(M) / la.norm(MM2.dot(MM).dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
 #
-# second_der_w = np.array([get_derivative2(w) for w in M1.dot(M).dot(w_nf)])
-# manual_spike_freq_ranges = [[10,-10]] * n_principal
-# manual_spike_freq_ranges[3] = [100, 400]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-# manual_spike_freq_ranges[5] = [100, 400]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-# manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) < freq_range[0]) | (np.array(freqs) > freq_range[1])] for freq_range in manual_spike_freq_ranges]
-# w_nf_intermediate = second_der_w
-# M2 = np.eye(n_principal)
-# reg = 0
-# for spike_principal, spike_fs in enumerate(manual_spike_ranges):
-#     if len(spike_fs) < len(freqs):
-#         non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
-#         non_spike_principals = [4]#np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
-#         spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
-#         M2[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
-# M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
-# M2[3,4] *= 4
-# M2 = M2 / la.norm(M2.dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
-# plot_components(M2.dot(M1).dot(M))
+# semifinal_M = MM2.dot(MM).dot(M1).dot(M) * la.norm(la.inv(MM2.dot(MM).dot(M1).dot(M)).transpose().dot(x_ni), axis=-1)[:, None]
+# # for i in range(n_principal):
+# #     semifinal_M[i] *= np.sign(np.mean(semifinal_M.dot(w_nf)))
+# plot_components(semifinal_M)
 #
-# manual_spike_freq_ranges = [[10,-10]] * n_principal
-# # manual_spike_freq_ranges[0] = [0, 30]#, [1, 1000], [10, 1e5], [-10, -10]]
-# manual_spike_freq_ranges[4] = [10, 1e6]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
-# manual_spike_ranges = [np.arange(len(freqs))[(np.array(freqs) >= freq_range[0]) & (np.array(freqs) <= freq_range[1])] for freq_range in manual_spike_freq_ranges]
-# w_nf_intermediate = M2.dot(M1).dot(M).dot(w_nf)
-# M3 = np.eye(n_principal)
-# reg = 0#.0001
-# for spike_principal, spike_fs in enumerate(manual_spike_ranges):
-#     if len(spike_fs) > 0:
-#         non_spike_fs = np.array([i for i in range(0, len(freqs)) if i not in spike_fs])
-#         non_spike_principals = [0, 2]#np.array([i for i in range(n_principal) if i != spike_principal and i != cmb_principal])
-#         spike_A = np.transpose(w_nf_intermediate[np.ix_(non_spike_principals, non_spike_fs)])
-#         M3[spike_principal, non_spike_principals] = -la.inv(np.transpose(spike_A).dot(spike_A) + np.eye(len(non_spike_principals)) * reg).dot(np.transpose(spike_A).dot(w_nf_intermediate[spike_principal, non_spike_fs]))
-# M3 = M3 / la.norm(M3.dot(M2).dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
-# plot_components(M3.dot(M2).dot(M1).dot(M))
-
-MM = np.eye(n_principal);
-MM[3, 4] = 1.1; MM[4, 5] = .48; MM[4,3] = .06; MM[0, 2] = .03;
-MM2 = np.eye(n_principal);
-MM2[3, 4] = -.98; MM2[5,4] = .2; MM2[4, 0] = .2; MM2[4,2] = -.05; MM2[5, 2] = .01;
-# semifinal_M = MM2.dot(MM).dot(M1).dot(M) / la.norm(MM2.dot(MM).dot(M1).dot(M).dot(w_nf), axis=-1)[:, None]
-
-semifinal_M = MM2.dot(MM).dot(M1).dot(M) * la.norm(la.inv(MM2.dot(MM).dot(M1).dot(M)).transpose().dot(x_ni), axis=-1)[:, None]
-# for i in range(n_principal):
-#     semifinal_M[i] *= np.sign(np.mean(semifinal_M.dot(w_nf)))
-plot_components(semifinal_M)
-
-plot_components_publication()
-
-a = 1.216
-b = 0#0.19
-d = -.16
-e = -.605
-qazM = np.eye(n_principal)
-qazM[5, 3] = a
-qazM[3, 4] = b
-qazM[4, 5] = d
-qazM[4, 0] = e
-final_M = qazM.dot(semifinal_M) * la.norm(la.inv(qazM.dot(semifinal_M)).transpose().dot(x_ni), axis=-1)[:, None]
-# plot_components_publication(final_M)
-
-qazM = np.eye(n_principal)
-qazM[4, 5] = -10**-.27
-final_M = qazM.dot(final_M) * la.norm(la.inv(qazM.dot(final_M)).transpose().dot(x_ni), axis=-1)[:, None]
+# plot_components_publication()
+#
+# a = 1.216
+# b = 0#0.19
+# d = -.16
+# e = -.605
+# qazM = np.eye(n_principal)
+# qazM[5, 3] = a
+# qazM[3, 4] = b
+# qazM[4, 5] = d
+# qazM[4, 0] = e
+# final_M = qazM.dot(semifinal_M) * la.norm(la.inv(qazM.dot(semifinal_M)).transpose().dot(x_ni), axis=-1)[:, None]
+# # plot_components_publication(final_M)
+#
+# qazM = np.eye(n_principal)
+# qazM[4, 5] = -10**-.27
+# final_M = qazM.dot(final_M) * la.norm(la.inv(qazM.dot(final_M)).transpose().dot(x_ni), axis=-1)[:, None]
+final_M = M1.dot(M)
 plot_components_publication(final_M)
 
 
@@ -382,37 +405,85 @@ for m, plot_M in enumerate([np.eye(n_principal) * la.norm(x_ni, axis=-1), final_
     plt.ylim([-1.5, 5])
     plt.show()
 
+def fit_power(freq, amp, relative_error=None, plot=False, log=False):
+    if relative_error is None:
+        relative_error = np.ones_like(amp)
+    b = np.log10(amp)
+    A = np.ones((len(freq), 2))
+    A[:, 0] = np.log10(freq)
+    Ni = 1. / relative_error**2
+    AtAi = la.inv((A.transpose() * Ni).dot(A))
+    x = AtAi.dot((A.transpose() * Ni).dot(b))
+    error = (A.dot(x) - b) * Ni**.5
+    noise = la.norm(error) / (len(freq) - 2)**.5
+    if plot:
+        if log:
+            plt_x = 10**A[:, 0]
+        else:
+            plt_x = A[:, 0]
+        plt.errorbar(plt_x, b, yerr=noise * relative_error, fmt='bo')
+        plt.plot(plt_x, A.dot(x), 'g-')
+        plt.show()
+    return x, np.diagonal(AtAi)**.5 * noise
+
 for m, plot_M in enumerate([final_M]):
     for n, i in enumerate(range(n_principal)):#n, i same thing, just a relic
         if i < 3 and i != cmb_principal:
             mask = freqso < 10
         elif i == cmb_principal:
             mask = (freqso > 20) & (freqso < 500)
-        elif i not in [0, 2, 4]:
-            mask = freqso > 10
+        elif i == 3:
+            mask = freqso > 150
+        elif i == 4:
+            mask = freqso > 50
         else:
-            mask = np.arange(len(freqso))
+            mask = (freqso > 10) & (freqso < 100)
         label = labels[n]
-        plt.plot(np.log10(freqso)[mask], np.log10(np.abs(normalizationo * plot_M.dot(w_nfo)[i]))[mask], c[i]+'-', label=label)
-        plt.plot(np.log10(freqso)[mask], np.log10(np.abs(normalizationo * plot_M.dot(w_nfo)[i]))[mask], c[i]+'o')
+        local_x = freqso[mask]
+        local_norm = np.log10(normalizationo)[mask]
+        local_y = np.log10(np.abs(normalizationo * plot_M.dot(w_nfo)[i]))[mask]
+        plt.plot(np.log10(local_x), local_y, c[i]+'-', label=label)
+        plt.plot(np.log10(local_x), local_y, c[i]+'o')
 
         if i == 0:
-            plt.plot(np.log10(freqso)[mask], np.min([1.5 -.5 * np.log10(freqso)[mask], 1.4 -.7 * np.log10(freqso)[mask]], axis=0), c[i]+'--')
+            pars = [0,0]
+            for j, sync_mask in enumerate([local_x < 0.5, local_x > 0.3]):
+                pars[j], err = fit_power(local_x[sync_mask], 10.**local_y[sync_mask])
+                print labels[i], pars[j], err
+            plt.plot(np.log10(local_x), np.min([pars[j][1] + pars[j][0] * np.log10(local_x) for j in range(2)], axis=0), c[i]+'--')
         elif i == 1:
-            # plt.plot(np.log10(freqso)[mask], np.log10(1e18 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
-            # plt.plot(np.log10(freqso)[mask], np.log10(10**15.85 * freqso * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
-            plt.plot(np.log10(freqso)[mask], np.log10(10**16.64 * freqso**.65 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
-        elif i == 3:
-            # plt.plot(np.log10(freqso)[mask], .2 + np.log10(dust_spectrum(9.15, 1.67, freqso * 1e9))[mask], c[i]+'--')
-            plt.plot(np.log10(freqso)[mask], -1.1 + np.log10(dust_spectrum(9.15*1.72, 1.67, freqso * 1e9))[mask], c[i]+'--')
-        elif i == 4:
-            # plt.plot(np.log10(freqso)[mask], -.4 + np.log10(1e-13 * dust_spectrum(15.72, 2.70, freqso * 1e9))[mask], c[i]+'--')
-            # plt.plot(np.log10(freqso)[mask], -12.7 + np.log10(1e-13 * dust_spectrum(15.72, 3.70, freqso * 1e9))[mask], c[i]+'--')
-            plt.plot(np.log10(freqso)[mask], -12.7 + np.log10(10**-15.5 * dust_spectrum(15.72, 3.90, freqso * 1e9))[mask], c[i]+'--')
+            # plt.plot(np.log10(local_x), np.log10(1e18 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
+            # plt.plot(np.log10(local_x), np.log10(10**15.85 * freqso * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
+            plt.plot(np.log10(local_x), np.log10(10**16.64 * freqso**.65 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
+        elif i == 3 or i == 4:
+            # plt.plot(np.log10(local_x), -.4 + np.log10(1e-13 * dust_spectrum(15.72, 2.70, freqso * 1e9))[mask], c[i]+'--')
+            # plt.plot(np.log10(local_x), -12.7 + np.log10(1e-13 * dust_spectrum(15.72, 3.70, freqso * 1e9))[mask], c[i]+'--')
 
-            plt.plot(np.log10(freqso)[mask], .12 - 1.2 * np.log10(freqso)[mask], c[i]+'--')
+            best_Tdust = 5
+            best_beta = 1
+            amp = 1
+            std = np.std(np.log10(dust_spectrum(best_Tdust, best_beta, local_x * 1e9)) - local_y)
+            for Tdust in np.arange(5, 30, .01):
+                for beta in np.arange(1, 4, .01):
+                    log_ratio = np.log10(dust_spectrum(Tdust, beta, local_x * 1e9)) - local_y
+                    if np.std(log_ratio) < std:
+                        std = np.std(log_ratio)
+                        best_Tdust = Tdust
+                        best_beta = beta
+                        best_offset = -np.mean(log_ratio)
+            print labels[i], best_Tdust, best_beta
+            plt.plot(np.log10(local_x), best_offset + np.log10(dust_spectrum(best_Tdust, best_beta, local_x * 1e9)), c[i]+'--')
+            # plt.plot(np.log10(local_x), -12.7 + np.log10(10**-15.5 * dust_spectrum(15.72, 3.90, freqso * 1e9))[mask], c[i]+'--')
+
+
+            # plt.plot(np.log10(local_x), .12 - 1.2 * np.log10(local_x), c[i]+'--')
+        # elif i == 4:
+        #     # plt.plot(np.log10(local_x), .2 + np.log10(dust_spectrum(9.15, 1.67, freqso * 1e9))[mask], c[i]+'--')
+        #     plt.plot(np.log10(local_x), -1.1 + np.log10(dust_spectrum(9.15*1.72, 1.67, freqso * 1e9))[mask], c[i]+'--')
         elif i == 5:
-            plt.plot(np.log10(freqso)[mask], 0.97 -.2 * np.log10(freqso)[mask], c[i]+'--')
+            pars = fit_power(local_x, 10.**local_y)
+            plt.plot(np.log10(local_x), pars[0][1] + pars[0][0] * np.log10(local_x), c[i]+'--')
+            print labels[i], pars
     plt.legend(loc='upper left')
     plt.xlim([-2.3, 4])
     plt.ylim([-1.5, 5])
