@@ -53,6 +53,9 @@ def K_RJ2MJysr(K_RJ, nu):#in Kelvin and Hz
 def Bnu(T, nu):
     return 2 * h * nu**3 / (C**2 * (np.exp(hoverk * nu / T) - 1))
 
+def dBnu(T, nu):
+    return Bnu(T, nu) / (1 - np.exp(-hoverk * nu / T)) * hoverk * nu / T**2
+
 def dust_spectrum(T, beta, nu):
     return Bnu(T, nu) * nu**beta
 
@@ -126,8 +129,8 @@ def plot_components(M=np.eye(n_principal)):
 
     plt.show()
 
-def plot_components_publication(M=np.eye(n_principal)):
-    w_nf_local = M.dot(w_nf)
+def plot_components_publication(M=np.eye(n_principal), x_ni=x_ni):
+    # w_nf_local = M.dot(w_nf)
     x_ni_local = la.inv(M).transpose().dot(x_ni)
     for n in range(n_principal):
 
@@ -254,7 +257,7 @@ plot_components(M)
 
 manual_spike_freq_ranges = [[10,-10]] * n_principal
 # manual_spike_freq_ranges[0] = [0, 30]#, [1, 1000], [10, 1e5], [-10, -10]]
-manual_spike_freq_ranges[2] = [.5, 3]#, [1, 1000], [10, 1e5], [-10, -10]]
+# manual_spike_freq_ranges[2] = [.5, 3]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_freq_ranges[3] = [1e3, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_freq_ranges[4] = [100, 1e3]#[100, 1e6]#, [1, 1000], [10, 1e5], [-10, -10]]
 manual_spike_freq_ranges[5] = [10, 100]#, [1, 1000], [10, 1e5], [-10, -10]]
@@ -426,6 +429,51 @@ def fit_power(freq, amp, relative_error=None, plot=False, log=False):
         plt.show()
     return x, np.diagonal(AtAi)**.5 * noise
 
+def fit_dust(local_x, local_y, positive_mask, Tstart=0, Tend=20, Tstep=.02, betastart=0, betaend=5, betastep=.02, recursive=True, ntrial=1000, verbose=False):
+    best_Tdust = 5
+    best_beta = 1
+    fit_std = np.std((np.log10(dust_spectrum(best_Tdust, best_beta, local_x * 1e9)) - local_y)[positive_mask])
+    for Tdust in np.arange(Tstart, Tend, Tstep):
+        for beta in np.arange(betastart, betaend, betastep):
+            log_ratio = (np.log10(dust_spectrum(Tdust, beta, local_x * 1e9)) - local_y)[positive_mask]
+            if np.std(log_ratio) < fit_std:
+                fit_std = np.std(log_ratio)
+                best_Tdust = Tdust
+                best_beta = beta
+                best_offset = -np.mean(log_ratio)
+    if recursive:
+        trial_results = []
+        for i in range(ntrial):
+            trial_Tdust, trial_beta, _, _ = fit_dust(local_x, local_y + fit_std * np.random.randn(len(local_y)), positive_mask, Tstart=best_Tdust-15, Tend=best_Tdust+15, Tstep=0.1, betastart=best_beta-4, betaend=best_beta+4, betastep=.05, recursive=False)
+            trial_results.append([trial_Tdust, trial_beta])
+            if verbose:
+                print [trial_Tdust, trial_beta]
+        stds = np.std(trial_results, axis=0)
+    else:
+        stds = np.zeros(2)
+    return best_Tdust, best_beta, best_offset, stds
+
+def fit_cmb(local_x, local_y, Tstart=2.7, Tend=2.8, Tstep=.0002, recursive=True, ntrial=1000, verbose=False):
+    best_Tdust = 3#T
+    fit_std = np.std(np.log10(dBnu(best_Tdust, local_x * 1e9)) - local_y)
+    for Tdust in np.arange(Tstart, Tend, Tstep):
+        log_ratio = (np.log10(dBnu(Tdust, local_x * 1e9)) - local_y)
+        if np.std(log_ratio) < fit_std:
+            fit_std = np.std(log_ratio)
+            best_Tdust = Tdust
+            best_offset = -np.mean(log_ratio)
+    if recursive:
+        trial_results = []
+        for i in range(ntrial):
+            trial_Tdust, _, _ = fit_cmb(local_x, local_y + fit_std * np.random.randn(len(local_y)), Tstart=best_Tdust-.2, Tend=best_Tdust+.2, Tstep=0.002, recursive=False)
+            trial_results.append(trial_Tdust)
+            if verbose:
+                print [trial_Tdust]
+        stds = np.std(trial_results)
+    else:
+        stds = 0.
+    return best_Tdust, best_offset, stds
+
 for m, plot_M in enumerate([final_M]):
     for n, i in enumerate(range(n_principal)):#n, i same thing, just a relic
         if i < 3 and i != cmb_principal:
@@ -441,38 +489,53 @@ for m, plot_M in enumerate([final_M]):
         label = labels[n]
         local_x = freqso[mask]
         local_norm = np.log10(normalizationo)[mask]
+        local_nw = (normalizationo * plot_M.dot(w_nfo)[i])[mask]
         local_y = np.log10(np.abs(normalizationo * plot_M.dot(w_nfo)[i]))[mask]
-        plt.plot(np.log10(local_x), local_y, c[i]+'-', label=label)
-        plt.plot(np.log10(local_x), local_y, c[i]+'o')
+        # plt.plot(np.log10(local_x), local_y, c[i]+'-')
+        plt.plot(np.log10(local_x), local_y, c[i]+'o', label=label)
 
+        model_x = 10.**np.arange(-2., 4., .01)
         if i == 0:
             pars = [0,0]
             for j, sync_mask in enumerate([local_x < 0.5, local_x > 0.3]):
                 pars[j], err = fit_power(local_x[sync_mask], 10.**local_y[sync_mask])
                 print labels[i], pars[j], err
-            plt.plot(np.log10(local_x), np.min([pars[j][1] + pars[j][0] * np.log10(local_x) for j in range(2)], axis=0), c[i]+'--')
+            plt.plot(np.log10(model_x), np.min([pars[j][1] + pars[j][0] * np.log10(model_x) for j in range(2)], axis=0), c[i]+'--')
         elif i == 1:
             # plt.plot(np.log10(local_x), np.log10(1e18 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
             # plt.plot(np.log10(local_x), np.log10(10**15.85 * freqso * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
-            plt.plot(np.log10(local_x), np.log10(10**16.64 * freqso**.65 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
+            # plt.plot(np.log10(local_x), np.log10(10**16.64 * freqso**.65 * Bnu(2.75, freqso * 1e9))[mask], c[i]+'--')
+            # amp = 10**np.mean(local_y - np.log10(dBnu(T, local_x * 1e9)))
+            # plt.plot(np.log10(model_x), np.log10(amp * dBnu(T, model_x * 1e9)), c[i]+'--')
+            best_Tdust, best_offset, std = fit_cmb(local_x, local_y, verbose=False)
+            print labels[i], best_Tdust, std
+            sys.stdout.flush()
+            plt.plot(np.log10(model_x), best_offset + np.log10(dBnu(T, model_x * 1e9)), c[i]+'--')
         elif i == 3 or i == 4:
             # plt.plot(np.log10(local_x), -.4 + np.log10(1e-13 * dust_spectrum(15.72, 2.70, freqso * 1e9))[mask], c[i]+'--')
             # plt.plot(np.log10(local_x), -12.7 + np.log10(1e-13 * dust_spectrum(15.72, 3.70, freqso * 1e9))[mask], c[i]+'--')
-
-            best_Tdust = 5
-            best_beta = 1
-            amp = 1
-            std = np.std(np.log10(dust_spectrum(best_Tdust, best_beta, local_x * 1e9)) - local_y)
-            for Tdust in np.arange(5, 30, .01):
-                for beta in np.arange(1, 4, .01):
-                    log_ratio = np.log10(dust_spectrum(Tdust, beta, local_x * 1e9)) - local_y
-                    if np.std(log_ratio) < std:
-                        std = np.std(log_ratio)
-                        best_Tdust = Tdust
-                        best_beta = beta
-                        best_offset = -np.mean(log_ratio)
-            print labels[i], best_Tdust, best_beta
-            plt.plot(np.log10(local_x), best_offset + np.log10(dust_spectrum(best_Tdust, best_beta, local_x * 1e9)), c[i]+'--')
+            local_nw *= np.sign(local_nw[np.argmax(np.abs(local_nw))])
+            local_w = local_nw / (normalizationo[mask])
+            positive_mask = local_nw > 0
+            positive_mask[local_y < np.max(local_y) - 2] = False
+            # positive_mask[-1] = False
+            # positive_mask[0] = False
+            #
+            # best_Tdust = 5
+            # best_beta = 1
+            # std = np.std((np.log10(dust_spectrum(best_Tdust, best_beta, local_x * 1e9)) - local_y)[positive_mask])
+            # for Tdust in np.arange(0, 20, .02):
+            #     for beta in np.arange(0, 5, .02):
+            #         log_ratio = (np.log10(dust_spectrum(Tdust, beta, local_x * 1e9)) - local_y)[positive_mask]
+            #         if np.std(log_ratio) < std:
+            #             std = np.std(log_ratio)
+            #             best_Tdust = Tdust
+            #             best_beta = beta
+            #             best_offset = -np.mean(log_ratio)
+            best_Tdust, best_beta, best_offset, std = fit_dust(local_x, local_y, positive_mask, verbose=False)
+            print labels[i], best_Tdust, best_beta, std
+            sys.stdout.flush()
+            plt.plot(np.log10(model_x), best_offset + np.log10(dust_spectrum(best_Tdust, best_beta, model_x * 1e9)), c[i]+'--')
             # plt.plot(np.log10(local_x), -12.7 + np.log10(10**-15.5 * dust_spectrum(15.72, 3.90, freqso * 1e9))[mask], c[i]+'--')
 
 
@@ -482,7 +545,7 @@ for m, plot_M in enumerate([final_M]):
         #     plt.plot(np.log10(local_x), -1.1 + np.log10(dust_spectrum(9.15*1.72, 1.67, freqso * 1e9))[mask], c[i]+'--')
         elif i == 5:
             pars = fit_power(local_x, 10.**local_y)
-            plt.plot(np.log10(local_x), pars[0][1] + pars[0][0] * np.log10(local_x), c[i]+'--')
+            plt.plot(np.log10(model_x), pars[0][1] + pars[0][0] * np.log10(model_x), c[i]+'--')
             print labels[i], pars
     plt.legend(loc='upper left')
     plt.xlim([-2.3, 4])
@@ -496,7 +559,7 @@ for m, plot_M in enumerate([final_M]):
 #############################
 
 high_res_nside = 1024
-high_res = 14./60*np.pi/180.
+high_res = 24./60*np.pi/180.#14./60*np.pi/180.
 low_res = .8*np.pi/180.
 high_f_file = np.load('/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(high_res_nside, high_res, 3*np.pi/180., True, False, 3.0))
 low_f_file = np.load('/mnt/data0/omniscope/polarized foregrounds/data_nside_%i_smooth_%.2E_edge_%.2E_rmvcmb_%i_UV%i_v%.1f.npz'%(high_res_nside, low_res, 3*np.pi/180., True, False, 3.0))
@@ -534,8 +597,20 @@ high_res_x_ni[low_f_principals] = la.inv(np.transpose(A).dot(A)).dot(A.transpose
 
 #plot all components
 for i in range(n_principal):
-    qaz = np.arcsinh(high_res_x_ni[i])
-    hpv.mollview(qaz, sub=(2, 3, i+1), nest=True, min=np.percentile(qaz, 2), max=np.percentile(qaz, 98));
+    qaz = np.copy(high_res_x_ni[i])
+    qaz /= la.norm(qaz)
+    if i == cmb_principal:
+        hpv.mollview(qaz, sub=(3, 2, i+1), nest=True, min=np.percentile(qaz, 1), max=np.percentile(qaz, 99))
+    else:
+        if i <= 2:
+            dy_range = 1
+        else:
+            dy_range = 2
+        qaz *= np.sign(np.median(high_res_x_ni[i]))
+
+        qaz[qaz < np.percentile(qaz, 98) / 10**dy_range] = np.percentile(qaz, 98) / 10**dy_range
+        qaz = np.log10(qaz)
+        hpv.mollview(qaz, sub=(3, 2, i+1), nest=True, min=np.ceil(np.percentile(qaz, 98))-dy_range, max=np.ceil(np.percentile(qaz, 98)), cmap=cmap, title=labels[i])
 plt.show()
 
 w_estimates = si.interp1d(np.log10(freqso), np.arcsinh(final_w_nf * normalizationo), axis=-1, bounds_error=False)

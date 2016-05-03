@@ -174,7 +174,7 @@ version = 3.0
 I_only = True
 mother_nside = 1024#64
 mother_npix = hpf.nside2npix(mother_nside)
-target_fwhm = 14 * ARCMIN#5 * DEGREE#3.6 * DEGREE#
+target_fwhm = 24 * ARCMIN#14 * ARCMIN#5 * DEGREE#3.6 * DEGREE#
 min_edge_width = 3 * DEGREE
 remove_cmb = True
 
