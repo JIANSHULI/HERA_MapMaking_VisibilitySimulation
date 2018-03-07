@@ -353,7 +353,7 @@ elif INSTRUMENT == 'hera47':
 	PointSource_AbsCal = True
 	
 	Use_AbsCal = True # Use Model calculated noise which is just fullsim autocorr calculated noise.
-	Use_PsAbsCal = True # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
+	Use_PsAbsCal = False # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
 	comply_ps2mod_autocorr = False
 	Use_Fullsim_Noise = False # Use fullsim autocorr calculated noise.
 	
@@ -856,9 +856,6 @@ elif INSTRUMENT == 'hera47':
 	nt_used = len(tlist)
 	nf_used = len(flist[0])
 	jansky2kelvin = 1.e-26 * (C / freq) ** 2 / 2 / kB / (4 * PI / (12 * nside_standard ** 2))
-	jansky2kelvin_mfreq = {}
-	for j in range(2):
-		jansky2kelvin_mfreq[j] = np.array([1.e-26 * (C / flist[j][i]) ** 2 / 2 / kB / (4 * PI / (12 * nside_standard ** 2)) for i in range(len(flist[j]))])
 
 	############################## Common UBL ###########################
 	ubls = {}
@@ -2033,7 +2030,7 @@ if PointSource_AbsCal:
 		Ni = np.transpose([Ni['x'], Ni['y']], (1, 0, 2))
 
 		realA = np.zeros((2 * Apol.shape[0] * Apol.shape[1], 1 + 2 * np.sum(cal_ubl_mask) * 2), dtype='complex128')
-		realA[:, 0] = np.concatenate((np.real(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2]))), np.imag(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2])))), axis=0).dot([jansky2kelvin_mfreq[0][id_f] * flux_func[source](vis_freq[0]) for source in cal_sources]) #([flux_func[source](vis_freq[cal_sources.index(source)]) for source in cal_sources])
+		realA[:, 0] = np.concatenate((np.real(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2]))), np.imag(Apol.reshape((Apol.shape[0] * Apol.shape[1], Apol.shape[2])))), axis=0).dot([flux_func[source](vis_freq[cal_sources.index(source)]) for source in cal_sources])
 		vis_scale = la.norm(realA[:, 0]) / len(realA)**.5
 		for coli, ncol in enumerate(range(1, realA.shape[1])):
 			realA[coli * np.sum(cal_time_mask): (coli + 1) * np.sum(cal_time_mask), ncol] = vis_scale
@@ -3309,31 +3306,9 @@ if plot_data_error:
 	best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
 	best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
 	sim_best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+
 	ri = 1
-	# plt.clf()
-	#	for p in range(2):
-	#		plt.figure(10*p + 80)
-	#		for nu, u in enumerate(us):
-	#
-	#			plt.subplot(6, (len(us) + 5) / 6, nu + 1)
-	#			# plt.errorbar(range(nt_used), qaz_data[ri, u, p], yerr=Ni.reshape((2, nUBL_used, 2, nt_used))[ri, u, p]**-.5)
-	#			plt.plot(qaz_data[ri, u, p])
-	#			plt.plot(qaz_model[ri, u, p])
-	#			plt.plot(best_fit[ri, u, p])
-	#			plt.plot(best_fit_no_additive[ri, u, p])
-	#			if pre_calibrate:
-	#				plt.plot(qaz_add[ri, u, p])
-	#			if fit_for_additive:
-	#				plt.plot(autocorr_vis_normalized[p] * sol2additive(w_solution)[p, u, ri])
-	#			plt.plot(best_fit[ri, u, p] - qaz_data[ri, u, p])
-	#			plt.plot(Ni.reshape((2, nUBL_used, 2, nt_used))[ri, u, p]**-.5)
-	#			data_range = np.max(np.abs(qaz_data[ri, u, p]))
-	#			plt.ylim([-1.05*data_range, 1.05*data_range])
-	#			plt.title("%.1f,%.1f,%.1e"%(used_common_ubls[u, 0], used_common_ubls[u, 1], la.norm(best_fit[ri, u, p] - qaz_data[ri, u, p])))
-	#		plt.savefig(script_dir + '/../Output/data_error_wiener-%s%s-%s-dipole-bnside-%s-nside_standard-%s.png'%(p, p, INSTRUMENT, bnside, nside_standard))
-	#		plt.show(block=False)
-	#		#plt.gcf().clear()
-	#		#plt.close()
+
 	figure_W = {}
 	for p in range(2):
 
@@ -3382,8 +3357,8 @@ if plot_data_error:
 # Del=True
 # if Del:
 # 	try:
-# 		del(additive_A)
-# 		del(real_additive_A)
+# 		#del(additive_A)
+# 		#del(real_additive_A)
 # 	except:
 # 		pass
 
@@ -3427,11 +3402,6 @@ def plot_IQU_unlimit(solution, title, col, shape=(2,3), coord='C'):
 #	#plt.gcf().clear()
 
 rescale_factor = np.max(np.abs(fake_solution))/ np.max(np.abs(w_solution))
-
-print('Number of Positive w_solution Pixels: %s'%len(w_solution[w_solution>=0]))
-print('Number of Positive w_GSM Pixels: %s'%len(w_GSM[w_GSM>=0]))
-print('Number of Positive w_sim Pixels: %s'%len(w_sim_sol[w_sim_sol>=0]))
-print('Number of Positive GSM Pixels: %s'%len(fake_solution[fake_solution>=0]))
 
 
 crd = 0
