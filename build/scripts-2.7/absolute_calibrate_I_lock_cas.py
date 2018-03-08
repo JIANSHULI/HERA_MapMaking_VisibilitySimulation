@@ -187,7 +187,7 @@ for Q in ['q3AL']:#['q0AL', 'q0C', 'q1AL', 'q2AL', 'q2C', 'q3AL', 'q4AL']:
         realAtNiAinv = np.linalg.pinv(np.einsum('ji,j,jk->ik', realA, realNi, realA))
 
 
-        b = np.transpose([vis_data['x'], vis_data['y']], (1, 0, 2))
+        b = np.transpose([['x'], vis_data['y']], (1, 0, 2))
         phase_degen_niter = 0
         phase_degen2 = {'x': np.zeros(2), 'y': np.zeros(2)}
         phase_degen_iterative_x = np.zeros(2)
