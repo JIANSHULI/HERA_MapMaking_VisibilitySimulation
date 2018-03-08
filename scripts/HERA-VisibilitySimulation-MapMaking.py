@@ -366,9 +366,11 @@ elif INSTRUMENT == 'hera47':
     pre_phscal = True
     pre_addcal = True
     fit_for_additive = True
+
+    Erase = True
     
-    Add_S_diag = True
-    Add_Rcond = False
+    Add_S_diag = False
+    Add_Rcond = True
     
     sys.stdout.flush()
     
@@ -2420,7 +2422,7 @@ def stitch_complex_data(complex_data):
 
 
 ##################### Delete or Erase Data #######################
-Erase = False
+# Erase = False
 if Erase:
     model_sf = {}
     model_dred = {}
