@@ -218,7 +218,7 @@ try:
     __file__
 except NameError:
     # script_dir = '/Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/simulate_visibilities/scripts'
-    script_dir = os.path.join(DATA_PATH, '../../../simulate_visibilities/scripts')
+    script_dir = os.path.join(DATA_PATH, '../../../HERA_MapMaking_VisibilitySimulation/scripts')
     pixel_directory = script_dir
     print 'Run IPython'
 else:
