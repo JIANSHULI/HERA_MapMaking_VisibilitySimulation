@@ -220,7 +220,7 @@ try:
     __file__
 except NameError:
     # script_dir = '/Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/simulate_visibilities/scripts'
-    script_dir = os.path.join(DATA_PATH, '../../../simulate_visibilities/scripts')
+    script_dir = os.path.join(DATA_PATH, '../../../HERA_MapMaking_VisibilitySimulation/scripts')
     pixel_directory = script_dir
 	print 'Run IPython'
 else:
@@ -356,7 +356,6 @@ elif INSTRUMENT == 'hera47':
 
     Use_AbsCal = True  # Use Model calculated noise which is just fullsim autocorr calculated noise.
 	Use_PsAbsCal = True  # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
-	Use_PsAbsCal = False  # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
     comply_ps2mod_autocorr = False
 	Use_Fullsim_Noise = False  # Use fullsim autocorr calculated noise.
 
@@ -369,8 +368,8 @@ elif INSTRUMENT == 'hera47':
     pre_addcal = True
     fit_for_additive = True
 
-    Add_S_diag = True
-    Add_Rcond = False
+    Add_S_diag = False
+    Add_Rcond = True
 
     sys.stdout.flush()
 
@@ -381,6 +380,7 @@ elif INSTRUMENT == 'hera47':
     Frequency_Bin = 1.625 * 1.e6  # Hz
 
     S_type = 'dyS_lowadduniform_min3I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+    rcond_list = 10. ** np.arange(-29., -2., 1.)
 
     seek_optimal_threshs = False and not AtNiA_only
     dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
@@ -3154,7 +3154,7 @@ else:
     AtNiAi_version = 0.1
 if pre_ampcal:
     AtNiAi_version += 1.
-rcond_list = 10. ** np.arange(-9., -2., 1.)
+# rcond_list = 10. ** np.arange(-9., -2., 1.)
 
 AtNiAi_candidate_files = glob.glob(datadir + tag + AtNiAi_tag + '_S%s_RE*_N%s_v%.1f' % (S_type, vartag, AtNiAi_version) + A_filename)
 if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_recompute and not force_recompute_S and not AtNiA_only:
