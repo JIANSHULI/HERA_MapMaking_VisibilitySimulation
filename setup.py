@@ -22,19 +22,19 @@ setup(name = 'wignerpy',
     package_dir = {'simulate_visibilities':'src'},
     packages = ['simulate_visibilities'],
     ext_modules = [
-        Extension('simulate_visibilities._boost_math',
+        Extension('HERA_MapMaking_VisibilitySimulation_boost_math',
             globdir('src/_boost_math/',
                 ['*.cpp', '*.c', '*.cc']),
             include_dirs = ['src/_boost_math/include', '/usr/include', numpy.get_include()],
             extra_compile_args=['-Wno-write-strings', '-O3']
         ),
-        Extension('simulate_visibilities._Bulm',
+        Extension('HERA_MapMaking_VisibilitySimulation._Bulm',
             globdir('src/_Bulm/',
                 ['*.cpp', '*.c', '*.cc']),
             include_dirs = ['src/_Bulm/include', '/usr/include', numpy.get_include()],
             extra_compile_args=['-Wno-write-strings', '-O3']
         ),
-        Extension('simulate_visibilities._omnical',
+        Extension('HERA_MapMaking_VisibilitySimulation._omnical',
             ['src/_omnical/omnical_wrap.cpp', 'src/_omnical/omnical_redcal.cc'],
             #globdir('src/_omnical/',
             #    ['*.cpp', '*.c', '*.cc']),
@@ -44,4 +44,3 @@ setup(name = 'wignerpy',
     ],
     scripts = glob.glob('scripts/*'),
 )
-
