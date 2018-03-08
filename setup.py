@@ -16,7 +16,7 @@ setup(name = 'wignerpy',
     description = __doc__,
     long_description = __doc__,
     license = 'GPL',
-    author = 'Eric Yang, Jeff Zheng',
+    author = 'Eric Yang, Jeff Zheng, Jianshu Li',
     author_email = '',
     url = '',
     package_dir = {'simulate_visibilities':'src'},
@@ -34,6 +34,13 @@ setup(name = 'wignerpy',
             include_dirs = ['src/_Bulm/include', '/usr/include', numpy.get_include()],
             extra_compile_args=['-Wno-write-strings', '-O3']
         ),
+        Extension('simulate_visibilities._omnical',
+            ['src/_omnical/omnical_wrap.cpp', 'src/_omnical/omnical_redcal.cc'],
+            #globdir('src/_omnical/',
+            #    ['*.cpp', '*.c', '*.cc']),
+            include_dirs=['src/_omnical/include', numpy.get_include()],
+            extra_compile_args=['-Wno-write-strings', '-O3']
+        )
     ],
     scripts = glob.glob('scripts/*'),
 )
