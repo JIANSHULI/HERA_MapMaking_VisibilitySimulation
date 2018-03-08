@@ -2,34 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7d6dd782-efc7-41b8-8e2b-e772f3629961" name="Default" comment="">
-      <change beforePath="" afterPath="$PROJECT_DIR$/.idea/vcs.xml" />
-      <change beforePath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" />
-      <change beforePath="$PROJECT_DIR$/Output/3C-GSM_Map-1.500e+02MHz_128Nside_Log_Default_healpyNEST_lin_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/3C-GSM_Map-1.500e+02MHz_32Nside_Log_Default_healpyNEST_Lin_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-1.500e+02MHz_128Nside_Lin_Default_healpyNEST_hist_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-1.500e+02MHz_128Nside_Log_Default_healpyNEST_hist_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-1.500e+02MHz_128Nside_Log_Default_healpyNEST_lin_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-1.500e+02ghz_128Nside_Lin_Default_healpyNEST_None_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-150.000MHz-128-CG.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-150.000MHz-C.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/GSM_Map-150.000MHz-CG.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/HERA-47-Dipole-beampattern.png" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/PCA1_GSM_Map_1.500e+02ghz_0.00res_Log_Default_healpyNEST_lin_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/PCA2_GSM_Map_1.500e+02ghz_0.00res_Log_Default_healpyNEST_lin_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/Output/PCA3_GSM_Map_1.500e+02ghz_0.00res_Log_Default_healpyNEST_lin_jet.pdf" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/README.md" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/GSM_I_plots.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/GSM_I_rm1freq.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/GSM_extract_surveys.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/GSM_extract_surveystmp.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking.py" afterPath="$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking.py" />
-      <change beforePath="$PROJECT_DIR$/scripts/absolute_calibrate_I_lock_cas.py" afterPath="$PROJECT_DIR$/scripts/absolute_calibrate_I_lock_cas.py" />
-      <change beforePath="$PROJECT_DIR$/scripts/compute_sky_matrix.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/example_beam_read.py" afterPath="$PROJECT_DIR$/scripts/example_beam_read.py" />
-      <change beforePath="$PROJECT_DIR$/scripts/extract_PAPER.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/extract_healpix.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/galactic_magnetic_field.py" afterPath="" />
-      <change beforePath="$PROJECT_DIR$/scripts/gsm_for_adrian_and_josh.py" afterPath="" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
+      <change beforePath="$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking-AbsCal.ipynb" afterPath="$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking-AbsCal.ipynb" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="TRACKING_ENABLED" value="true" />
@@ -46,8 +20,8 @@
       <file leaf-file-name="HERA-VisibilitySimulation-MapMaking.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="2063">
-              <caret line="3364" column="0" lean-forward="false" selection-start-line="3364" selection-start-column="0" selection-end-line="3364" selection-end-column="0" />
+            <state relative-caret-position="-243">
+              <caret line="133" column="0" lean-forward="false" selection-start-line="133" selection-start-column="0" selection-end-line="133" selection-end-column="0" />
               <folding>
                 <marker date="1520466674613" expanded="true" signature="150352:153798" ph="..." />
               </folding>
@@ -243,8 +217,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="2063">
-          <caret line="3364" column="0" lean-forward="false" selection-start-line="3364" selection-start-column="0" selection-end-line="3364" selection-end-column="0" />
+        <state relative-caret-position="-243">
+          <caret line="133" column="0" lean-forward="false" selection-start-line="133" selection-start-column="0" selection-end-line="133" selection-end-column="0" />
           <folding>
             <marker date="1520466674613" expanded="true" signature="150352:153798" ph="..." />
           </folding>
