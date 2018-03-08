@@ -353,7 +353,11 @@ elif INSTRUMENT == 'hera47':
 	PointSource_AbsCal = True
 	
 	Use_AbsCal = True # Use Model calculated noise which is just fullsim autocorr calculated noise.
+<<<<<<< HEAD
 	Use_PsAbsCal = True # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
+=======
+	Use_PsAbsCal = False # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
+>>>>>>> 10f63a0c6d05e4e24e9a945811f0155e50e5480e
 	comply_ps2mod_autocorr = False
 	Use_Fullsim_Noise = False # Use fullsim autocorr calculated noise.
 	
@@ -3306,8 +3310,13 @@ if plot_data_error:
 	best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
 	best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
 	sim_best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
+<<<<<<< HEAD
 	ri = 1
 	# plt.clf()
+=======
+
+	ri = 1
+>>>>>>> 10f63a0c6d05e4e24e9a945811f0155e50e5480e
 
 	figure_W = {}
 	for p in range(2):
@@ -3362,7 +3371,10 @@ if plot_data_error:
 # 	except:
 # 		pass
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 10f63a0c6d05e4e24e9a945811f0155e50e5480e
 sys.stdout.flush()
 
 def plot_IQU(solution, title, col, shape=(2,3), coord='C'):

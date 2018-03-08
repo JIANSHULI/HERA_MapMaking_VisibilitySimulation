@@ -2,6 +2,19 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="7d6dd782-efc7-41b8-8e2b-e772f3629961" name="Default" comment="">
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-C-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-0.017157589327365705-denegative-unlimit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-C-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-0.017157589327365705-limit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-C-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-0.017157589327365705-unlimit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-C-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-none-limit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-C-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-none-unlimit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-CG-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-0.017157589327365705-denegative-unlimit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-CG-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-0.017157589327365705-limit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-CG-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-0.017157589327365705-unlimit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-CG-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-none-limit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener-CG-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-none-unlimit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener_renormalized-C-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-none-limit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/Maps/Mocal-prephaamp-additive-S/results_wiener_renormalized-CG-hera47-150.0MHz-dipole-bnside-64-nside_standard-32-rescale-none-limit-S-dyS_lowadduniform_maxI-recond-none.png" />
+      <change beforePath="" afterPath="$PROJECT_DIR$/scriptspixel_scheme_10420_150.0.npz" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
       <change beforePath="$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking-AbsCal.ipynb" afterPath="$PROJECT_DIR$/scripts/HERA-VisibilitySimulation-MapMaking-AbsCal.ipynb" />
     </list>
