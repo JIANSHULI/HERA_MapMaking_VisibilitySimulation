@@ -381,7 +381,7 @@ elif INSTRUMENT == 'hera47':
     Frequency_Bin = 1.625 * 1.e6  # Hz
     
     S_type = 'dyS_lowadduniform_min3I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-    rcond_list = 10. ** np.arange(-29., -2., 1.)
+    rcond_list = 10. ** np.arange(-19., -2., 1.)
     
     seek_optimal_threshs = False and not AtNiA_only
     dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
@@ -412,7 +412,7 @@ elif INSTRUMENT == 'hera47':
     model = {}
     mflags = {}
     mantpos = {}
-    mant = {}
+    mants = {}
     model_freqs = {}
     model_times = {}
     model_lsts = {}
@@ -437,6 +437,13 @@ elif INSTRUMENT == 'hera47':
             for i in range(2):
                 model_fname[i] = os.path.join(DATA_PATH, "zen.2458042.12552.%s.HH.uvXA" % ['xx', 'yy'][i])  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
                 # model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
+                if i == 1:
+                    try:
+                        # data_fname[1] = os.path.join(DATA_PATH, "zen.2458043.12552.yy.HH.uvORA") #zen.2457698.40355.yy.HH.uvcA
+                        if not os.path.isfile(model_fname[i]):
+                            model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA")
+                    except:
+                        pass
                 (model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i],
                  model_pols[i]) = hc.abscal.UVData2AbsCalDict(model_fname[i], return_meta=True)
         
@@ -3483,11 +3490,12 @@ plt.show(block=False)
 
 try:
     print('Additive_sol: %s' % additive_sol[:2])
+    print('Rescale_factor: %s' % rescale_factor)
+    print ("regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes))
 except:
     pass
 
-print('Rescale_factor: %s' % rescale_factor)
-print ("regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes))
+
 
 sys.stdout.flush()
 
