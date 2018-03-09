@@ -433,7 +433,7 @@ elif INSTRUMENT == 'hera47':
     if Small_ModelData:
         if Model_Calibration:
             model_fname = {}
-            model = mflags = mantpos = mant = model_freqs = model_times = model_lsts = model_pols = {}
+            #model = mflags = mantpos = mant = model_freqs = model_times = model_lsts = model_pols = {}
             for i in range(2):
                 model_fname[i] = os.path.join(DATA_PATH, "zen.2458042.12552.%s.HH.uvXA" % ['xx', 'yy'][i])  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
                 # model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
