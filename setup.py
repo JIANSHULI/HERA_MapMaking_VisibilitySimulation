@@ -19,7 +19,7 @@ setup(name = 'wignerpy',
     author = 'Eric Yang, Jeff Zheng, Jianshu Li',
     author_email = '',
     url = '',
-    package_dir = {'simulate_visibilities':'src'},
+    package_dir = {'HERA_MapMaking_VisibilitySimulation':'src'},
     packages = ['simulate_visibilities'],
     ext_modules = [
         Extension('HERA_MapMaking_VisibilitySimulation_boost_math',
