@@ -1935,7 +1935,7 @@ for source in pt_sources:
 	
 	pix_max_index_gsm_ps[source] = pix_raw_index_gsm_ps[source][flux_raw_dis_gsm_ps[source].index(np.array(flux_raw_dis_gsm_ps[source]).max())]
 	for j in range(len(flux_raw_dis_gsm_ps[source])):
-		if flux_raw_dis_gsm_ps[source][j] >= 0.4 * equatorial_GSM_standard[pix_max_index_gsm_ps[source]]:
+		if flux_raw_dis_gsm_ps[source][j] >= 0.5 * equatorial_GSM_standard[pix_max_index_gsm_ps[source]]:
 			flux_gsm_ps[source] += equatorial_GSM_standard[pix_raw_index_gsm_ps[source][j]]
 			flux_dis_gsm_ps[source].append(equatorial_GSM_standard[pix_raw_index_gsm_ps[source][j]])
 			pix_index_gsm_ps[source].append(pix_raw_index_gsm_ps[source][j])
@@ -2020,7 +2020,7 @@ if PointSource_AbsCal:
 
 			pix_max_index_gsm_ps[source] = pix_raw_index_gsm_ps[source][flux_raw_dis_gsm_ps[source].index(np.array(flux_raw_dis_gsm_ps[source]).max())]
 			for j in range(len(flux_raw_dis_gsm_ps[source])):
-				if flux_raw_dis_gsm_ps[source][j] >= 0.4 * equatorial_GSM_standard_mfreq[id_f, pix_max_index_gsm_ps[source]]:
+				if flux_raw_dis_gsm_ps[source][j] >= 0.5 * equatorial_GSM_standard_mfreq[id_f, pix_max_index_gsm_ps[source]]:
 					flux_gsm_ps[source] += equatorial_GSM_standard_mfreq[id_f, pix_raw_index_gsm_ps[source][j]]
 					flux_dis_gsm_ps[source].append(equatorial_GSM_standard_mfreq[id_f, pix_raw_index_gsm_ps[source][j]])
 					pix_index_gsm_ps[source].append(pix_raw_index_gsm_ps[source][j])
