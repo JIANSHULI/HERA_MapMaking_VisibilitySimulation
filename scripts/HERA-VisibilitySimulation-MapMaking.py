@@ -8,7 +8,7 @@ import scipy.linalg as sla
 import time, ephem, sys, os, resource, datetime, warnings
 import aipy as ap
 import os
-#os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 import sys
 import matplotlib.pyplot as plt
 import healpy as hp
@@ -57,6 +57,65 @@ def pixelize(sky, nside_distribution, nside_standard, nside_start, thresh, final
 
 def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thresh, final_index, thetas, phis, sizes):
 	# print "visiting ", nside, inest
+	starti, endi = inest #!/usr/bin/python
+
+import simulate_visibilities.Bulm as Bulm
+import simulate_visibilities.simulate_visibilities as sv
+import numpy as np
+import numpy.linalg as la
+import scipy.linalg as sla
+import time, ephem, sys, os, resource, datetime, warnings
+import aipy as ap
+import os
+#os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+import sys
+import matplotlib.pyplot as plt
+import healpy as hp
+import healpy.rotator as hpr
+import healpy.pixelfunc as hpf
+import healpy.visufunc as hpv
+import scipy.interpolate as si
+import glob
+import astropy
+from astropy.io import fits
+import HERA_MapMaking_VisibilitySimulation as mmvs
+from pyuvdata import UVData, UVCal, UVFITS
+import hera_cal as hc
+from hera_cal.data import DATA_PATH
+from collections import OrderedDict as odict
+from pyuvdata import utils as uvutils
+import copy
+import uvtools as uvt
+import linsolve
+from hera_cal.datacontainer import DataContainer
+from astropy.time import Time
+import omnical
+import omnical.calibration_omni as omni
+from memory_profiler import memory_usage as memuse
+from collections import OrderedDict as odict
+import pandas
+import aipy.miriad as apm
+import re
+import copy
+
+PI = np.pi
+TPI = PI * 2
+
+
+def pixelize(sky, nside_distribution, nside_standard, nside_start, thresh, final_index, thetas, phis, sizes):
+	# thetas = []
+	# phis = []
+	for inest in range(12 * nside_start ** 2):
+		pixelize_helper(sky, nside_distribution, nside_standard, nside_start, inest, thresh, final_index, thetas, phis,
+						sizes)
+# newt, newp = pixelize_helper(sky, nside_distribution, nside_standard, nside_start, inest, thresh, final_index, thetas, phis)
+# thetas += newt.tolist()
+# phis += newp.tolist()
+# return np.array(thetas), np.array(phis)
+
+
+def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thresh, final_index, thetas, phis, sizes):
+	# print "visiting ", nside, inest
 	starti, endi = inest * nside_standard ** 2 / nside ** 2, (inest + 1) * nside_standard ** 2 / nside ** 2
 	##local mean###if nside == nside_standard or np.std(sky[starti:endi])/np.mean(sky[starti:endi]) < thresh:
 	if nside == nside_standard or np.std(sky[starti:endi]) < thresh:
@@ -75,10 +134,10 @@ def pixelize_helper(sky, nside_distribution, nside_standard, nside, inest, thres
 		for jnest in range(inest * 4, (inest + 1) * 4):
 			pixelize_helper(sky, nside_distribution, nside_standard, nside * 2, jnest, thresh, final_index, thetas,
 							phis, sizes)
-		# newt, newp = pixelize_helper(sky, nside_distribution, nside_standard, nside * 2, jnest, thresh)
-		# thetas += newt.tolist()
-		# phis += newp.tolist()
-		# return np.array(thetas), np.array(phis)
+	# newt, newp = pixelize_helper(sky, nside_distribution, nside_standard, nside * 2, jnest, thresh)
+	# thetas += newt.tolist()
+	# phis += newp.tolist()
+	# return np.array(thetas), np.array(phis)
 
 
 def dot(A, B, C, nchunk=10):
@@ -105,7 +164,7 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 		ltm = time.time()
 		C[i * chunk:(i + 1) * chunk] = np.einsum('ji,jk->ik', A[:, i * chunk:(i + 1) * chunk] * Ni[:, None], A)
 		if expected_time >= 1.:
-			print "%i/%i: %.1fmins" % (i, nchunk, (time.time() - ltm) / 60.),
+			print "%i/%i: %.5fmins" % (i, nchunk, (time.time() - ltm) / 60.),
 			sys.stdout.flush()
 	if chunk * nchunk < len(C):
 		C[chunk * nchunk:] = np.einsum('ji,jk->ik', A[:, chunk * nchunk:] * Ni[:, None], A)
@@ -129,7 +188,7 @@ def solve_phase_degen(data_xx, data_yy, model_xx, model_yy, ubls, plot=False):  
 		plt.hist((np.array(A).dot(phase_cal) - b + PI) % TPI - PI)
 		plt.title('phase fitting error')
 		plt.show()
-
+	
 	# sooolve
 	return phase_cal
 
@@ -154,7 +213,7 @@ def S_casa_v_t(v, t=2015.5):
 	c = 1.509 * 1.e-7  # +-0.162*1.e-7 year-1
 	
 	v *= 1.e-3
-
+	
 	# print(v) # from MHz to GHz
 	# print(t) # in decimal year
 	
@@ -163,7 +222,7 @@ def S_casa_v_t(v, t=2015.5):
 	d_speed_log_v = a + b * np.log(v) + c * v ** (-2.1)  # a,b,c: 2005.0
 	
 	S_casa_v_t = np.exp((t - 2015.5) * d_speed_log_v + np.log(S_casa_v))
-
+	
 	# print(d_speed_log_v)
 	
 	return S_casa_v_t
@@ -348,11 +407,11 @@ elif INSTRUMENT == 'hera47':
 	Absolute_Calibration_red = False
 	Absolute_Calibration_mfreq = False
 	Absolute_Calibration_dred = False
-	Absolute_Calibration_dred_mfreq = True
-	PointSource_AbsCal = True
+	Absolute_Calibration_dred_mfreq = False
+	PointSource_AbsCal = False
+	Absolute_Calibration_dred_mfreq_pscal = False
 	
-	Use_AbsCal = True  # Use Model calculated noise which is just fullsim autocorr calculated noise.
-	Use_PsAbsCal = True  # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
+	Use_AbsCal = False  # Use Model calculated noise which is just fullsim autocorr calculated noise.
 	Use_PsAbsCal = False  # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise.
 	comply_ps2mod_autocorr = False
 	Use_Fullsim_Noise = False  # Use fullsim autocorr calculated noise.
@@ -363,13 +422,13 @@ elif INSTRUMENT == 'hera47':
 	tag = '-ampcal-' if pre_calibrate else ''  # '-ampcal-' #sys.argv[2]; if use real uncalibrated data, set tag = '-ampcal-' for amplitude calibration.
 	pre_ampcal = ('ampcal' in tag)
 	pre_phscal = True
-	pre_addcal = True
+	pre_addcal = False
 	fit_for_additive = True
-
+	
 	Erase = True
 	
-	Add_S_diag = False
-	Add_Rcond = True
+	Add_S_diag = True
+	Add_Rcond = False
 	
 	sys.stdout.flush()
 	
@@ -379,16 +438,16 @@ elif INSTRUMENT == 'hera47':
 	Integration_Time = 11  # seconds
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
-	S_type = 'dyS_lowadduniform_min3I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-19., -2., 1.)
-	
+	S_type = 'dyS_lowadduniform_min20I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
+	rcond_list = 10. ** np.arange(-9., -2., 1.)
+
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 2  # .2#2.#.03125#
 	valid_pix_thresh = 1.e-4
-	nside_start = 32
-	nside_standard = 32  # resolution of sky
-	nside_beamweight = 16  # A matrix shape
+	nside_start = 64
+	nside_standard = 64  # resolution of sky
+	nside_beamweight = 64  # A matrix shape
 	bnside = 64  # beam pattern data resolution
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
@@ -651,7 +710,7 @@ elif INSTRUMENT == 'hera47':
 				data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = uvd_xx.get_data((key[0], key[1]))[:, findex_list[i]] if i == 0 else uvd_yy.get_data((key[0], key[1]))[:, findex_list[i]]
 				autocorr_data_mfreq_ff[i] = autocorr_data_mfreq[i][:, findex_list[i]]
 				dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags[i][key]
-			# del data_ff[dflags[i].keys()[id_key]]
+		# del data_ff[dflags[i].keys()[id_key]]
 		
 		data = copy.deepcopy(data_ff)
 		dflags = copy.deepcopy(dflags_ff)
@@ -705,7 +764,7 @@ elif INSTRUMENT == 'hera47':
 	vis_data = {}
 	for i in range(2):
 		vis_data[i] = vis_data_mfreq[i][index_freq[i], :, :]  # [pol][ freq, time, bl]
-
+	
 	# del(vis_data_mfreq)
 	
 	################################## Unique Base Lines and Remove Redundancy ########################################
@@ -883,7 +942,7 @@ elif INSTRUMENT == 'hera47':
 			p = ['x', 'y'][i]
 			ubls[p] = bsl_coord_dred[i]
 		common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
-
+	
 	# common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
 	# manually filter UBLs
 	used_common_ubls = common_ubls[la.norm(common_ubls, axis=-1) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor]  # [np.argsort(la.norm(common_ubls, axis=-1))[10:]]     #remove shorted 10
@@ -949,9 +1008,9 @@ elif INSTRUMENT == 'hera47':
 		#             unit='dBi')
 		plt.savefig(script_dir + '/../Output/%s-dipole-Beam-north-%.2f-bnside-%s.pdf' % (INSTRUMENT, freq, bnside))
 		plt.show(block=False)
-	# plt.gcf().clear()
-	# plt.clf()
-	# plt.close()
+# plt.gcf().clear()
+# plt.clf()
+# plt.close()
 
 sys.stdout.flush()
 
@@ -1035,7 +1094,7 @@ for p in ['x', 'y']:
 
 ####################################################
 ###beam weights using an equal pixel A matrix######
-#################################################
+###################################################
 print "Computing beam weight...",
 sys.stdout.flush()
 beam_weight = ((la.norm(A['x'], axis=0) ** 2 + la.norm(A['y'], axis=0) ** 2) ** .5)[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
@@ -1127,8 +1186,8 @@ if simulation_opt == 1:
 			for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
 				res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
 				fullsim_vis[p] += masked_equ_GSM[i] * res
-			# fullsim_vis_DBG[p, ..., i] = res[:-1]
-			# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
+		# fullsim_vis_DBG[p, ..., i] = res[:-1]
+		# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
 		print "simulated visibilities in %.1f minutes." % ((time.time() - timer) / 60.)
 		fullsim_vis.astype('complex128').tofile(full_sim_filename)
 		fullsim_vis[0][:-1, :].astype('complex128').tofile(sim_vis_xx_filename)
@@ -1183,8 +1242,8 @@ if Absolute_Calibration_red:
 			for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
 				res_red = vs.calculate_pointsource_visibility(ra, dec, full_sim_bls_red, freq, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
 				fullsim_vis_red[p] += masked_equ_GSM[i] * res_red
-			# fullsim_vis_DBG[p, ..., i] = res[:-1]
-			# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
+		# fullsim_vis_DBG[p, ..., i] = res[:-1]
+		# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
 		print "simulated redundant visibilities in %.1f minutes." % ((time.time() - timer) / 60.)
 		fullsim_vis_red.astype('complex128').tofile(full_redabs_sim_filename)
 		fullsim_vis_red[0][:-1, :].astype('complex128').tofile(redabs_sim_vis_xx_filename)
@@ -1240,8 +1299,8 @@ if Absolute_Calibration_dred_mfreq:  # Used 9.4 min. 64*9*60*12280
 					for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
 						res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
 						fullsim_vis_mfreq[p, :, :, id_f] += masked_equ_GSM_mfreq[id_f, i] * res
-					# fullsim_vis_DBG[p, ..., i] = res[:-1]
-					# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
+				# fullsim_vis_DBG[p, ..., i] = res[:-1]
+				# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
 			print "simulated visibilities in %.1f minutes." % ((time.time() - timer) / 60.)
 			fullsim_vis_mfreq.astype('complex128').tofile(full_sim_filename_mfreq)
 			fullsim_vis_mfreq[0][:-1, :, :].astype('complex128').tofile(sim_vis_xx_filename_mfreq)
@@ -1267,7 +1326,7 @@ if not Model_Calibration:  # and Absolute_Calibration is True:
 	#		data_fname_omni = os.path.join(DATA_PATH, "zen.2458043.12552.xx.HH.uvORA")
 	#		(data_omni, dflags_omni, antpos_omni, ants_omni, data_freqs_omni, data_times_omni, data_lsts_omni,
 	#		 data_pols_omni) = hc.abscal.UVData2AbsCalDict(data_fname_omni, return_meta=True)
-
+	
 	# model_list = {}
 	# model = {}
 	model_sf = {}
@@ -1314,7 +1373,7 @@ if not Model_Calibration:  # and Absolute_Calibration is True:
 		cdflags_dred_mfreq = copy.deepcopy(dflags_dred_mfreq)
 	except:
 		pass
-
+	
 	# cwgts = copy.deepcopy(wgts)
 	# cwgts_dred = copy.deepcopy(wgts_dred)
 	
@@ -1399,7 +1458,7 @@ if not Model_Calibration:  # and Absolute_Calibration is True:
 		data_dred[i] = LastUpdatedOrderedDict()
 		data_dred_mfreq[i] = LastUpdatedOrderedDict()
 		pol = ['xx', 'yy'][i]
-
+		
 		# fulldflags[i] = hc.abscal.UVData2AbsCalDict(data_fname_full[i], return_meta=True)[1] # assume autocorr no RFI flagged.
 		
 		if Absolute_Calibration_red:
@@ -1674,7 +1733,7 @@ for i in range(2):
 			plt.plot(np.imag(abs_corr_data[i][bl]))
 			plt.title(pol + 'data Imag {}'.format(bl))
 			plt.show(block=False)
-	# plt.cla()
+# plt.cla()
 
 #		# inspect delays
 #		fig, axes = plt.subplots(1, 2, figsize=(14, 6))
@@ -1786,7 +1845,7 @@ for i in range(2):
 			plt.plot(np.imag(abs_corr_data_dred[i][bl_dred]))
 			plt.title(pol + ' data Imag {}'.format(bl_dred))
 			plt.show(block=False)
-	# plt.cla()
+# plt.cla()
 
 ################################################################
 ################# Noise and Vis Data Loading ##################
@@ -1872,13 +1931,19 @@ if Calculate_Data_Noise:
 	if Store_Data_Noise:
 		data_var_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
 		data_var_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
-		N_data['x'].astype('complex128').tofile(data_var_xx_filename)
-		N_data['y'].astype('complex128').tofile(data_var_yy_filename)
+		if not os.path.isfile(data_var_xx_filename):
+			N_data['x'].astype('complex128').tofile(data_var_xx_filename)
+		else:
+			pass
+		if not os.path.isfile(data_var_yy_filename):
+			N_data['y'].astype('complex128').tofile(data_var_yy_filename)
+		else:
+			pass
 	
 	Del = True
 	if Del:
 		del (noise_data)
-	# del(N_data)
+# del(N_data)
 #		try:
 #			del(autocorr_data)
 #		except:
@@ -1909,6 +1974,8 @@ flux_func = {}
 # flux_func['cyg'] = si.interp1d(np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,1], np.loadtxt('/home/omniscope/data/point_source_flux/cygA2006out')[:,2])
 flux_func['cas'] = si.interp1d(flist[0], np.array([S_casa_v_t(flist[0][i], DecimalYear) for i in range(len(flist[0]))]))
 flux_func['cyg'] = si.interp1d(flist[0], np.array([S_cyga_v(flist[0][i], DecimalYear) for i in range(len(flist[0]))]))
+
+full_thetas, full_phis = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 
 flux_raw_gsm_ps = {}
 flux_gsm_ps = {}
@@ -2013,18 +2080,18 @@ if PointSource_AbsCal:
 			#pix_max_index_gsm_ps[source] = []
 			for i in range(len(equatorial_GSM_standard_mfreq[id_f])):
 				if la.norm(np.array([full_phis[i] - southern_points[source]['body']._ra,
-									   (PI / 2 - full_thetas[i]) - southern_points[source]['body']._dec])) <= 0.1:
+									 (PI / 2 - full_thetas[i]) - southern_points[source]['body']._dec])) <= 0.1:
 					flux_raw_gsm_ps[source] += equatorial_GSM_standard_mfreq[id_f, i]
 					flux_raw_dis_gsm_ps[source].append(equatorial_GSM_standard_mfreq[id_f, i])
 					pix_raw_index_gsm_ps[source].append(i)
-
+			
 			pix_max_index_gsm_ps[source] = pix_raw_index_gsm_ps[source][flux_raw_dis_gsm_ps[source].index(np.array(flux_raw_dis_gsm_ps[source]).max())]
 			for j in range(len(flux_raw_dis_gsm_ps[source])):
 				if flux_raw_dis_gsm_ps[source][j] >= 0.5 * equatorial_GSM_standard_mfreq[id_f, pix_max_index_gsm_ps[source]]:
 					flux_gsm_ps[source] += equatorial_GSM_standard_mfreq[id_f, pix_raw_index_gsm_ps[source][j]]
 					flux_dis_gsm_ps[source].append(equatorial_GSM_standard_mfreq[id_f, pix_raw_index_gsm_ps[source][j]])
 					pix_index_gsm_ps[source].append(pix_raw_index_gsm_ps[source][j])
-
+			
 			print('total flux of %s'%source, flux_gsm_ps[source])
 			print('total raw flux of %s'%source, flux_raw_gsm_ps[source])
 			print('maximum pix flux of %s'%source, equatorial_GSM_standard_mfreq[id_f, pix_max_index_gsm_ps[source]])
@@ -2141,7 +2208,7 @@ if PointSource_AbsCal:
 		################################# apply to data and var and output unpolarized version ####################################
 		data_var_xx_filename_pscal = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx_pscal.simvis' % (INSTRUMENT, freq, nUBL, nt, nside_standard, bnside)
 		data_var_yy_filename_pscal = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_yy_pscal.simvis' % (INSTRUMENT, freq, nUBL, nt, nside_standard, bnside)
-
+		
 		# vis_data_dred_pscal = {}
 		# N_data_pscal = {}
 		
@@ -2163,7 +2230,7 @@ if PointSource_AbsCal:
 				p = ['x', 'y'][i]
 				ubls[p] = bsl_coord_dred[i]
 			common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
-
+		
 		# get data and var and apply change
 		
 		for j, p in enumerate(['x', 'y']):
@@ -2196,7 +2263,7 @@ if PointSource_AbsCal:
 		#		op_data_filename = datadir + tag + '_%s%s_%i_%i%s'%(p, p, nt, nUBL, dataoptag)
 		#		op_var_filename = datadir + tag + '_%s%s_%i_%i%s.var'%(p, p, nt, nUBL, varoptag)
 		#		op_var100_filename = datadir + tag + '_%s%s_%i_%i%s.var'%(p, p, nt, nUBL, varoptag+'x100')
-
+		
 		# ubl file
 		# ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl'%(p, p, nUBL, 3)
 		# ubls = np.fromfile(ubl_filename, dtype='float32').reshape((nUBL, 3))
@@ -2220,19 +2287,21 @@ if PointSource_AbsCal:
 		
 		N_data_pscal[p] = noise_data_pscal[p] * noise_data_pscal[p]
 		N_data_pscal[p] = N_data_pscal[p].reshape((nt, nUBL))
-
+		
 		# save
 		#		if os.path.isfile(op_data_filename) and not overwrite:
 		#			raise IOError(op_data_filename + ' exists.')
 		#		else:
 		#			new_data.astype('complex128').tofile(op_data_filename)
-		
-		N_data_pscal[p].astype('complex128').tofile(globals()['data_var_' + pol + '_filename_pscal'])
+		if not os.path.isfile(globals()['data_var_' + pol + '_filename_pscal']):
+			N_data_pscal[p].astype('complex128').tofile(globals()['data_var_' + pol + '_filename_pscal'])
+		else:
+			pass
 	# (new_var * 100.).astype('float32').tofile(op_var100_filename)
 	del (noise_data_pscal)
 
 ########################################### Redo GSM Model Abs Calibration on Point Source Calibrated Data ###########################################
-Absolute_Calibration_dred_mfreq_pscal = True
+#Absolute_Calibration_dred_mfreq_pscal = True
 
 if Absolute_Calibration_dred_mfreq_pscal:
 	
@@ -2354,43 +2423,63 @@ if Absolute_Calibration_dred_mfreq_pscal:
 			plt.colorbar()
 			plt.title(pol + ' abs_caled data PHS {}'.format(bl_dred_mfreq_pscal[i]))
 			plt.show(block=False)
-		# plt.cla()
+	# plt.cla()
 
 ################################### Store Visibility Data and prepare to Delete Variable ##################################
-data_vis_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
-data_vis_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
-vis_data[0].astype('complex128').tofile(data_vis_xx_filename)
-vis_data[1].astype('complex128').tofile(data_vis_yy_filename)
+try:
+	data_vis_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
+	data_vis_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
+	vis_data[0].astype('complex128').tofile(data_vis_xx_filename)
+	vis_data[1].astype('complex128').tofile(data_vis_yy_filename)
+except:
+	pass
 
-data_vis_dred_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_dred_xx_dred.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
-data_vis_dred_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_dred_yy_dred.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
-vis_data_dred[0].astype('complex128').tofile(data_vis_dred_xx_filename)
-vis_data_dred[1].astype('complex128').tofile(data_vis_dred_yy_filename)
+try:
+	data_vis_dred_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_dred_xx_dred.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
+	data_vis_dred_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_dred_yy_dred.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
+	vis_data_dred[0].astype('complex128').tofile(data_vis_dred_xx_filename)
+	vis_data_dred[1].astype('complex128').tofile(data_vis_dred_yy_filename)
+except:
+	pass
 
-data_vis_dred_mfreq_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_mfreq%s-%s-%s_dred_mfreq.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
-data_vis_dred_mfreq_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_mfreq%s-%s-%s_dred_mfreq.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[1]), np.max(flist[1]), len(flist[1]))
-vis_data_dred_mfreq[0].astype('complex128').tofile(data_vis_dred_mfreq_xx_filename)
-vis_data_dred_mfreq[1].astype('complex128').tofile(data_vis_dred_mfreq_yy_filename)
 
-abscal_data_vis_dred_mfreq_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_mfreq%s-%s-%s_dred_mfreq_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
-abscal_data_vis_dred_mfreq_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_mfreq%s-%s-%s_dred_mfreq_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[1]), np.max(flist[1]), len(flist[1]))
-vis_data_dred_mfreq_abscal[0].astype('complex128').tofile(abscal_data_vis_dred_mfreq_xx_filename)
-vis_data_dred_mfreq_abscal[1].astype('complex128').tofile(abscal_data_vis_dred_mfreq_yy_filename)
+try:
+	data_vis_dred_mfreq_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_mfreq%s-%s-%s_dred_mfreq.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
+	data_vis_dred_mfreq_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_mfreq%s-%s-%s_dred_mfreq.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[1]), np.max(flist[1]), len(flist[1]))
+	vis_data_dred_mfreq[0].astype('complex128').tofile(data_vis_dred_mfreq_xx_filename)
+	vis_data_dred_mfreq[1].astype('complex128').tofile(data_vis_dred_mfreq_yy_filename)
+except:
+	pass
 
-abscal_data_vis_dred_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_%s_dred_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, freq)
-abscal_data_vis_dred_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_%s_dred_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, freq)
-vis_data_dred_abscal[0].astype('complex128').tofile(abscal_data_vis_dred_xx_filename)
-vis_data_dred_abscal[1].astype('complex128').tofile(abscal_data_vis_dred_yy_filename)
+try:
+	abscal_data_vis_dred_mfreq_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_mfreq%s-%s-%s_dred_mfreq_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
+	abscal_data_vis_dred_mfreq_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_mfreq%s-%s-%s_dred_mfreq_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, np.min(flist[1]), np.max(flist[1]), len(flist[1]))
+	vis_data_dred_mfreq_abscal[0].astype('complex128').tofile(abscal_data_vis_dred_mfreq_xx_filename)
+	vis_data_dred_mfreq_abscal[1].astype('complex128').tofile(abscal_data_vis_dred_mfreq_yy_filename)
+except:
+	pass
 
-pscal_data_vis_dred_mfreq_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_%s_dred_mfreq_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
-pscal_data_vis_dred_mfreq_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_%s_dred_mfreq_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
-vis_data_dred_mfreq_pscal[0].astype('complex128').tofile(pscal_data_vis_dred_mfreq_xx_filename)
-vis_data_dred_mfreq_pscal[1].astype('complex128').tofile(pscal_data_vis_dred_mfreq_yy_filename)
+try:
+	abscal_data_vis_dred_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_%s_dred_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, freq)
+	abscal_data_vis_dred_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_%s_dred_abscal.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, nside_standard, bnside, freq)
+	vis_data_dred_abscal[0].astype('complex128').tofile(abscal_data_vis_dred_xx_filename)
+	vis_data_dred_abscal[1].astype('complex128').tofile(abscal_data_vis_dred_yy_filename)
+except:
+	pass
 
-pscal_data_vis_dred_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_%s_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
-pscal_data_vis_dred_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_%s_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
-vis_data_dred_pscal[0].astype('complex128').tofile(pscal_data_vis_dred_xx_filename)
-vis_data_dred_pscal[1].astype('complex128').tofile(pscal_data_vis_dred_yy_filename)
+try:
+	pscal_data_vis_dred_mfreq_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_%s_dred_mfreq_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
+	pscal_data_vis_dred_mfreq_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_%s_dred_mfreq_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
+	vis_data_dred_mfreq_pscal[0].astype('complex128').tofile(pscal_data_vis_dred_mfreq_xx_filename)
+	vis_data_dred_mfreq_pscal[1].astype('complex128').tofile(pscal_data_vis_dred_mfreq_yy_filename)
+	
+	pscal_data_vis_dred_xx_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_xx_%s_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
+	pscal_data_vis_dred_yy_filename = script_dir + '/../Output/%s_p2_u%i_t%i_nside%i_bnside%i_vis_data_yy_%s_pscal.simvis' % (INSTRUMENT, nUBL, nt, nside_standard, bnside, freq)
+	vis_data_dred_pscal[0].astype('complex128').tofile(pscal_data_vis_dred_xx_filename)
+	vis_data_dred_pscal[1].astype('complex128').tofile(pscal_data_vis_dred_yy_filename)
+except:
+	pass
+	
 
 sys.stdout.flush()
 
@@ -2481,8 +2570,8 @@ for p in ['x', 'y']:
 					data[pol] = vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
 					# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
 					data[pol] = (data[pol].flatten() * jansky2kelvin)  # .conjugate()  # there's a conjugate convention difference
-		# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
-		# data[pol] = (data[pol].flatten() * jansky2kelvin)#.conjugate()  # there's a conjugate convention difference
+	# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
+	# data[pol] = (data[pol].flatten() * jansky2kelvin)#.conjugate()  # there's a conjugate convention difference
 	data_shape[pol] = (nUBL_used, nt_used)
 	ubl_sort[p] = np.argsort(la.norm(used_common_ubls, axis=1))
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024)
@@ -2559,7 +2648,7 @@ if Erase:
 	# del(cdflags_dred_mfreq)
 	except:
 		pass
-
+	
 	# cwgts = copy.deepcopy(wgts)
 	# cwgts_dred = copy.deepcopy(wgts_dred)
 	
@@ -2663,7 +2752,7 @@ for cal_index in range(1):
 		n_usedants = np.unique(used_antpairs)
 	#####2. re-phasing and crosstalk#######
 	additive_A = np.zeros((nUBL_used, 2, nt_used, 1 + 4 * nUBL_used)).astype('complex128')
-
+	
 	# put in autocorr regardless of whats saved on disk
 	for p in range(2):
 		additive_A[:, p, :, 0] = fullsim_vis[:, p]
@@ -2779,7 +2868,7 @@ if plot_data_error:
 		#				plt.ylim([-1.05*data_range, 1.05*data_range])
 		#			plt.savefig(script_dir + '/../Output/%s-dipole-precal_data_error-fullvis-%s-%.2f-bnside-%s-nside_standard-%s.pdf'%(INSTRUMENT, ['xx','yy'][p], beam_freqs[ind], bnside, nside_standard))
 		#			plt.show(block=False)
-
+		
 		# plt.figure(500+10*p)
 		# plt.subplots_adjust(hspace=1.2,wspace=0.7)
 		for nu, u in enumerate(us):
@@ -2802,10 +2891,10 @@ if plot_data_error:
 				plt.legend(handles=[figure[1], figure[2], figure[3], figure[4]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise'], loc=0)
 			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-precal_data_error-Full_vis-%s-%.2f-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[u, 0], used_common_ubls[u, 1], ['xx', 'yy'][p], freq, bnside, nside_standard))
 			plt.show(block=False)
-	
-	# plt.gcf().clear()
-	# plt.clf()
-	# plt.close()
+
+# plt.gcf().clear()
+# plt.clf()
+# plt.close()
 
 Del = True
 if Del:
@@ -2923,7 +3012,7 @@ if plot_pixelization:
 					 nest=True)
 		plt.savefig(script_dir + '/../Output/stds-beam_weight_GSM-%s-%s-dipole-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard))
 		plt.show(block=False)
-	# plt.gcf().clear()
+# plt.gcf().clear()
 
 sys.stdout.flush()
 
@@ -3088,8 +3177,8 @@ if plot_data_error:
 				plt.legend(handles=[figure_D[1], figure_D[2], figure_D[3], figure_D[4]], labels=['calibrated_data', 'fullsim_vis', 'dynsim_vis', 'noise'], loc=0)
 			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-precal_data_error-Dynamic_Vis-%s-%.2f-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[u, 0], used_common_ubls[u, 1], ['xx', 'yy'][p], freq, bnside, nside_standard))
 			plt.show(block=False)
-		# plt.clf()
-		# plt.gcf().clear()
+	# plt.clf()
+	# plt.gcf().clear()
 	print "total deviation between dynamic and full sim compared to sim: ", la.norm(fullsim_vis - cdynamicmodel) / la.norm(fullsim_vis)
 	print "total deviation between dynamic and full sim compared to data noise: ", la.norm(fullsim_vis - cdynamicmodel) / np.sum(Ni ** -1) ** .5
 	
@@ -3187,6 +3276,30 @@ else:
 		I_supress = 2.5 * 1.e10
 	elif 'min10I' in S_type:
 		I_supress = 2.5 * 1.e11
+	elif 'min11I' in S_type:
+		I_supress = 2.5 * 1.e12
+	elif 'min12I' in S_type:
+		I_supress = 2.5 * 1.e13
+	elif 'min13I' in S_type:
+		I_supress = 2.5 * 1.e14
+	elif 'min14I' in S_type:
+		I_supress = 2.5 * 1.e15
+	elif 'min15I' in S_type:
+		I_supress = 2.5 * 1.e16
+	elif 'min16I' in S_type:
+		I_supress = 2.5 * 1.e17
+	elif 'min17I' in S_type:
+		I_supress = 2.5 * 1.e18
+	elif 'min18I' in S_type:
+		I_supress = 2.5 * 1.e19
+	elif 'min19I' in S_type:
+		I_supress = 2.5 * 1.e20
+	elif 'min20I' in S_type:
+		I_supress = 2.5 * 1.e21
+	elif 'min21I' in S_type:
+		I_supress = 2.5 * 1.e22
+	elif 'min22I' in S_type:
+		I_supress = 2.5 * 1.e23
 	elif 'maxI' in S_type:
 		I_supress = 2.5 * 1.e-1
 	elif 'ma2I' in S_type:
@@ -3586,7 +3699,7 @@ sys.stdout.flush()
 
 # S_type = 'none'
 # point spread function:
-if True and S_type == 'none':
+if True:    # and S_type == 'none':
 	print "Reading Regularized AtNiAi...",
 	sys.stdout.flush()
 	AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
@@ -3640,7 +3753,7 @@ if True and S_type == 'none':
 				plt.figure(1300 + iplot)
 				# hpv.mollview(np.log10(np.abs(spreaded)), min=-3, max=0, nest=True, coord='CG', title='FWHM = %.3f'%((fwhm_theta*fwhm_phi)**.5*180./PI), sub=(len(choose_plots), 1, choose_plots.index(iplot)+1))
 				hpv.mollview(np.log10(np.abs(spreaded)), min=-4, nest=True, coord='CG', title='FWHM = %.3f' % ((fwhm_theta * fwhm_phi) ** .5 * 180. / PI))
-				plt.savefig(script_dir + '/../Output/spreaded_function-CG-%s-%s-%s-dipole-bnside-%s-nside_standard-%s.png' % (INSTRUMENT, iplot, freq, bnside, nside_standard))
+				plt.savefig(script_dir + '/../Output/spreaded_function-CG-%s-%s-%s-dipole-bnside-%s-nside_standard-%s-%s-%s.png'%(INSTRUMENT, iplot, freq, bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
 				plt.show(block=False)
 			# plt.gcf().clear()
 			iplot += 1
