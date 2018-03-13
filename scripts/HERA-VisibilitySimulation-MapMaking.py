@@ -265,7 +265,7 @@ plot_data_error = True and not AtNiA_only
 
 force_recompute = False
 force_recompute_AtNiAi_eig = False
-force_recompute_AtNiAi = False
+force_recompute_AtNiAi = True
 force_recompute_S = False
 force_recompute_SEi = False
 
@@ -427,8 +427,8 @@ elif INSTRUMENT == 'hera47':
 	
 	Erase = True
 	
-	Add_S_diag = True
-	Add_Rcond = False
+	Add_S_diag = False
+	Add_Rcond = True
 	
 	sys.stdout.flush()
 	
@@ -439,7 +439,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min22I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-9., -2., 1.)
+	rcond_list = 10. ** np.arange(-2., -2., 1.)
 
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
