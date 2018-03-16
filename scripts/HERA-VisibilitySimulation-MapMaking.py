@@ -767,7 +767,7 @@ elif INSTRUMENT == 'hera47':
 					# key[2] = 'xx' if i == 0 else 'yy'
 					data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]  # if i == 0 else uvd_yy.get_data((key[0], key[1]))[:, findex_list[i]]
 					autocorr_data_mfreq_ff[i] = autocorr_data_mfreq[i][:, findex_list[i]]
-					dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]
+					dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]
 			
 			# del data_ff[dflags[i].keys()[id_key]]
 			
