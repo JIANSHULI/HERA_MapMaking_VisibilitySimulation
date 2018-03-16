@@ -746,18 +746,17 @@ elif INSTRUMENT == 'hera47':
 			data_full = {}
 			dflags_full = {}
 			antpos_full = {}
-			ants_full= {}
+			ants_full = {}
 			data_freqs_full = {}
 			
-			
 			for i in range(2):
-				(data[i], dflags[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
+				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
 				data_freqs_full[i] = data_freqs_full[i] / 1.e6
 				findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
 				
 				autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants_full[i][k], ants_full[i][k], ['xx', 'yy'][i]]) for k in range(len(ants_full[i]))]), axis=0)
-				#autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
-				
+			# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
+			
 			data_ff = {}
 			dflags_ff = {}
 			findex = np.where(data_freqs_full[0] == 150)
@@ -766,12 +765,12 @@ elif INSTRUMENT == 'hera47':
 				dflags_ff[i] = LastUpdatedOrderedDict()
 				for id_key, key in enumerate(dflags[i].keys()):
 					# key[2] = 'xx' if i == 0 else 'yy'
-					data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = data[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]] #if i == 0 else uvd_yy.get_data((key[0], key[1]))[:, findex_list[i]]
+					data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]  # if i == 0 else uvd_yy.get_data((key[0], key[1]))[:, findex_list[i]]
 					autocorr_data_mfreq_ff[i] = autocorr_data_mfreq[i][:, findex_list[i]]
 					dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]
-					
+			
 			# del data_ff[dflags[i].keys()[id_key]]
-	
+			
 			data = copy.deepcopy(data_ff)
 			dflags = copy.deepcopy(dflags_ff)
 			autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
@@ -779,6 +778,8 @@ elif INSTRUMENT == 'hera47':
 			del (data_ff)
 			del (dflags_ff)
 			del (autocorr_data_mfreq_ff)
+			del (data_full)
+			del (dflags_full)
 	
 	else:
 		if Model_Calibration:
