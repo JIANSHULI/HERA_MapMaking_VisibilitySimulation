@@ -610,7 +610,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Data_Deteriorate =  False
 	
-	Time_Expansion_Factor = 60. if Use_SimulatedData else 1.
+	Time_Expansion_Factor = 73. if Use_SimulatedData else 1.
 	
 	sys.stdout.flush()
 	
@@ -621,7 +621,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-3., -1., 1.)
+	rcond_list = 10. ** np.arange(-7., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -632,8 +632,8 @@ elif INSTRUMENT == 'hera47':
 	thresh = 2  # .2#2.#.03125#
 	valid_pix_thresh = 1.e-4
 	nside_start = 32 # starting point to calculate dynamic A
-	nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
-	nside_beamweight = 64  # undynamic A matrix shape
+	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+	nside_beamweight = 32  # undynamic A matrix shape
 	bnside = 64  # beam pattern data resolution
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
@@ -683,7 +683,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(2, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(1, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	flist = {}
 	index_freq = {}
@@ -1185,7 +1185,9 @@ elif INSTRUMENT == 'hera47':
 	else:
 		tlist = np.arange(tlist[0], tlist[0] + (tlist[-1] - tlist[0]) * (Time_Expansion_Factor + 1), (tlist[-1] - tlist[0]) * Time_Expansion_Factor/(len(tlist)-1))[tmask]
 		lsts = data_lsts[0] * LST_Renorm
-		lsts = np.arange(lsts[0], lsts[0] + (lsts[-1] - lsts[0]) * (Time_Expansion_Factor + 1), (lsts[-1] - lsts[0]) * Time_Expansion_Factor/(len(lsts)-1))[tmask]
+		for j in range(len(lsts)):
+			lsts[j] = lsts[0] + (lsts[j] - lsts[0]) * Time_Expansion_Factor
+		#lsts = np.arange(lsts[0], lsts[0] + (lsts[-1] - lsts[0]) * (Time_Expansion_Factor + 1), (lsts[-1] - lsts[0]) * Time_Expansion_Factor/(len(lsts)-1))[tmask]
 	nt_used = len(tlist)
 	nf_used = len(flist[0])
 	jansky2kelvin = 1.e-26 * (C / freq) ** 2 / 2 / kB / (4 * PI / (12 * nside_standard ** 2))
