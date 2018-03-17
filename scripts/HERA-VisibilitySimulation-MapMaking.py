@@ -605,12 +605,16 @@ elif INSTRUMENT == 'hera47':
 	Add_S_diag = False
 	Add_Rcond = True
 	
-	Small_ModelData = True
+	Small_ModelData = False
 	Model_Calibration = False
 	
 	Data_Deteriorate =  False
 	
 	Time_Expansion_Factor = 73. if Use_SimulatedData else 1.
+	
+	Compress_Average = True
+	Time_Average = 6
+	Frequency_Average = 16
 	
 	sys.stdout.flush()
 	
@@ -621,7 +625,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-7., -1., 1.)
+	rcond_list = 10. ** np.arange(-15., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -802,14 +806,59 @@ elif INSTRUMENT == 'hera47':
 			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
 			# data_freqs[i] = data_freqs[i] / 1.e6
 			autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants[i][k], ants[i][k], ['xx', 'yy'][i]]) for k in range(len(ants[i]))]), axis=0)
-		
+
+	
+	if Compress_Average:
+		data_ff = {}
+		dflags_ff = {}
+		autocorr_data_mfreq_ff = {}
+		data_freqs_ff = {}
+		data_times_ff = {}
+		data_lsts_ff = {}
 		for i in range(2):
-			flist[i] = np.array(data_freqs[i]) / 10 ** 6
-			try:
-				index_freq[i] = np.where(flist[i] == 150)[0][0]
-			#		index_freq = 512
-			except:
-				index_freq[i] = len(flist[i]) / 2
+			data_ff[i] = LastUpdatedOrderedDict()
+			dflags_ff[i] = LastUpdatedOrderedDict()
+			autocorr_data_mfreq_ff[i] = LastUpdatedOrderedDict()
+			data_freqs_ff[i] = LastUpdatedOrderedDict()
+			data_times_ff[i] = LastUpdatedOrderedDict()
+			data_lsts_ff[i] = LastUpdatedOrderedDict()
+			
+			for id_key, key in enumerate(data[i].keys()):
+				data_ff[i][key] = np.mean(data[i][key].reshape(Time_Average, data[i][key].shape[0] / Time_Average, data[i][key].shape[1]), axis=0)
+				data_ff[i][key] = np.mean(data_ff[i][key].reshape(data[i][key].shape[0] / Time_Average, data[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+				
+				autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(Time_Average, data[i][key].shape[0] / Time_Average, data[i][key].shape[1]), axis=0)
+				autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(data[i][key].shape[0] / Time_Average, data[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+				
+				dflags_ff[i][key] = np.mean(dflags[i][key].reshape(Time_Average, dflags[i][key].shape[0] / Time_Average, dflags[i][key].shape[1]), axis=0)
+				dflags_ff[i][key] = np.mean(dflags_ff[i][key].reshape(dflags[i][key].shape[0] / Time_Average, dflags[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0
+				
+				data_freqs_ff[i] = data_freqs[i].reshape(len(data_freqs[i]) / Frequency_Average, Frequency_Average)[:, 0]
+				data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+				data_lsts_ff[i] = data_lsts[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+		
+		data = copy.deepcopy(data_ff)
+		dflags = copy.deepcopy(dflags_ff)
+		autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
+		dflags = copy.deepcopy(dflags_ff)
+		data_freqs = copy.deepcopy(data_freqs_ff)
+		data_times = copy.deepcopy(data_times_ff)
+		data_lsts = copy.deepcopy(data_lsts_ff)
+		
+		del (data_ff)
+		del (dflags_ff)
+		del (autocorr_data_mfreq_ff)
+		del (data_freqs_ff)
+		del (data_times_ff)
+		del (data_lsts_ff)
+	
+	for i in range(2):
+		flist[i] = np.array(data_freqs[i]) / 10 ** 6
+		try:
+			index_freq[i] = np.where(flist[i] == 150)[0][0]
+		#		index_freq = 512
+		except:
+			index_freq[i] = len(flist[i]) / 2
 	
 	if Data_Deteriorate:
 		autocorr_data_mfreq[0] = np.random.uniform(0, np.max(autocorr_data_mfreq[0]), autocorr_data_mfreq[0].shape)
@@ -819,6 +868,8 @@ elif INSTRUMENT == 'hera47':
 	
 	for i in range(2):
 		autocorr_data[i] = autocorr_data_mfreq[i][:, index_freq[i]]
+	
+	#tempt = data[0][37, 65, 'xx'].reshape(6, 20, 64)
 	
 	################# Select Frequency ####################
 	# flist = {}
