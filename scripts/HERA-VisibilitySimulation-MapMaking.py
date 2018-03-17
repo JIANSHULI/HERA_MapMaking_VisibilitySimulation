@@ -574,7 +574,7 @@ if INSTRUMENT == 'miteor':
 
 elif INSTRUMENT == 'hera47':
 	Simulation = True
-	Use_SimulatedData = True
+	Use_SimulatedData = False
 	Use_Simulation_noise = True
 	From_File_Data = True
 	Keep_Red = False
@@ -605,7 +605,7 @@ elif INSTRUMENT == 'hera47':
 	Add_S_diag = False
 	Add_Rcond = True
 	
-	Small_ModelData = False
+	Small_ModelData = True
 	Model_Calibration = False
 	
 	Data_Deteriorate =  False
@@ -613,8 +613,8 @@ elif INSTRUMENT == 'hera47':
 	Time_Expansion_Factor = 73. if Use_SimulatedData else 1.
 	
 	Compress_Average = True
-	Time_Average = 6
-	Frequency_Average = 16
+	Time_Average = 12
+	Frequency_Average = 16 if not Small_ModelData else 1
 	
 	sys.stdout.flush()
 	
@@ -687,7 +687,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(1, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(73, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	flist = {}
 	index_freq = {}
