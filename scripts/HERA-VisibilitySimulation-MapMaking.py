@@ -595,7 +595,7 @@ if INSTRUMENT == 'miteor':
 
 elif INSTRUMENT == 'hera47':
 	Simulation = True
-	Use_SimulatedData = True
+	Use_SimulatedData = False
 	Use_Simulation_noise = True
 	From_File_Data = True
 	Keep_Red = False
@@ -630,7 +630,7 @@ elif INSTRUMENT == 'hera47':
 	Add_S_diag = False
 	Add_Rcond = True
 	
-	Small_ModelData = False
+	Small_ModelData = True
 	Model_Calibration = False
 	
 	Data_Deteriorate = False
@@ -641,8 +641,8 @@ elif INSTRUMENT == 'hera47':
 	Compress_Average = True
 	Time_Average = 12
 	Frequency_Average = 16 if not Small_ModelData else 1
-	Mocal_time_bin_temp = 600
-	Mocal_freq_bin_temp = 600
+	Mocal_time_bin_temp = 30 #30; 600; (362)
+	Mocal_freq_bin_temp = 22 #600; 32; (64)
 	Precal_time_bin_temp = 600
 	
 	sys.stdout.flush()
@@ -654,7 +654,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-40., -1., 1.)
+	rcond_list = 10. ** np.arange(-20., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -716,7 +716,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(73, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(2, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	flist = {}
 	index_freq = {}
@@ -734,12 +734,13 @@ elif INSTRUMENT == 'hera47':
 		print ('Nfiles: %s' % Nfiles)
 	except:
 		pass
-	
-	if Small_ModelData:
-		if Model_Calibration:
-			
-			# model = mflags = mantpos = mant = model_freqs = model_times = model_lsts = model_pols = {}
-			for i in range(2):
+
+	for i in range(2):
+		if Small_ModelData:
+			if Model_Calibration:
+				
+				# model = mflags = mantpos = mant = model_freqs = model_times = model_lsts = model_pols = {}
+				# for i in range(2):
 				model_fname[i] = os.path.join(DATA_PATH, "zen.2458042.12552.%s.HH.uvXA" % ['xx', 'yy'][i])  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
 				# model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
 				if i == 1:
@@ -751,8 +752,8 @@ elif INSTRUMENT == 'hera47':
 						pass
 				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
 				print('model_Pol_%s is done.' % ['xx', 'yy'][i])
-		# specify data file and load into UVData, load into dictionary
-		for i in range(2):
+			# specify data file and load into UVData, load into dictionary
+			# for i in range(2):
 			data_fname[i] = os.path.join(DATA_PATH, "zen.2458043.12552.%s.HH.uvORA" % ['xx', 'yy'][i])  # zen.2457698.40355.xx.HH.uvcA
 			if i == 1:
 				try:
@@ -765,39 +766,42 @@ elif INSTRUMENT == 'hera47':
 			# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
 			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True)
 			print('small_Pol_%s is done.' % ['xx', 'yy'][i])
-		
-		for i in range(2):
+			
+			# for i in range(2):
 			flist[i] = np.array(data_freqs[i]) / 10 ** 6
 			try:
-				index_freq[i] = np.where(flist[i] == 150)[0][0]
+				# index_freq[i] = np.where(flist[i] == 150)[0][0]
+				index_freq[i] = np.abs(150 - flist[i]).argmin()
 			#		index_freq = 512
 			except:
 				index_freq[i] = len(flist[i]) / 2
-		
-		if Replace_Data:
 			
-			findex_list = {}
-			autocorr_data_mfreq_ff = {}
-			data_full = {}
-			dflags_full = {}
-			antpos_full = {}
-			ants_full = {}
-			data_freqs_full = {}
-			
-			for i in range(2):
+			if Replace_Data:
+				if i == 0:
+					findex_list = {}
+					autocorr_data_mfreq_ff = {}
+					data_full = {}
+					dflags_full = {}
+					antpos_full = {}
+					ants_full = {}
+					data_freqs_full = {}
+					
+					data_ff = {}
+					dflags_ff = {}
+					
+				# for i in range(2):
 				timer = time.time()
 				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
 				data_freqs_full[i] = data_freqs_full[i] / 1.e6
-				findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
+				# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
+				findex_list[i] = np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))])
 				
 				autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants_full[i][k], ants_full[i][k], ['xx', 'yy'][i]]) for k in range(len(ants_full[i]))]), axis=0)
 				print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
-			# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
-			
-			data_ff = {}
-			dflags_ff = {}
-			findex = np.where(data_freqs_full[0] == 150)
-			for i in range(2):
+				# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
+				
+				findex = np.where(data_freqs_full[i] == 150)
+				# for i in range(2):
 				timer = time.time()
 				data_ff[i] = LastUpdatedOrderedDict()
 				dflags_ff[i] = LastUpdatedOrderedDict()
@@ -828,22 +832,22 @@ elif INSTRUMENT == 'hera47':
 				# dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]
 				# dflags_full[i].__delitem__((key[0], key[1], 'xx' if i == 0 else 'yy'))
 				print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
-			# del data_ff[dflags[i].keys()[id_key]]
-			
-			data = copy.deepcopy(data_ff)
-			dflags = copy.deepcopy(dflags_ff)
-			autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
-			
-			del (data_ff)
-			del (dflags_ff)
-			del (autocorr_data_mfreq_ff)
-			del (data_full)
-			del (dflags_full)
-	
-	else:
-		if Model_Calibration:
-			
-			for i in range(2):
+				# del data_ff[dflags[i].keys()[id_key]]
+				
+				data[i] = copy.deepcopy(data_ff[i])
+				dflags[i] = copy.deepcopy(dflags_ff[i])
+				autocorr_data_mfreq[i] = copy.deepcopy(autocorr_data_mfreq_ff[i])
+				
+				del (data_ff[i])
+				del (dflags_ff[i])
+				del (autocorr_data_mfreq_ff[i])
+				del (data_full[i])
+				del (dflags_full[i])
+		
+		else:
+			if Model_Calibration:
+				
+				# for i in range(2):
 				model_fname[i] = "/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/ObservingSession-1192115507/2458042/zen.2458042.12552.%s.HH.uv" % ['xx', 'yy'][i]  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
 				# model_fname[i] = os.path.join(DATA_PATH, 'Observation-1192114862/2458042/zen.2458042.12552.%s.HH.uv' % ['xx', 'yy'][i])
 				# model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
@@ -852,9 +856,9 @@ elif INSTRUMENT == 'hera47':
 				# (model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i]) = hc.abscal.UVData2AbsCalDict(model_fname[i], return_meta=True)
 				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
 				print('model_Pol_%s is done.' % ['xx', 'yy'][i])
-		# specify data file and load into UVData, load into dictionary
-		
-		for i in range(2):
+			# specify data file and load into UVData, load into dictionary
+			
+			# for i in range(2):
 			timer = time.time()
 			# data_fname[i] = os.path.join(DATA_PATH, 'Observation-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
 			# data_fname[i] = '/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192287662/2458043/zen.2458043.12552.%s.HH.uvOR'%['xx', 'yy'][i]
@@ -863,35 +867,37 @@ elif INSTRUMENT == 'hera47':
 			# data_freqs[i] = data_freqs[i] / 1.e6
 			autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants[i][k], ants[i][k], ['xx', 'yy'][i]]) for k in range(len(ants[i]))]), axis=0)
 			print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
-	
-	if Lst_Hourangle:
-		for i in range(2):
+		
+		if Lst_Hourangle:
+			# for i in range(2):
 			data_lsts[i] = set_lsts_from_time_array_hourangle(data_times[i])
-	
-	if Compress_Average:
-		if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
-			if (data[0][data[0].keys()[0]].shape[0] / Time_Average) < 1.:
-				Time_Average = 1
-		if np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average) != 0:
-			if (data[0][data[0].keys()[0]].shape[1] / Frequency_Average) < 1.:
-				Frequency_Average = 1
 		
-		remove_times = np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average)
-		remove_freqs = np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average)
-		if remove_times == 0:
-			remove_times = -data[0][data[0].keys()[0]].shape[0]
-		if remove_freqs == 0:
-			remove_freqs = -data[0][data[0].keys()[0]].shape[1]
-		print ('Time_Average: %s; Frequency_Average: %s.' % (Time_Average, Frequency_Average))
-		print ('Remove_Times: %s; Remove_Freqs: %s.' % (remove_times, remove_freqs))
-		
-		data_ff = {}
-		dflags_ff = {}
-		autocorr_data_mfreq_ff = {}
-		data_freqs_ff = {}
-		data_times_ff = {}
-		data_lsts_ff = {}
-		for i in range(2):
+		if Compress_Average:
+			if i == 0:
+				if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
+					if (data[0][data[0].keys()[0]].shape[0] / Time_Average) < 1.:
+						Time_Average = 1
+				if np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average) != 0:
+					if (data[0][data[0].keys()[0]].shape[1] / Frequency_Average) < 1.:
+						Frequency_Average = 1
+			
+				remove_times = np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average)
+				remove_freqs = np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average)
+				if remove_times == 0:
+					remove_times = -data[0][data[0].keys()[0]].shape[0]
+				if remove_freqs == 0:
+					remove_freqs = -data[0][data[0].keys()[0]].shape[1]
+				print ('Time_Average: %s; Frequency_Average: %s.' % (Time_Average, Frequency_Average))
+				print ('Remove_Times: %s; Remove_Freqs: %s.' % (remove_times, remove_freqs))
+			
+				data_ff = {}
+				dflags_ff = {}
+				autocorr_data_mfreq_ff = {}
+				data_freqs_ff = {}
+				data_times_ff = {}
+				data_lsts_ff = {}
+				
+			# for i in range(2):
 			timer = time.time()
 			data_ff[i] = LastUpdatedOrderedDict()
 			dflags_ff[i] = LastUpdatedOrderedDict()
@@ -948,34 +954,272 @@ elif INSTRUMENT == 'hera47':
 			# data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
 			# data_lsts_ff[i] = data_lsts[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
 			print('compress_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
-		
-		data = copy.deepcopy(data_ff)
-		dflags = copy.deepcopy(dflags_ff)
-		autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
-		dflags = copy.deepcopy(dflags_ff)
-		data_freqs = copy.deepcopy(data_freqs_ff)
-		data_times = copy.deepcopy(data_times_ff)
-		data_lsts = copy.deepcopy(data_lsts_ff)
-		
-		del (data_ff)
-		del (dflags_ff)
-		del (autocorr_data_mfreq_ff)
-		del (data_freqs_ff)
-		del (data_times_ff)
-		del (data_lsts_ff)
-		
-		print ('Data_Shape-%s: %s' % (key, data[i][key].shape))
-		print ('Dflags_Shape-%s: %s' % (key, dflags[i][key].shape))
-		print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
-		print ('Data_Freqs: %s' % (len(data_freqs[i])))
-		print ('Data_Times: %s' % (len(data_times[i])))
-		print ('Data_Lsts: %s' % (len(data_lsts[i])))
+			
+			data[i] = copy.deepcopy(data_ff[i])
+			dflags[i] = copy.deepcopy(dflags_ff[i])
+			autocorr_data_mfreq[i] = copy.deepcopy(autocorr_data_mfreq_ff[i])
+			dflags[i] = copy.deepcopy(dflags_ff[i])
+			data_freqs[i] = copy.deepcopy(data_freqs_ff[i])
+			data_times[i] = copy.deepcopy(data_times_ff[i])
+			data_lsts[i] = copy.deepcopy(data_lsts_ff[i])
+			
+			del (data_ff[i])
+			del (dflags_ff[i])
+			del (autocorr_data_mfreq_ff[i])
+			del (data_freqs_ff[i])
+			del (data_times_ff[i])
+			del (data_lsts_ff[i])
+			
+			print ('Data_Shape-%s: %s' % (key, data[i][key].shape))
+			print ('Dflags_Shape-%s: %s' % (key, dflags[i][key].shape))
+			print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+			print ('Data_Freqs: %s' % (len(data_freqs[i])))
+			print ('Data_Times: %s' % (len(data_times[i])))
+			print ('Data_Lsts: %s' % (len(data_lsts[i])))
+
+	
+	# if Small_ModelData:
+	# 	if Model_Calibration:
+	#
+	# 		# model = mflags = mantpos = mant = model_freqs = model_times = model_lsts = model_pols = {}
+	# 		for i in range(2):
+	# 			model_fname[i] = os.path.join(DATA_PATH, "zen.2458042.12552.%s.HH.uvXA" % ['xx', 'yy'][i])  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
+	# 			# model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
+	# 			if i == 1:
+	# 				try:
+	# 					# data_fname[1] = os.path.join(DATA_PATH, "zen.2458043.12552.yy.HH.uvORA") #zen.2457698.40355.yy.HH.uvcA
+	# 					if not os.path.isfile(model_fname[i]):
+	# 						model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA")
+	# 				except:
+	# 					pass
+	# 			(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
+	# 			print('model_Pol_%s is done.' % ['xx', 'yy'][i])
+	# 	# specify data file and load into UVData, load into dictionary
+	# 	for i in range(2):
+	# 		data_fname[i] = os.path.join(DATA_PATH, "zen.2458043.12552.%s.HH.uvORA" % ['xx', 'yy'][i])  # zen.2457698.40355.xx.HH.uvcA
+	# 		if i == 1:
+	# 			try:
+	# 				# data_fname[1] = os.path.join(DATA_PATH, "zen.2458043.12552.yy.HH.uvORA") #zen.2457698.40355.yy.HH.uvcA
+	# 				if not os.path.isfile(data_fname[i]):
+	# 					data_fname[1] = os.path.join(DATA_PATH, "zen.2458043.12552.xx.HH.uvORA")
+	# 			except:
+	# 				pass
+	# 		data_fname_full[i] = os.path.join(DATA_PATH, 'ObservingSession-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
+	# 		# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
+	# 		(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True)
+	# 		print('small_Pol_%s is done.' % ['xx', 'yy'][i])
+	#
+	# 	for i in range(2):
+	# 		flist[i] = np.array(data_freqs[i]) / 10 ** 6
+	# 		try:
+	# 			index_freq[i] = np.where(flist[i] == 150)[0][0]
+	# 		#		index_freq = 512
+	# 		except:
+	# 			index_freq[i] = len(flist[i]) / 2
+	#
+	# 	if Replace_Data:
+	#
+	# 		findex_list = {}
+	# 		autocorr_data_mfreq_ff = {}
+	# 		data_full = {}
+	# 		dflags_full = {}
+	# 		antpos_full = {}
+	# 		ants_full = {}
+	# 		data_freqs_full = {}
+	#
+	# 		for i in range(2):
+	# 			timer = time.time()
+	# 			(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
+	# 			data_freqs_full[i] = data_freqs_full[i] / 1.e6
+	# 			findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
+	#
+	# 			autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants_full[i][k], ants_full[i][k], ['xx', 'yy'][i]]) for k in range(len(ants_full[i]))]), axis=0)
+	# 			print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
+	# 		# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
+	#
+	# 		data_ff = {}
+	# 		dflags_ff = {}
+	# 		findex = np.where(data_freqs_full[0] == 150)
+	# 		for i in range(2):
+	# 			timer = time.time()
+	# 			data_ff[i] = LastUpdatedOrderedDict()
+	# 			dflags_ff[i] = LastUpdatedOrderedDict()
+	# 			autocorr_data_mfreq_ff[i] = np.zeros(autocorr_data_mfreq[i][:, findex_list[i]].shape)
+	#
+	# 			for id_f in range(len(findex_list[i])):
+	# 				# autocorr_data_mfreq_ff[i] = autocorr_data_mfreq[i][:, findex_list[i]]
+	# 				if id_f <= (len(findex_list[i]) - 2):
+	# 					autocorr_data_mfreq_ff[i][:, id_f] = np.mean(autocorr_data_mfreq[i][:, findex_list[i][id_f]: findex_list[i][id_f + 1]], axis=-1)
+	# 				else:
+	# 					autocorr_data_mfreq_ff[i][:, id_f] = np.mean(autocorr_data_mfreq[i][:, findex_list[i][id_f]:], axis=-1)
+	#
+	# 			for id_key, key in enumerate(dflags[i].keys()):
+	# 				data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = np.zeros(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]].shape)
+	# 				dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = np.zeros(dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]].shape)
+	# 				for id_f in range(len(findex_list[i])):
+	# 					if id_f <= (len(findex_list[i]) - 2):
+	# 						data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, id_f] = np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]: findex_list[i][id_f + 1]], axis=-1)
+	# 						dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, id_f] = np.mean(dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]: findex_list[i][id_f + 1]], axis=-1) > 0
+	# 					else:
+	# 						data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, id_f] = np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]:], axis=-1)
+	# 						dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, id_f] = np.mean(dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]:], axis=-1)
+	# 			# data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = np.array([np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]: findex_list[i][id_f+1] if id_f <= len(findex_list[i] - 2) else None], axis = -1) if id_f <= len(findex_list[i] - 2) else np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]:], axis = -1)  for id_f in range(len(findex_list[i]))])
+	# 			# key[2] = 'xx' if i == 0 else 'yy'
+	# 			# data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]  # if i == 0 else uvd_yy.get_data((key[0], key[1]))[:, findex_list[i]]
+	# 			# data_full[i].__delitem__((key[0], key[1], 'xx' if i == 0 else 'yy'))
+	#
+	# 			# dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]
+	# 			# dflags_full[i].__delitem__((key[0], key[1], 'xx' if i == 0 else 'yy'))
+	# 			print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
+	# 		# del data_ff[dflags[i].keys()[id_key]]
+	#
+	# 		data = copy.deepcopy(data_ff)
+	# 		dflags = copy.deepcopy(dflags_ff)
+	# 		autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
+	#
+	# 		del (data_ff)
+	# 		del (dflags_ff)
+	# 		del (autocorr_data_mfreq_ff)
+	# 		del (data_full)
+	# 		del (dflags_full)
+	#
+	# else:
+	# 	if Model_Calibration:
+	#
+	# 		for i in range(2):
+	# 			model_fname[i] = "/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/ObservingSession-1192115507/2458042/zen.2458042.12552.%s.HH.uv" % ['xx', 'yy'][i]  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
+	# 			# model_fname[i] = os.path.join(DATA_PATH, 'Observation-1192114862/2458042/zen.2458042.12552.%s.HH.uv' % ['xx', 'yy'][i])
+	# 			# model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
+	# 			#				(model_dred[i], mflags_dred[i], mantpos_dred[i], mants_dred[i], model_freqs_dred[i], model_times_dred[i], model_lsts_dred[i],
+	# 			#				 model_pols_dred[i]) = hc.abscal.UVData2AbsCalDict(model_fname_dred[i], return_meta=True)
+	# 			# (model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i]) = hc.abscal.UVData2AbsCalDict(model_fname[i], return_meta=True)
+	# 			(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
+	# 			print('model_Pol_%s is done.' % ['xx', 'yy'][i])
+	# 	# specify data file and load into UVData, load into dictionary
+	#
+	# 	for i in range(2):
+	# 		timer = time.time()
+	# 		# data_fname[i] = os.path.join(DATA_PATH, 'Observation-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
+	# 		# data_fname[i] = '/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192287662/2458043/zen.2458043.12552.%s.HH.uvOR'%['xx', 'yy'][i]
+	# 		# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
+	# 		(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
+	# 		# data_freqs[i] = data_freqs[i] / 1.e6
+	# 		autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants[i][k], ants[i][k], ['xx', 'yy'][i]]) for k in range(len(ants[i]))]), axis=0)
+	# 		print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
+	#
+	# if Lst_Hourangle:
+	# 	for i in range(2):
+	# 		data_lsts[i] = set_lsts_from_time_array_hourangle(data_times[i])
+	#
+	# if Compress_Average:
+	# 	if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
+	# 		if (data[0][data[0].keys()[0]].shape[0] / Time_Average) < 1.:
+	# 			Time_Average = 1
+	# 	if np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average) != 0:
+	# 		if (data[0][data[0].keys()[0]].shape[1] / Frequency_Average) < 1.:
+	# 			Frequency_Average = 1
+	#
+	# 	remove_times = np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average)
+	# 	remove_freqs = np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average)
+	# 	if remove_times == 0:
+	# 		remove_times = -data[0][data[0].keys()[0]].shape[0]
+	# 	if remove_freqs == 0:
+	# 		remove_freqs = -data[0][data[0].keys()[0]].shape[1]
+	# 	print ('Time_Average: %s; Frequency_Average: %s.' % (Time_Average, Frequency_Average))
+	# 	print ('Remove_Times: %s; Remove_Freqs: %s.' % (remove_times, remove_freqs))
+	#
+	# 	data_ff = {}
+	# 	dflags_ff = {}
+	# 	autocorr_data_mfreq_ff = {}
+	# 	data_freqs_ff = {}
+	# 	data_times_ff = {}
+	# 	data_lsts_ff = {}
+	# 	for i in range(2):
+	# 		timer = time.time()
+	# 		data_ff[i] = LastUpdatedOrderedDict()
+	# 		dflags_ff[i] = LastUpdatedOrderedDict()
+	# 		# autocorr_data_mfreq_ff[i] = LastUpdatedOrderedDict()
+	# 		# data_freqs_ff[i] = LastUpdatedOrderedDict()
+	# 		# data_times_ff[i] = LastUpdatedOrderedDict()
+	# 		# data_lsts_ff[i] = LastUpdatedOrderedDict()
+	#
+	# 		autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
+	# 		data_freqs[i] = data_freqs[i][: -remove_freqs]
+	# 		data_times[i] = data_times[i][: -remove_times]
+	# 		data_lsts[i] = data_lsts[i][: -remove_times]
+	#
+	# 		autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, Time_Average, autocorr_data_mfreq[i].shape[1]), axis=1)
+	# 		autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+	#
+	# 		data_freqs_ff[i] = data_freqs[i].reshape(len(data_freqs[i]) / Frequency_Average, Frequency_Average)[:, 0]
+	# 		data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+	# 		data_lsts_ff[i] = data_lsts[i].reshape(len(data_lsts[i]) / Time_Average, Time_Average)[:, 0]
+	#
+	# 		for id_key, key in enumerate(data[i].keys()):
+	#
+	# 			data[i][key] = data[i][key][: -remove_times, : -remove_freqs]
+	# 			# autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
+	# 			dflags[i][key] = dflags[i][key][: -remove_times, : -remove_freqs]
+	# 			# data_freqs[i] = data_freqs[i][: -remove_freqs]
+	# 			# data_times[i] = data_times[i][: -remove_times]
+	# 			# data_lsts[i] = data_lsts[i][: -remove_times]
+	# 			print ('rawData_Shape-%s: %s' % (key, data[i][key].shape))
+	# 			print ('rawDflags_Shape-%s: %s' % (key, dflags[i][key].shape))
+	# 			print ('rawAutocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+	# 			print ('rawData_Freqs: %s' % (len(data_freqs[i])))
+	# 			print ('rawData_Times: %s' % (len(data_times[i])))
+	# 			print ('rawData_Lsts: %s' % (len(data_lsts[i])))
+	#
+	# 			data_ff[i][key] = np.mean(data[i][key].reshape(data[i][key].shape[0] / Time_Average, Time_Average, data[i][key].shape[1]), axis=1)
+	# 			data_ff[i][key] = np.mean(data_ff[i][key].reshape(data[i][key].shape[0] / Time_Average, data[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+	# 			if Small_ModelData:
+	# 				data[i].pop(key)
+	# 			else:
+	# 				data[i].__delitem__(key)
+	#
+	# 			# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(Time_Average, autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1]), axis=0)
+	# 			# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+	#
+	# 			dflags_ff[i][key] = np.mean(dflags[i][key].reshape(dflags[i][key].shape[0] / Time_Average, Time_Average, dflags[i][key].shape[1]), axis=1)
+	# 			dflags_ff[i][key] = np.mean(dflags_ff[i][key].reshape(dflags[i][key].shape[0] / Time_Average, dflags[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0
+	# 			if Small_ModelData:
+	# 				dflags[i].pop(key)
+	# 			else:
+	# 				dflags[i].__delitem__(key)
+	#
+	# 		# data_freqs_ff[i] = data_freqs[i].reshape(len(data_freqs[i]) / Frequency_Average, Frequency_Average)[:, 0]
+	# 		# data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+	# 		# data_lsts_ff[i] = data_lsts[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+	# 		print('compress_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
+	#
+	# 	data = copy.deepcopy(data_ff)
+	# 	dflags = copy.deepcopy(dflags_ff)
+	# 	autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
+	# 	dflags = copy.deepcopy(dflags_ff)
+	# 	data_freqs = copy.deepcopy(data_freqs_ff)
+	# 	data_times = copy.deepcopy(data_times_ff)
+	# 	data_lsts = copy.deepcopy(data_lsts_ff)
+	#
+	# 	del (data_ff)
+	# 	del (dflags_ff)
+	# 	del (autocorr_data_mfreq_ff)
+	# 	del (data_freqs_ff)
+	# 	del (data_times_ff)
+	# 	del (data_lsts_ff)
+	#
+	# 	print ('Data_Shape-%s: %s' % (key, data[i][key].shape))
+	# 	print ('Dflags_Shape-%s: %s' % (key, dflags[i][key].shape))
+	# 	print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+	# 	print ('Data_Freqs: %s' % (len(data_freqs[i])))
+	# 	print ('Data_Times: %s' % (len(data_times[i])))
+	# 	print ('Data_Lsts: %s' % (len(data_lsts[i])))
 	
 	for i in range(2):
 		flist[i] = np.array(data_freqs[i]) / 10 ** 6
 		try:
-			index_freq[i] = np.where(flist[i] == 150)[0][0]
+			# index_freq[i] = np.where(flist[i] == 150)[0][0]
 		#		index_freq = 512
+			index_freq[i] = np.abs(150 - flist[i]).argmin()
 		except:
 			index_freq[i] = len(flist[i]) / 2
 	
@@ -1993,56 +2237,56 @@ if INSTRUMENT == 'hera47' and (Absolute_Calibration_dred_mfreq or Absolute_Calib
 # 		wgts_dred_mfreq[i][k] = (((~wgts_dred_mfreq[i][k]).astype(np.float) + 1).astype(bool)).astype(np.float)
 
 
-for i in range(2):
-	pol = ['xx', 'yy'][i]
-	re_cal = 0
-	
-	if Absolute_Calibration_dred_mfreq:
-		for re_cal in range(re_cal_times):  # number of times of absolute calibration
-			if re_cal == 0:
-				model_dred_mfreq[i], interp_flags_dred_mfreq[i] = hc.abscal.interp2d_vis(model_dred_mfreq[i], lsts, flist[i], lsts, flist[i])
-				# instantiate class
-				AC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
-				# kernel is median filter kernel, chosen to produce time-smooth output delays for this particular dataset
-				AC_dred_mfreq[i].delay_lincal(kernel=(1, 11), medfilt=True, time_avg=True, solve_offsets=True)
-			else:
-				# model_dred_mfreq[i], interp_flags_dred_mfreq[i] = hc.abscal.interp2d_vis(model_dred_mfreq[i], lsts, flist[i], lsts, flist[i])
-				# instantiate class
-				AC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], abs_corr_data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
-				# kernel is median filter kernel, chosen to produce time-smooth output delays for this particular dataset
-				AC_dred_mfreq[i].delay_lincal(kernel=(1, 3), medfilt=True, time_avg=True, solve_offsets=True)
-			# apply to data
-			delay_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(AC_dred_mfreq[i].data, (AC_dred_mfreq[i].ant_dly_gain))
-			# instantiate class
-			DAC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], delay_corr_data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
-			# avg phase solver
-			DAC_dred_mfreq[i].phs_logcal(avg=True)
-			# apply to data
-			dly_phs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DAC_dred_mfreq[i].data, (DAC_dred_mfreq[i].ant_phi_gain))
-			# instantiate class
-			DPAC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], dly_phs_corr_data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
-			# run amp linsolve
-			DPAC_dred_mfreq[i].abs_amp_logcal()
-			# run phs linsolve
-			DPAC_dred_mfreq[i].TT_phs_logcal(zero_psi=False, four_pol=False)
-			# apply to data
-			abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data,
-																(DPAC_dred_mfreq[i].abs_psi_gain, DPAC_dred_mfreq[i].TT_Phi_gain, DPAC_dred_mfreq[i].abs_eta_gain), gain_convention='multiply')
-		
-		vis_data_dred_mfreq_abscal[i] = np.zeros_like(vis_data_dred_mfreq[i], dtype='complex128')
-		for key_id, key in enumerate(dflags_dred_mfreq[i].keys()):
-			vis_data_dred_mfreq_abscal[i][:, :, key_id] = abs_corr_data_dred_mfreq[i][key].transpose()
-		# vis_data_dred_mfreq_abscal[i][:, :, key_id] = np.real(abs_corr_data_dred_mfreq[i][key].transpose()) + np.abs(np.imag(abs_corr_data_dred_mfreq[i][key].transpose()))*1j
-		if add_Autobsl:
-			autocorr_data_dred_mfreq_abscal[i] = abs_corr_data_dred_mfreq[i][auto_select_dred_mfreq[i]]
-		else:
-			autocorr_data_dred_mfreq_abscal[i] = autocorr_vis_mfreq[i]
-		
-		vis_data_dred_abscal[i] = vis_data_dred_mfreq_abscal[i][index_freq[i], :, :]
-		if add_Autobsl:
-			autocorr_data_dred_abscal[i] = autocorr_data_dred_mfreq_abscal[i][:, index_freq[i]]
-		else:
-			autocorr_data_dred_abscal[i] = autocorr_vis_mfreq[i][:, index_freq[i]]
+# for i in range(2):
+# 	pol = ['xx', 'yy'][i]
+# 	re_cal = 0
+#
+# 	if Absolute_Calibration_dred_mfreq:
+# 		for re_cal in range(re_cal_times):  # number of times of absolute calibration
+# 			if re_cal == 0:
+# 				model_dred_mfreq[i], interp_flags_dred_mfreq[i] = hc.abscal.interp2d_vis(model_dred_mfreq[i], lsts, flist[i], lsts, flist[i])
+# 				# instantiate class
+# 				AC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
+# 				# kernel is median filter kernel, chosen to produce time-smooth output delays for this particular dataset
+# 				AC_dred_mfreq[i].delay_lincal(kernel=(1, 11), medfilt=True, time_avg=True, solve_offsets=True)
+# 			else:
+# 				# model_dred_mfreq[i], interp_flags_dred_mfreq[i] = hc.abscal.interp2d_vis(model_dred_mfreq[i], lsts, flist[i], lsts, flist[i])
+# 				# instantiate class
+# 				AC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], abs_corr_data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
+# 				# kernel is median filter kernel, chosen to produce time-smooth output delays for this particular dataset
+# 				AC_dred_mfreq[i].delay_lincal(kernel=(1, 3), medfilt=True, time_avg=True, solve_offsets=True)
+# 			# apply to data
+# 			delay_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(AC_dred_mfreq[i].data, (AC_dred_mfreq[i].ant_dly_gain))
+# 			# instantiate class
+# 			DAC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], delay_corr_data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
+# 			# avg phase solver
+# 			DAC_dred_mfreq[i].phs_logcal(avg=True)
+# 			# apply to data
+# 			dly_phs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DAC_dred_mfreq[i].data, (DAC_dred_mfreq[i].ant_phi_gain))
+# 			# instantiate class
+# 			DPAC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], dly_phs_corr_data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist[i])
+# 			# run amp linsolve
+# 			DPAC_dred_mfreq[i].abs_amp_logcal()
+# 			# run phs linsolve
+# 			DPAC_dred_mfreq[i].TT_phs_logcal(zero_psi=False, four_pol=False)
+# 			# apply to data
+# 			abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data,
+# 																(DPAC_dred_mfreq[i].abs_psi_gain, DPAC_dred_mfreq[i].TT_Phi_gain, DPAC_dred_mfreq[i].abs_eta_gain), gain_convention='multiply')
+#
+# 		vis_data_dred_mfreq_abscal[i] = np.zeros_like(vis_data_dred_mfreq[i], dtype='complex128')
+# 		for key_id, key in enumerate(dflags_dred_mfreq[i].keys()):
+# 			vis_data_dred_mfreq_abscal[i][:, :, key_id] = abs_corr_data_dred_mfreq[i][key].transpose()
+# 		# vis_data_dred_mfreq_abscal[i][:, :, key_id] = np.real(abs_corr_data_dred_mfreq[i][key].transpose()) + np.abs(np.imag(abs_corr_data_dred_mfreq[i][key].transpose()))*1j
+# 		if add_Autobsl:
+# 			autocorr_data_dred_mfreq_abscal[i] = abs_corr_data_dred_mfreq[i][auto_select_dred_mfreq[i]]
+# 		else:
+# 			autocorr_data_dred_mfreq_abscal[i] = autocorr_vis_mfreq[i]
+#
+# 		vis_data_dred_abscal[i] = vis_data_dred_mfreq_abscal[i][index_freq[i], :, :]
+# 		if add_Autobsl:
+# 			autocorr_data_dred_abscal[i] = autocorr_data_dred_mfreq_abscal[i][:, index_freq[i]]
+# 		else:
+# 			autocorr_data_dred_abscal[i] = autocorr_vis_mfreq[i][:, index_freq[i]]
 
 # vis_data_dred_mfreq_abscal = [[], []]
 # for i in range(2):
@@ -2114,7 +2358,10 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred:
 							DAC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist_binned)
 						else:
 							# instantiate class
-							model_dred_mfreq[i], interp_flags_dred_mfreq[i] = hc.abscal.interp2d_vis(model_dred_mfreq[i], lsts_binned, flist_binned, lsts_binned, flist_binned)
+							try:
+								model_dred_mfreq[i], interp_flags_dred_mfreq[i] = hc.abscal.interp2d_vis(model_dred_mfreq[i], lsts_binned, flist_binned, lsts_binned, flist_binned)
+							except:
+								print('No Interp')
 							AC_dred_mfreq[i] = hc.abscal.AbsCal(model_dred_mfreq[i], data_dred_mfreq[i], antpos=antpos[i], wgts=wgts_dred_mfreq[i], freqs=flist_binned)
 							# kernel is median filter kernel, chosen to produce time-smooth output delays for this particular dataset
 							AC_dred_mfreq[i].delay_lincal(kernel=(1, ((np.min([nf_mocal_used, 11]) - 1) / 2 * 2 + 1)), medfilt=True, time_avg=True, solve_offsets=True)
@@ -2490,6 +2737,44 @@ flux_func['cyg'] = si.interp1d(flist[0], np.array([S_cyga_v(flist[0][i], Decimal
 
 full_thetas, full_phis = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 
+flux_raw_gsm_ps = {}
+flux_gsm_ps = {}
+flux_raw_dis_gsm_ps = {}
+flux_dis_gsm_ps = {}
+pix_index_gsm_ps = {}
+pix_raw_index_gsm_ps = {}
+pix_max_index_gsm_ps = {}
+pt_sources = southern_points.keys()
+for source in pt_sources:
+	flux_raw_gsm_ps[source] = 0
+	flux_gsm_ps[source] = 0
+	flux_raw_dis_gsm_ps[source] = []
+	flux_dis_gsm_ps[source] = []
+	pix_raw_index_gsm_ps[source] = []
+	pix_index_gsm_ps[source] = []
+	# pix_max_index_gsm_ps[source] = []
+	for i in range(len(equatorial_GSM_standard)):
+		if la.norm(np.array([full_phis[i] - southern_points[source]['body']._ra,
+		                     (PI / 2 - full_thetas[i]) - southern_points[source]['body']._dec])) <= 0.1:
+			flux_raw_gsm_ps[source] += equatorial_GSM_standard[i]
+			flux_raw_dis_gsm_ps[source].append(equatorial_GSM_standard[i])
+			pix_raw_index_gsm_ps[source].append(i)
+	
+	pix_max_index_gsm_ps[source] = pix_raw_index_gsm_ps[source][flux_raw_dis_gsm_ps[source].index(np.array(flux_raw_dis_gsm_ps[source]).max())]
+	for j in range(len(flux_raw_dis_gsm_ps[source])):
+		if flux_raw_dis_gsm_ps[source][j] >= 0.4 * equatorial_GSM_standard[pix_max_index_gsm_ps[source]]:
+			flux_gsm_ps[source] += equatorial_GSM_standard[pix_raw_index_gsm_ps[source][j]]
+			flux_dis_gsm_ps[source].append(equatorial_GSM_standard[pix_raw_index_gsm_ps[source][j]])
+			pix_index_gsm_ps[source].append(pix_raw_index_gsm_ps[source][j])
+	
+	print('total flux of %s' % source, flux_gsm_ps[source])
+	print('total raw flux of %s' % source, flux_raw_gsm_ps[source])
+	print('maximum pix flux of %s' % source, equatorial_GSM_standard[pix_max_index_gsm_ps[source]])
+	print('pix-index with maximum flux of %s' % source, pix_max_index_gsm_ps[source])
+	print('raw-pix-indexes of %s' % source, pix_raw_index_gsm_ps[source])
+	print('pix-indexes of %s' % source, pix_index_gsm_ps[source])
+	print('\n')
+
 # pt_sources = ['cyg', 'cas']
 pt_sources = southern_points.keys()
 pt_vis = np.zeros((len(pt_sources), 2, nUBL_used, nt_used), dtype='complex128')
@@ -2519,6 +2804,15 @@ if PointSource_AbsCal:
 	
 	autocorr_data_dred_mfreq_pscal = {}
 	vis_data_dred_mfreq_pscal = {}
+	
+	# flux_raw_gsm_ps = {}
+	# flux_gsm_ps = {}
+	# flux_raw_dis_gsm_ps = {}
+	# flux_dis_gsm_ps = {}
+	# pix_index_gsm_ps = {}
+	# pix_raw_index_gsm_ps = {}
+	# pix_max_index_gsm_ps = {}
+	# pt_sources = southern_points.keys()
 	
 	# PointSource_AbsCal_SingleFreq = True
 	
