@@ -21,6 +21,9 @@ import astropy
 from astropy.io import fits
 import HERA_MapMaking_VisibilitySimulation as mmvs
 from pyuvdata import UVData, UVCal, UVFITS
+from HERA_MapMaking_VisibilitySimulation import UVData as UVData_HR
+from HERA_MapMaking_VisibilitySimulation import UVCal as UVCal_HR
+from HERA_MapMaking_VisibilitySimulation import UVFITS as UVFITS_HR
 import hera_cal as hc
 from hera_cal.data import DATA_PATH
 from collections import OrderedDict as odict
@@ -314,7 +317,8 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 	if type(datanames) is not list and type(datanames) is not np.ndarray:
 		if type(datanames) is str:
 			# assume datanames is a file path
-			uvd = UVData()
+			# uvd = UVData()
+			uvd = UVData_HR() # Self-Contain Module form pyuvdata
 			suffix = os.path.splitext(datanames)[1]
 			if filetype == 'uvfits' or suffix == '.uvfits':
 				uvd.read_uvfits(datanames)
@@ -328,7 +332,8 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 		# if datanames is a list, check data types of elements
 		if type(datanames[0]) is str:
 			# assume datanames contains file paths
-			uvd = UVData()
+			# uvd = UVData()
+			uvd = UVData_HR()  # Self-Contain Module form pyuvdata
 			suffix = os.path.splitext(datanames[0])[1]
 			if filetype == 'uvfits' or suffix == '.uvfits':
 				uvd.read_uvfits(datanames)
@@ -794,7 +799,7 @@ elif INSTRUMENT == 'hera47':
 				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
 				data_freqs_full[i] = data_freqs_full[i] / 1.e6
 				# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
-				findex_list[i] = np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))])
+				findex_list[i] = np.unique(np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))]))
 				
 				autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants_full[i][k], ants_full[i][k], ['xx', 'yy'][i]]) for k in range(len(ants_full[i]))]), axis=0)
 				print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
