@@ -1,3 +1,4 @@
+MANIFEST.in
 setup.py
 HERA_MapMaking_VisibilitySimulation.egg-info/PKG-INFO
 HERA_MapMaking_VisibilitySimulation.egg-info/SOURCES.txt
@@ -63,6 +64,8 @@ scripts/test_rot_speed.py
 scripts/units.py
 scripts/uv_imaging.py
 src/Bulm.py
+src/GIT_INFO
+src/VERSION
 src/__init__.py
 src/arrayinfo.py
 src/beamfits.py

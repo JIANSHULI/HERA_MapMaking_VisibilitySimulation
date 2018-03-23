@@ -1,4 +1,4 @@
-from distutils.core import setup, Extension
+# from distutils.core import setup, Extension
 import os, glob, numpy
 import os.path as op
 from src import version
@@ -20,7 +20,8 @@ def globdir(dir, files):
     return rv
 
 setup(name = 'HERA_MapMaking_VisibilitySimulation',
-    version = __version__,
+    # version = __version__,
+    version = version.version,
     description = __doc__,
     long_description = __doc__,
     license = 'GPL',
@@ -29,6 +30,7 @@ setup(name = 'HERA_MapMaking_VisibilitySimulation',
     url = 'https://github.com/JIANSHULI/HERA_MapMaking_VisibilitySimulation.git',
     package_dir = {'HERA_MapMaking_VisibilitySimulation':'src'},
     packages = ['HERA_MapMaking_VisibilitySimulation'],
+    include_package_data = True,
     ext_modules = [
         Extension('HERA_MapMaking_VisibilitySimulation._boost_math',
             globdir('src/_boost_math/',
