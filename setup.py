@@ -1,9 +1,17 @@
 from distutils.core import setup, Extension
 import os, glob, numpy
+import os.path as op
+from src import version
+import json
+from setuptools import setup, Extension, Command
 
+########## pyuvdata version ##########
+data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
+with open(op.join('src', 'GIT_INFO'), 'w') as outfile:
+    json.dump(data, outfile)
 
-
-__version__ = '0.0.1'
+########## hera_dp_vs_mp version ###########
+__version__ = '0.0.2'
 
 def indir(dir, files): return [dir+f for f in files]
 def globdir(dir, files):
@@ -11,14 +19,14 @@ def globdir(dir, files):
     for f in files: rv += glob.glob(dir+f)
     return rv
 
-setup(name = 'wignerpy',
+setup(name = 'HERA_MapMaking_VisibilitySimulation',
     version = __version__,
     description = __doc__,
     long_description = __doc__,
     license = 'GPL',
     author = 'Eric Yang, Jeff Zheng, Jianshu Li',
     author_email = '',
-    url = '',
+    url = 'https://github.com/JIANSHULI/HERA_MapMaking_VisibilitySimulation.git',
     package_dir = {'HERA_MapMaking_VisibilitySimulation':'src'},
     packages = ['HERA_MapMaking_VisibilitySimulation'],
     ext_modules = [
