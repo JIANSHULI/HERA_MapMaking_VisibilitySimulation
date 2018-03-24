@@ -1448,16 +1448,17 @@ class UVData(UVBase):
                              run_check=run_check, check_extra=check_extra,
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
-            print(filepath[0])
+            print('File Loaded: ' + filepath[0])
             if len(filepath) > 1:
-                for f in filepath[1:]:
+                for id_f, f in enumerate(filepath[1:]):
+                    
                     uv2 = UVData()
                     uv2.read_miriad(f, correct_lat_lon=correct_lat_lon,
                                     run_check=run_check, check_extra=check_extra,
                                     run_check_acceptability=run_check_acceptability,
                                     phase_type=phase_type)
                     self += uv2
-                    print(f)
+                    print('File Loaded %s : %s'%(id_f+1, f))
                 del(uv2)
         else:
             miriad_obj = miriad.Miriad()

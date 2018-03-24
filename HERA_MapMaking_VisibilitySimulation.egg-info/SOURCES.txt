@@ -75,7 +75,6 @@ src/calib.py
 src/calibration_omni.py
 src/cst_beam.py
 src/fhd.py
-src/fhd_cal.py
 src/fileio.py
 src/info.py
 src/miriad.py
