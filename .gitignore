@@ -1,5 +1,5 @@
 # Distribution and Packaging
-*.so
+#*.so
 *.pyc
 src/*.pyc
 *.py
