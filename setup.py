@@ -1,10 +1,11 @@
+# from __future__ import absolute_import
 # from distutils.core import setup, Extension
 import os, glob, numpy
 import os.path as op
 from src import version
 import json
-from setuptools import Extension, Command
-from setuptools import setup
+# from setuptools import Extension, Command
+# from setuptools import setup
 from distutils.core import setup, Extension
 
 ########## pyuvdata version ##########
@@ -48,11 +49,12 @@ setup(name = 'HERA_MapMaking_VisibilitySimulation',
         ),
         Extension('HERA_MapMaking_VisibilitySimulation._omnical',
             ['src/_omnical/omnical_wrap.cpp', 'src/_omnical/omnical_redcal.cc'],
-            #globdir('src/_omnical/',
+            # globdir('src/_omnical/',
             #    ['*.cpp', '*.c', '*.cc']),
-            include_dirs=['src/_omnical/include', numpy.get_include()],
+            include_dirs=['src/_omnical/include', '/usr/include', numpy.get_include()],
             extra_compile_args=['-Wno-write-strings', '-O3']
         )
     ],
     scripts = glob.glob('scripts/*'),
 )
+

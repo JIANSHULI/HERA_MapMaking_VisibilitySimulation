@@ -1,4 +1,5 @@
 include *.md
+include *.so
 include LICENSE
 include src/VERSION
 include src/GIT_INFO

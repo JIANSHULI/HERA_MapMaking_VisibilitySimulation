@@ -8,9 +8,10 @@ import scipy.linalg as sla
 import time, ephem, sys, os, resource, datetime, warnings
 import aipy as ap
 import os
-#os.environ['QT_QPA_PLATFORM'] = 'offscreen'
+os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 import sys
 import matplotlib.pyplot as plt
+plt.switch_backend('agg')
 import healpy as hp
 import healpy.rotator as hpr
 import healpy.pixelfunc as hpf
@@ -635,7 +636,7 @@ elif INSTRUMENT == 'hera47':
 	Add_S_diag = False
 	Add_Rcond = True
 	
-	Small_ModelData = True
+	Small_ModelData = False
 	Model_Calibration = False
 	
 	Data_Deteriorate = False
@@ -721,7 +722,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(3, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(73, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	flist = {}
 	index_freq = {}
@@ -1266,16 +1267,16 @@ elif INSTRUMENT == 'hera47':
 	
 	# plot sub-array HERA layout
 	for j in range(2):
-		plt.figure(100000 + 5 * j, figsize=(6, 6))
+		plt.figure(100000 + 50 * j)
 		plt.grid()
-		plt.scatter(antloc[j][:, 0], antloc[j][:, 1], s=3000)
-		_ = [plt.text(antloc[j][i, 0] - 1, antloc[j][i, 1], str(ants[j][i]), fontsize=14, color='w') for i in range(len(antloc[j]))]
+		plt.scatter(antloc[j][:, 0], antloc[j][:, 1], s=500)
+		_ = [plt.text(antloc[j][i, 0] - 1, antloc[j][i, 1], str(ants[j][i]), fontsize=5, color='w') for i in range(len(antloc[j]))]
 		plt.title('%s-polarization selected subarray' % ['xx', 'yy'][j])
-		plt.xlim(-30, 30)
-		plt.ylim(-30, 30)
+		# plt.xlim(-30, 30)
+		# plt.ylim(-30, 30)
 		plt.savefig(script_dir + '/../Output/%s-Nant%s-Ant_Locations.pdf' % (INSTRUMENT, len(antloc[0])))
 		plt.show(block=False)
-	# plt.cla()
+	plt.clf()
 	
 	############################## Autocorrelation #################################
 	More_Details = False
