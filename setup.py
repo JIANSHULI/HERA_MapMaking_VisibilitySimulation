@@ -59,4 +59,6 @@ from src import version
 ########## pyuvdata version ##########
 data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
 with open(op.join('src', 'GIT_INFO'), 'w') as outfile:
-    json.dump(data, outfile)
+        json.dump(data, outfile)
+with open(op.join('src', 'VERSION'), 'w') as outfile:
+        json.dump(__version__, outfile)
