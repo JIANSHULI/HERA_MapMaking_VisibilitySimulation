@@ -3,7 +3,9 @@ import os, glob, numpy
 import os.path as op
 from src import version
 import json
-from setuptools import setup, Extension, Command
+from setuptools import Extension, Command
+from setuptools import setup
+from distutils.core import setup, Extension
 
 ########## pyuvdata version ##########
 data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
