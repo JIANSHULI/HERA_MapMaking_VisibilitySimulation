@@ -1,5 +1,6 @@
 # Distribution and Packaging
 *.pyc
+src/*.pyc
 *.py
 *.DS_Store
 Output/
