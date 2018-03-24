@@ -2,16 +2,13 @@
 # from distutils.core import setup, Extension
 import os, glob, numpy
 import os.path as op
-from src import version
+# from src import version
 import json
 # from setuptools import Extension, Command
 # from setuptools import setup
 from distutils.core import setup, Extension
 
-########## pyuvdata version ##########
-data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
-with open(op.join('src', 'GIT_INFO'), 'w') as outfile:
-    json.dump(data, outfile)
+
 
 ########## hera_dp_vs_mp version ###########
 __version__ = '0.0.2'
@@ -23,8 +20,8 @@ def globdir(dir, files):
     return rv
 
 setup(name = 'HERA_MapMaking_VisibilitySimulation',
-    # version = __version__,
-    version = version.version,
+    version = __version__,
+    # version = version.version,
     description = __doc__,
     long_description = __doc__,
     license = 'GPL',
@@ -58,3 +55,8 @@ setup(name = 'HERA_MapMaking_VisibilitySimulation',
     scripts = glob.glob('scripts/*'),
 )
 
+from src import version
+########## pyuvdata version ##########
+data = [version.git_origin, version.git_hash, version.git_description, version.git_branch]
+with open(op.join('src', 'GIT_INFO'), 'w') as outfile:
+    json.dump(data, outfile)

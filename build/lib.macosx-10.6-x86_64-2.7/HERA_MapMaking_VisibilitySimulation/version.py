@@ -25,10 +25,11 @@ def construct_version_info():
         try:
             git_version = subprocess.check_output(['git', '-C', pyuvdata_dir, 'describe',
                                                '--tags', '--abbrev=0']).strip()
-        except Exception as exception:
+        except:
             # assert type(exception).__name__ == 'NameError'
             # assert exception.__class__.__name__ == 'NameError'
             print('Exception: git_version.')
+            pass
         
     except subprocess.CalledProcessError:
         try:
