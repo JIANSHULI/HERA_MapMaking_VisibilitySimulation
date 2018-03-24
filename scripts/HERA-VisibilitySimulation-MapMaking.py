@@ -721,7 +721,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(2, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(3, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	flist = {}
 	index_freq = {}
