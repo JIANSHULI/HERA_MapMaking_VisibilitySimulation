@@ -405,6 +405,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 			if k[0] == k[1]:
 				autos[k] = d[k]
 				autos_flags[k] = f[k]
+				redundancy = np.append(redundancy[:k], redundancy[k:])
 				d.pop(k)
 				f.pop(k)
 	
@@ -1701,7 +1702,7 @@ elif INSTRUMENT == 'hera47':
 				var_data_dred[i][:, i_ubl] = np.mean(var_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
 			except:
 				pass
-		redundancy[i] = redundancy[i] + np.array(redundancy_pro[i])
+		redundancy[i] = redundancy[i] + (np.array(redundancy_pro[i]) - 1)
 	# vis_data_dred_mfreq = [[],[]]
 	dflags_dred_mfreq = {}
 	
