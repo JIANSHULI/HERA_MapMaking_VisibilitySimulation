@@ -1758,6 +1758,7 @@ class UVData(UVBase):
             return uv_object
         else:
             self.Nfreqs = uv_object.Nfreqs
+            self.freq_array = uv_object.freq_array
             self.Nubls = uv_object.Nubls
             self.Ntimes = uv_object.Ntimes
             self.data_array = uv_object.data_array

@@ -405,7 +405,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 			if k[0] == k[1]:
 				autos[k] = d[k]
 				autos_flags[k] = f[k]
-				redundancy = np.append(redundancy[:k], redundancy[k:])
+				redundancy = np.append(redundancy[:i], redundancy[i+1:])
 				d.pop(k)
 				f.pop(k)
 	
@@ -806,8 +806,8 @@ elif INSTRUMENT == 'hera47':
 	Compress_Average = True
 	Time_Average = 12
 	Frequency_Average = 1 if not Small_ModelData else 1
-	Mocal_time_bin_temp = 30 #30; 600; (362)
-	Mocal_freq_bin_temp = 22 #600; 32; (64)
+	Mocal_time_bin_temp = 600 #30; 600; (362)
+	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
 	
 	sys.stdout.flush()
@@ -819,7 +819,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-5., -1., 1.)
+	rcond_list = 10. ** np.arange(-30., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -881,7 +881,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(73, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(3, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	redundancy = [[],[]]
 	model_redundancy = [[], []]
@@ -1654,7 +1654,8 @@ elif INSTRUMENT == 'hera47':
 							try:
 								list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
 							except:
-								print('Baseline:%s%s not in bls[%s]'%(ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
+								# print('Baseline:%s%s not in bls[%s]'%(ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
+								pass
 							
 			if len(list_bsl) >= 1:
 				Ubl_list[i].append(list_bsl)
