@@ -19,6 +19,7 @@ import healpy.visufunc as hpv
 import scipy.interpolate as si
 import glob
 import astropy
+# from aipy.miriad import pol2str
 from astropy.io import fits
 import HERA_MapMaking_VisibilitySimulation as mmvs
 from pyuvdata import UVData, UVCal, UVFITS
@@ -47,6 +48,27 @@ from hera_cal import utils, firstcal, cal_formats, redcal
 PI = np.pi
 TPI = PI * 2
 
+try:
+	str2pol = {
+		'I' :  1,   # Stokes Paremeters
+		'Q' :  2,
+		'U' :  3,
+		'V' :  4,
+		'rr': -1,   # Circular Polarizations
+		'll': -2,
+		'rl': -3,
+		'lr': -4,
+		'xx': -5,   # Linear Polarizations
+		'yy': -6,
+		'xy': -7,
+		'yx': -8,
+	}
+	
+	pol2str = {}
+	for k in str2pol: pol2str[str2pol[k]] = k
+except:
+	from aipy.miriad import pol2str
+	from aipy.miriad import str2pol
 
 def pixelize(sky, nside_distribution, nside_standard, nside_start, thresh, final_index, thetas, phis, sizes):
 	# thetas = []
@@ -275,7 +297,7 @@ def UVData2AbsCalDict(datanames, pol_select=None, pop_autos=True, return_meta=Fa
 
 
 def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_meta=False, filetype='miriad',
-					  pick_data_ants=True):
+					  pick_data_ants=True, svmemory=True):
 	"""
 	turn a list of pyuvdata.UVData objects or a list of miriad or uvfits file paths
 	into the datacontainer dictionary form that AbsCal requires. This format is
@@ -345,8 +367,35 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 			# assume datanames contains UVData instances
 			uvd = reduce(operator.add, datanames)
 	
+	if return_meta:
+		# freqs = np.unique(uvd.freq_array)
+		# times = np.unique(uvd.time_array)
+		# lsts = np.unique(uvd.lst_array)
+		freqs = uvd.freq_array.squeeze()
+		times = uvd.time_array.reshape(uvd.Ntimes, uvd.Nbls)[:, 0]
+		lsts = uvd.lst_array.reshape(uvd.Ntimes, uvd.Nbls)[:, 0]
+		antpos, ants = uvd.get_ENU_antpos(center=True, pick_data_ants=pick_data_ants)
+		antpos = odict(zip(ants, antpos))
+		pols = uvd.polarization_array
+		redundancy = uvd.redundancy
+		if len(times) != len(np.unique(uvd.time_array)):
+			print ('Times Overlapping.')
+		else:
+			print ('No Time Overlapping.')
+		if len(lsts) != len(np.unique(uvd.lst_array)):
+			print ('Lsts Overlapping.')
+		else:
+			print ('No Lst Overlapping.')
+		if len(freqs) != len(np.unique(uvd.freq_array)):
+			print ('Frequencies Overlapping.')
+		else:
+			print ('No Frequency Overlapping.')
+	
 	# load data
-	d, f = firstcal.UVData_to_dict([uvd])
+	if not svmemory:
+		d, f = firstcal.UVData_to_dict([uvd])
+	else:
+		d, f = UVData_to_dict_svmemory([uvd], svmemory=svmemory)
 	autos = {}
 	autos_flags = {}
 	
@@ -365,15 +414,30 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 	
 	# get meta
 	if return_meta:
-		freqs = np.unique(uvd.freq_array)
-		times = np.unique(uvd.time_array)
-		lsts = np.unique(uvd.lst_array)
-		antpos, ants = uvd.get_ENU_antpos(center=True, pick_data_ants=pick_data_ants)
-		antpos = odict(zip(ants, antpos))
-		pols = uvd.polarization_array
-		return data, flags, antpos, ants, freqs, times, lsts, pols, autos_pro, autos_flags_pro
+		# freqs = np.unique(uvd.freq_array)
+		# times = np.unique(uvd.time_array)
+		# lsts = np.unique(uvd.lst_array)
+		# freqs = uvd.freq_array
+		# times = uvd.time_array
+		# lsts = uvd.lst_array
+		# antpos, ants = uvd.get_ENU_antpos(center=True, pick_data_ants=pick_data_ants)
+		# antpos = odict(zip(ants, antpos))
+		# pols = uvd.polarization_array
+		# if len(times) != len(np.unique(uvd.time_array)):
+		# 	print ('Times Overlapping.')
+		# else:
+		# 	print ('No Time Overlapping.')
+		# if len(lsts) != len(np.unique(uvd.lst_array)):
+		# 	print ('Lsts Overlapping.')
+		# else:
+		# 	print ('No Lst Overlapping.')
+		# if len(freqs) != len(np.unique(uvd.freq_array)):
+		# 	print ('Frequencies Overlapping.')
+		# else:
+		# 	print ('No Frequency Overlapping.')
+		return data, flags, antpos, ants, freqs, times, lsts, pols, autos_pro, autos_flags_pro, redundancy
 	else:
-		return data, flags, autos_pro, autos_flags_pro
+		return data, flags, autos_pro, autos_flags_pro, redundancy
 
 
 def set_lsts_from_time_array_hourangle(times, lon='21:25:41.9', lat='-30:43:17.5'):
@@ -397,6 +461,100 @@ def set_lsts_from_time_array_radian(times, lon='21:25:41.9', lat='-30:43:17.5'):
 		lst_array[np.where(np.isclose(
 			jd, times, atol=1e-6, rtol=1e-12))] = t.sidereal_time('apparent').radian
 	return lst_array
+
+def UVData_to_dict(uvdata_list, filetype='miriad'):
+	""" Turn a list of UVData objects or filenames in to a data and flag dictionary.
+
+        Make dictionary with blpair key first and pol second key from either a
+        list of UVData objects or a list of filenames with specific file_type.
+
+        Args:
+            uvdata_list: list of UVData objects or strings of filenames.
+            filetype (string, optional): type of file if uvdata_list is
+                a list of filenames
+
+        Return:
+            data (dict): dictionary of data indexed by pol and antenna pairs
+            flags (dict): dictionary of flags indexed by pol and antenna pairs
+        """
+	
+	d, f = {}, {}
+	for uv_in in uvdata_list:
+		if type(uv_in) == str:
+			fname = uv_in
+			uv_in = UVData()
+			# read in file without multiple if statements
+			getattr(uv_in, 'read_' + filetype)(fname)
+		
+		# iterate over unique baselines
+		for nbl, (i, j) in enumerate(map(uv_in.baseline_to_antnums, np.unique(uv_in.baseline_array))):
+			if (i, j) not in d:
+				d[i, j] = {}
+				f[i, j] = {}
+			for ip, pol in enumerate(uv_in.polarization_array):
+				pol = pol2str[pol]
+				new_data = copy.copy(uv_in.get_data((i, j, pol)))
+				new_flags = copy.copy(uv_in.get_flags((i, j, pol)))
+				
+				if pol not in d[(i, j)]:
+					d[(i, j)][pol] = new_data
+					f[(i, j)][pol] = new_flags
+				else:
+					d[(i, j)][pol] = np.concatenate(
+						[d[(i, j)][pol], new_data ])
+					f[(i, j)][pol] = np.concatenate(
+						[f[(i, j)][pol], new_flags ])
+	return d, f
+
+
+def UVData_to_dict_svmemory(uvdata_list, filetype='miriad', svmemory=True):
+	""" Turn a list of UVData objects or filenames in to a data and flag dictionary.
+
+        Make dictionary with blpair key first and pol second key from either a
+        list of UVData objects or a list of filenames with specific file_type.
+
+        Args:
+            uvdata_list: list of UVData objects or strings of filenames.
+            filetype (string, optional): type of file if uvdata_list is
+                a list of filenames
+
+        Return:
+            data (dict): dictionary of data indexed by pol and antenna pairs
+            flags (dict): dictionary of flags indexed by pol and antenna pairs
+        """
+	
+	d, f = {}, {}
+	print (len(uvdata_list))
+	for id_uv, uv_in in enumerate(uvdata_list):
+		if type(uv_in) == str:
+			fname = uv_in
+			uv_in = UVData()
+			# read in file without multiple if statements
+			getattr(uv_in, 'read_' + filetype)(fname)
+		
+		# iterate over unique baselines
+		for nbl, (i, j) in enumerate(map(uv_in.baseline_to_antnums, np.unique(uv_in.baseline_array))):
+			if (i, j) not in d:
+				d[i, j] = {}
+				f[i, j] = {}
+			for ip, pol in enumerate(uv_in.polarization_array):
+				pol = pol2str[pol]
+				new_data = copy.copy(uv_in.get_data((i, j, pol)))
+				new_flags = copy.copy(uv_in.get_flags((i, j, pol)))
+				
+				if pol not in d[(i, j)]:
+					d[(i, j)][pol] = new_data
+					f[(i, j)][pol] = new_flags
+				else:
+					d[(i, j)][pol] = np.concatenate(
+						[d[(i, j)][pol], new_data])
+					f[(i, j)][pol] = np.concatenate(
+						[f[(i, j)][pol], new_flags])
+		if svmemory:
+			uvdata_list[id_uv] = []
+			print ('Blank uvdata: %s'%id_uv)
+			
+	return d, f
 
 INSTRUMENT = ''
 
@@ -646,7 +804,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Compress_Average = True
 	Time_Average = 12
-	Frequency_Average = 16 if not Small_ModelData else 1
+	Frequency_Average = 1 if not Small_ModelData else 1
 	Mocal_time_bin_temp = 30 #30; 600; (362)
 	Mocal_freq_bin_temp = 22 #600; 32; (64)
 	Precal_time_bin_temp = 600
@@ -724,6 +882,9 @@ elif INSTRUMENT == 'hera47':
 	autocorr_data = {}
 	Nfiles = min(73, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
+	redundancy = [[],[]]
+	model_redundancy = [[], []]
+	
 	flist = {}
 	index_freq = {}
 	
@@ -756,7 +917,7 @@ elif INSTRUMENT == 'hera47':
 							model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA")
 					except:
 						pass
-				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
+				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
 				print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 			# specify data file and load into UVData, load into dictionary
 			# for i in range(2):
@@ -770,7 +931,7 @@ elif INSTRUMENT == 'hera47':
 					pass
 			data_fname_full[i] = os.path.join(DATA_PATH, 'ObservingSession-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
 			# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
-			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True)
+			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True)
 			print('small_Pol_%s is done.' % ['xx', 'yy'][i])
 			
 			# for i in range(2):
@@ -797,12 +958,12 @@ elif INSTRUMENT == 'hera47':
 					
 				# for i in range(2):
 				timer = time.time()
-				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
+				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
 				data_freqs_full[i] = data_freqs_full[i] / 1.e6
 				# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
 				findex_list[i] = np.unique(np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))]))
-				
-				autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants_full[i][k], ants_full[i][k], ['xx', 'yy'][i]]) for k in range(len(ants_full[i]))]), axis=0)
+
+				autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][data_autos[i].keys()[k]]) for k in range(len(data_autos[i].keys()))]), axis=0)
 				print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 				# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
 				
@@ -860,7 +1021,7 @@ elif INSTRUMENT == 'hera47':
 				#				(model_dred[i], mflags_dred[i], mantpos_dred[i], mants_dred[i], model_freqs_dred[i], model_times_dred[i], model_lsts_dred[i],
 				#				 model_pols_dred[i]) = hc.abscal.UVData2AbsCalDict(model_fname_dred[i], return_meta=True)
 				# (model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i]) = hc.abscal.UVData2AbsCalDict(model_fname[i], return_meta=True)
-				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
+				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
 				print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 			# specify data file and load into UVData, load into dictionary
 			
@@ -869,14 +1030,18 @@ elif INSTRUMENT == 'hera47':
 			# data_fname[i] = os.path.join(DATA_PATH, 'Observation-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
 			# data_fname[i] = '/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192287662/2458043/zen.2458043.12552.%s.HH.uvOR'%['xx', 'yy'][i]
 			# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
-			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
+			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
 			# data_freqs[i] = data_freqs[i] / 1.e6
-			autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants[i][k], ants[i][k], ['xx', 'yy'][i]]) for k in range(len(ants[i]))]), axis=0)
+			# autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants[i][k], ants[i][k], ['xx', 'yy'][i]]) for k in range(len(ants[i]))]), axis=0)
+			autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][data_autos[i].keys()[k]]) for k in range(len(data_autos[i].keys()))]), axis=0)
 			print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 		
 		if Lst_Hourangle:
 			# for i in range(2):
 			data_lsts[i] = set_lsts_from_time_array_hourangle(data_times[i])
+		
+		# def Compress_Data_byAverage(data=None, dflags=None, Time_Average=12, Frequency_Average=16, data_freqs, data_times, data_lsts, Contain_Autocorr=True, autocorr_data_mfreq=None):
+			
 		
 		if Compress_Average:
 			if i == 0:
@@ -932,12 +1097,13 @@ elif INSTRUMENT == 'hera47':
 				# data_freqs[i] = data_freqs[i][: -remove_freqs]
 				# data_times[i] = data_times[i][: -remove_times]
 				# data_lsts[i] = data_lsts[i][: -remove_times]
-				print ('rawData_Shape-%s: %s' % (key, data[i][key].shape))
-				print ('rawDflags_Shape-%s: %s' % (key, dflags[i][key].shape))
-				print ('rawAutocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
-				print ('rawData_Freqs: %s' % (len(data_freqs[i])))
-				print ('rawData_Times: %s' % (len(data_times[i])))
-				print ('rawData_Lsts: %s' % (len(data_lsts[i])))
+				if id_key == 0:
+					print ('rawData_Shape-%s: %s' % (key, data[i][key].shape))
+					print ('rawDflags_Shape-%s: %s' % (key, dflags[i][key].shape))
+					print ('rawAutocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+					print ('rawData_Freqs: %s' % (len(data_freqs[i])))
+					print ('rawData_Times: %s' % (len(data_times[i])))
+					print ('rawData_Lsts: %s' % (len(data_lsts[i])))
 				
 				data_ff[i][key] = np.mean(data[i][key].reshape(data[i][key].shape[0] / Time_Average, Time_Average, data[i][key].shape[1]), axis=1)
 				data_ff[i][key] = np.mean(data_ff[i][key].reshape(data[i][key].shape[0] / Time_Average, data[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
@@ -964,7 +1130,7 @@ elif INSTRUMENT == 'hera47':
 			data[i] = copy.deepcopy(data_ff[i])
 			dflags[i] = copy.deepcopy(dflags_ff[i])
 			autocorr_data_mfreq[i] = copy.deepcopy(autocorr_data_mfreq_ff[i])
-			dflags[i] = copy.deepcopy(dflags_ff[i])
+			# dflags[i] = copy.deepcopy(dflags_ff[i])
 			data_freqs[i] = copy.deepcopy(data_freqs_ff[i])
 			data_times[i] = copy.deepcopy(data_times_ff[i])
 			data_lsts[i] = copy.deepcopy(data_lsts_ff[i])
@@ -1281,15 +1447,15 @@ elif INSTRUMENT == 'hera47':
 	############################## Autocorrelation #################################
 	More_Details = False
 	if More_Details:
-		xxfile = data_fname[0] if not Small_ModelData else data_fname_full[0]
-		yyfile = data_fname[1] if not Small_ModelData else data_fname_full[1]
+		xxfiles = data_fnames[0] if not Small_ModelData else data_fname_full[0]
+		yyfiles = data_fnames[1] if not Small_ModelData else data_fname_full[1]
 		
 		# Load data for autocorrelation calculating
-		uvd_xx = UVData()
-		uvd_xx.read_miriad(xxfile)
+		uvd_xx = UVData_HR()
+		uvd_xx.read_miriad(xxfiles)
 		uvd_xx.ants = np.unique(np.concatenate([uvd_xx.ant_1_array, uvd_xx.ant_2_array]))
-		uvd_yy = UVData()
-		uvd_yy.read_miriad(yyfile)
+		uvd_yy = UVData_HR()
+		uvd_yy.read_miriad(yyfiles)
 		uvd_yy.ants = np.unique(np.concatenate([uvd_yy.ant_1_array, uvd_yy.ant_2_array]))
 		
 		# Get metadata
@@ -1461,7 +1627,7 @@ elif INSTRUMENT == 'hera47':
 	Nubl_raw = np.zeros(2, dtype=int)
 	times_raw = np.zeros(2, dtype=int)
 	times_raw_list = [[], []]
-	redundancy = [[], []]
+	redundancy_pro = [[], []]
 	bsl_coord_dred = [[], []]
 	vis_data_dred = [[], []]
 	vis_data_dred_mfreq = [[], []]
@@ -1474,14 +1640,21 @@ elif INSTRUMENT == 'hera47':
 	for i in range(2):
 		for i_ubl in range(len(Ubl_list_raw[i])):
 			list_bsl = []
-			for i_ubl_pair in range(len(Ubl_list_raw[0][i_ubl])):
+			for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
 				try:
 					list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
 				except:
 					try:
 						list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1 - i])))
 					except:
-						pass
+						try:
+							list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
+						except:
+							try:
+								list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
+							except:
+								print('Baseline:%s%s not in bls[%s]'%(ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
+							
 			if len(list_bsl) >= 1:
 				Ubl_list[i].append(list_bsl)
 			else:
@@ -1523,12 +1696,12 @@ elif INSTRUMENT == 'hera47':
 			#				else:
 			#					#data_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
 			#					dflags_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = dflags_yy[dflags_yy.keys()[Ubl_list[i][i_ubl][0]]]
-			redundancy[i].append(len(Ubl_list[i][i_ubl]))
+			redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
 			try:
 				var_data_dred[i][:, i_ubl] = np.mean(var_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
 			except:
 				pass
-	
+		redundancy[i] = redundancy[i] + np.array(redundancy_pro[i])
 	# vis_data_dred_mfreq = [[],[]]
 	dflags_dred_mfreq = {}
 	
@@ -1549,7 +1722,7 @@ elif INSTRUMENT == 'hera47':
 			#				else:
 			#					#data_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
 			#					dflags_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = dflags_yy[dflags_yy.keys()[Ubl_list[i][i_ubl][0]]]
-			# redundancy[i].append(len(Ubl_list[i][i_ubl]))
+			# redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
 			try:
 				var_data_dred[i][:, i_ubl] = np.mean(var_data[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
 			except:
@@ -2308,7 +2481,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred:
 	mocal_time_bin_num = nt_used / mocal_time_bin if np.mod(nt_used, mocal_time_bin) == 0 else (nt_used / mocal_time_bin + 1)
 	print('Mocal_time_bin_temp: %s; mocal_time_bin: %s; mocal_time_bin_num: %s' % (Mocal_time_bin_temp, mocal_time_bin, mocal_time_bin_num))
 	
-	Mocal_freq_bin_temp = 64
+	# Mocal_freq_bin_temp = 64
 	mocal_freq_bin = 1 if not Absolute_Calibration_dred_mfreq else np.min([Mocal_freq_bin_temp, len(flist[0])])
 	mocal_freq_bin_num = len(flist[0]) / mocal_freq_bin if np.mod(len(flist[0]), mocal_freq_bin) == 0 else (len(flist[0]) / mocal_freq_bin + 1)
 	print('Mocal_freq_bin_temp: %s; mocal_freq_bin: %s; mocal_freq_bin_num: %s' % (Mocal_freq_bin_temp, mocal_freq_bin, mocal_freq_bin_num))
