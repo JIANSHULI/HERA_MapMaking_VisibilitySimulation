@@ -88,7 +88,41 @@ def compute_reds_total(antpos, tol=0.1):
                 ubl_v[u] = ubl_v[u] * len(ublgp[u]) - ubl_v.pop(nu) * len(ublgp[nu]) # note sign reversal
                 ublgp[u] += [(j,i) for i,j in ublgp.pop(nu)]
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
-    return [v for v in ublgp.values() if len(v) >= 1] # no such thing as redundancy of one
+    return [v for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
+
+def compute_reds_total_autocorr(antpos, tol=0.1):
+    '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
+    list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
+    fall within the specified tolerance of each other.  'antpos' is a (nant,3) array of antenna positions.'''
+    bls = [(i,j) for i in xrange(antpos.shape[0]) for j in xrange(i,antpos.shape[0])]
+    # Coarsely sort bls using absolute grid (i.e. not relative separations); some groups may have several uids
+    def sep(i,j): return antpos[j] - antpos[i]
+    def uid(s): return tuple(map(int,np.around(s/tol)))
+    ublgp,ubl_v = {},{}
+    for bl in bls:
+        s = sep(*bl); u = uid(s)
+        ubl_v[u] = ubl_v.get(u,0) + s
+        ublgp[u] = ublgp.get(u,[]) + [bl]
+    for u in ubl_v: ubl_v[u] /= len(ublgp[u])
+    # Now combine neighbors and Hermitian neighbors if within tol
+    def neighbors(u):
+        for du in itertools.product((-1,0,1),(-1,0,1),(-1,0,1)): yield (u[0]+du[0],u[1]+du[1],u[2]+du[2])
+    for u in ubl_v.keys(): # Using 'keys' here allows dicts to be modified, but results in missing keys
+        if not ubl_v.has_key(u): continue # bail if this has been popped already
+        for nu in neighbors(u):
+            if not ubl_v.has_key(nu): continue # bail if nonexistant
+            if u == nu: continue
+            if np.linalg.norm(ubl_v[u] - ubl_v[nu]) < tol:
+                ubl_v[u] = ubl_v[u] * len(ublgp[u]) + ubl_v.pop(nu) * len(ublgp[nu])
+                ublgp[u] += ublgp.pop(nu)
+                ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
+        for nu in neighbors((-u[0],-u[1],-u[2])): # Find Hermitian neighbors
+            if not ubl_v.has_key(nu): continue # bail if nonexistant
+            if np.linalg.norm(ubl_v[u] + ubl_v[nu]) < tol: # note sign reversal
+                ubl_v[u] = ubl_v[u] * len(ublgp[u]) - ubl_v.pop(nu) * len(ublgp[nu]) # note sign reversal
+                ublgp[u] += [(j,i) for i,j in ublgp.pop(nu)]
+                ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
+    return [np.unique(v, axis=0) for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
 
 class ArrayInfo:
     '''Store information about an antenna array needed for computing redundancy and indexing matrices.'''
