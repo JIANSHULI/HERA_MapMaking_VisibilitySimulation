@@ -297,7 +297,7 @@ def UVData2AbsCalDict(datanames, pol_select=None, pop_autos=True, return_meta=Fa
 
 
 def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_meta=False, filetype='miriad',
-					  pick_data_ants=True, svmemory=True):
+					  pick_data_ants=True, svmemory=True, Time_Average=1, Frequency_Average=1, Dred=False, inplace=True):
 	"""
 	turn a list of pyuvdata.UVData objects or a list of miriad or uvfits file paths
 	into the datacontainer dictionary form that AbsCal requires. This format is
@@ -347,7 +347,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				uvd.read_uvfits(datanames)
 				uvd.unphase_to_drift()
 			elif filetype == 'miriad':
-				uvd.read_miriad(datanames)
+				uvd.read_miriad(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace)
 		else:
 			# assume datanames is a UVData instance
 			uvd = datanames
@@ -362,7 +362,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				uvd.read_uvfits(datanames)
 				uvd.unphase_to_drift()
 			elif filetype == 'miriad':
-				uvd.read_miriad(datanames)
+				uvd.read_miriad(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace)
 		else:
 			# assume datanames contains UVData instances
 			uvd = reduce(operator.add, datanames)
@@ -377,7 +377,8 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 		antpos, ants = uvd.get_ENU_antpos(center=True, pick_data_ants=pick_data_ants)
 		antpos = odict(zip(ants, antpos))
 		pols = uvd.polarization_array
-		redundancy = uvd.redundancy
+		redundancy_temp = uvd.redundancy
+		redundancy = np.zeros(0, np.int)
 		if len(times) != len(np.unique(uvd.time_array)):
 			print ('Times Overlapping.')
 		else:
@@ -405,9 +406,11 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 			if k[0] == k[1]:
 				autos[k] = d[k]
 				autos_flags[k] = f[k]
-				redundancy = np.append(redundancy[:i], redundancy[i+1:])
+				# redundancy = np.append(redundancy[:i], redundancy[i+1:])
 				d.pop(k)
 				f.pop(k)
+			else:
+				redundancy = np.append(redundancy, redundancy_temp[i])
 	
 	# turn into datacontainer
 	data, flags = DataContainer(d), DataContainer(f)
@@ -556,6 +559,120 @@ def UVData_to_dict_svmemory(uvdata_list, filetype='miriad', svmemory=True):
 			print ('Blank uvdata: %s'%id_uv)
 			
 	return d, f
+
+
+def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_Average=1, data_freqs=None, data_times=None, data_lsts=None, Contain_Autocorr=True, autocorr_data_mfreq=None, DicData=False, pol=None):
+	if np.mod(data[data.keys()[0]].shape[0], Time_Average) != 0:
+		if (data[data.keys()[0]].shape[0] / Time_Average) < 1.:
+			Time_Average = 1
+	if np.mod(data[data.keys()[0]].shape[1], Frequency_Average) != 0:
+		if (data[data.keys()[0]].shape[1] / Frequency_Average) < 1.:
+			Frequency_Average = 1
+	
+	remove_times = np.mod(data[data.keys()[0]].shape[0], Time_Average)
+	remove_freqs = np.mod(data[data.keys()[0]].shape[1], Frequency_Average)
+	if remove_times == 0:
+		remove_times = -data[data.keys()[0]].shape[0]
+	if remove_freqs == 0:
+		remove_freqs = -data[data.keys()[0]].shape[1]
+	print ('Time_Average: %s; Frequency_Average: %s.' % (Time_Average, Frequency_Average))
+	print ('Remove_Times: %s; Remove_Freqs: %s.' % (remove_times, remove_freqs))
+	
+	# data_ff = {}
+	# dflags_ff = {}
+	# autocorr_data_mfreq_ff = {}
+	# data_freqs_ff = {}
+	# data_times_ff = {}
+	# data_lsts_ff = {}
+	
+	# for i in range(2):
+	timer = time.time()
+	data_ff = LastUpdatedOrderedDict()
+	dflags_ff = LastUpdatedOrderedDict()
+	# autocorr_data_mfreq_ff[i] = LastUpdatedOrderedDict()
+	# data_freqs_ff[i] = LastUpdatedOrderedDict()
+	# data_times_ff[i] = LastUpdatedOrderedDict()
+	# data_lsts_ff[i] = LastUpdatedOrderedDict()
+	
+	data_freqs = data_freqs[: -remove_freqs]
+	data_times = data_times[: -remove_times]
+	data_lsts = data_lsts[: -remove_times]
+	
+	data_freqs_ff = data_freqs.reshape(len(data_freqs) / Frequency_Average, Frequency_Average)[:, 0]
+	data_times_ff = data_times.reshape(len(data_times) / Time_Average, Time_Average)[:, 0]
+	data_lsts_ff = data_lsts.reshape(len(data_lsts) / Time_Average, Time_Average)[:, 0]
+	
+	for id_key, key in enumerate(data.keys()):
+		
+		data[key] = data[key][: -remove_times, : -remove_freqs]
+		# autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
+		dflags[key] = dflags[key][: -remove_times, : -remove_freqs]
+		# data_freqs[i] = data_freqs[i][: -remove_freqs]
+		# data_times[i] = data_times[i][: -remove_times]
+		# data_lsts[i] = data_lsts[i][: -remove_times]
+		if id_key == 0:
+			print ('rawData_Shape-%s: %s' % (key, data[key].shape))
+			print ('rawDflags_Shape-%s: %s' % (key, dflags[key].shape))
+			print ('rawAutocorr_Shape: (%s, %s)' % autocorr_data_mfreq.shape)
+			print ('rawData_Freqs: %s' % (len(data_freqs)))
+			print ('rawData_Times: %s' % (len(data_times)))
+			print ('rawData_Lsts: %s' % (len(data_lsts)))
+		
+		data_ff[key] = np.mean(data[key].reshape(data[key].shape[0] / Time_Average, Time_Average, data[key].shape[1]), axis=1)
+		data_ff[key] = np.mean(data_ff[key].reshape(data[key].shape[0] / Time_Average, data[key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+		if DicData:
+			data.pop(key)
+		else:
+			data.__delitem__(key)
+		
+		dflags_ff[key] = np.mean(dflags[key].reshape(dflags[key].shape[0] / Time_Average, Time_Average, dflags[key].shape[1]), axis=1)
+		dflags_ff[key] = np.mean(dflags_ff[key].reshape(dflags[key].shape[0] / Time_Average, dflags[key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0
+		if DicData:
+			dflags.pop(key)
+		else:
+			dflags.__delitem__(key)
+	
+	print('compress_Pol_%s is done. %s seconds used.' % (pol, time.time() - timer))
+	
+	data = copy.deepcopy(data_ff)
+	dflags = copy.deepcopy(dflags_ff)
+	# autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
+	data_freqs = copy.deepcopy(data_freqs_ff)
+	data_times = copy.deepcopy(data_times_ff)
+	data_lsts = copy.deepcopy(data_lsts_ff)
+	
+	if Contain_Autocorr:
+		autocorr_data_mfreq = autocorr_data_mfreq[: -remove_times, : -remove_freqs]
+		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1]), axis=1)
+		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+		autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
+		del (autocorr_data_mfreq_ff)
+		try:
+			print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq.shape)
+		except:
+			print('Shape of autocorr results printing not complete.')
+	
+	del (data_ff)
+	del (dflags_ff)
+	# del (autocorr_data_mfreq_ff)
+	del (data_freqs_ff)
+	del (data_times_ff)
+	del (data_lsts_ff)
+	
+	try:
+		print ('Data_Shape-%s: %s' % (key, data[key].shape))
+		print ('Dflags_Shape-%s: %s' % (key, dflags[key].shape))
+		# print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+		print ('Data_Freqs: %s' % (len(data_freqs)))
+		print ('Data_Times: %s' % (len(data_times)))
+		print ('Data_Lsts: %s' % (len(data_lsts)))
+	except:
+		print('Shape of results printing not complete.')
+	
+	if Contain_Autocorr:
+		return data, dflags, autocorr_data_mfreq, data_freqs, data_times, data_lsts
+	else:
+		return data, dflags, data_freqs, data_times, data_lsts
 
 INSTRUMENT = ''
 
@@ -770,7 +887,7 @@ elif INSTRUMENT == 'hera47':
 	Absolute_Calibration_mfreq = False
 	Absolute_Calibration_dred = False
 	
-	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
+	Absolute_Calibration_dred_mfreq = False  # The only working Model Calibration Method.
 	Fake_wgts_dred_mfreq = True  # Remove Flags for Model Calibration.
 	PointSource_AbsCal = False
 	PointSource_AbsCal_SingleFreq = False if PointSource_AbsCal else False
@@ -783,7 +900,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Replace_Data = True
 	
-	pre_calibrate = False
+	pre_calibrate = True
 	tag = '-ampcal-' if pre_calibrate else ''  # '-ampcal-' #sys.argv[2]; if use real uncalibrated data, set tag = '-ampcal-' for amplitude calibration.
 	pre_ampcal = ('ampcal' in tag)
 	pre_phscal = True
@@ -803,10 +920,20 @@ elif INSTRUMENT == 'hera47':
 	Time_Expansion_Factor = 73. if Use_SimulatedData else 1.
 	Lst_Hourangle = True
 	
+	
+	Time_Average_preload = 12 # Number of Times averaged before loaded for each file (keep tails)'
+	Frequency_Average_preload = 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Dred_preload = True # Whether to de-redundancy before each file loaded
+	inplace_preload = True # Change the self when given to the function select_average in uvdata.py.
+	
 	Compress_Average = True
-	Time_Average = 12
-	Frequency_Average = 1 if not Small_ModelData else 1
-	Mocal_time_bin_temp = 600 #30; 600; (362)
+	Time_Average_afterload = 1 if Compress_Average else 1
+	Frequency_Average_afterload = 1 if Compress_Average else 1
+	
+	Time_Average = Time_Average_preload * Time_Average_afterload
+	Frequency_Average = Frequency_Average_preload * Frequency_Average_afterload
+	
+	Mocal_time_bin_temp = 20 #30; 600; (362)
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
 	
@@ -819,7 +946,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-30., -1., 1.)
+	rcond_list = 10. ** np.arange(-10., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -881,7 +1008,7 @@ elif INSTRUMENT == 'hera47':
 	
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
 	autocorr_data = {}
-	Nfiles = min(3, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	Nfiles = min(73, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
 	
 	redundancy = [[],[]]
 	model_redundancy = [[], []]
@@ -918,7 +1045,7 @@ elif INSTRUMENT == 'hera47':
 							model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA")
 					except:
 						pass
-				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
+				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True, Time_Average=Time_Average_preload, Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload)
 				print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 			# specify data file and load into UVData, load into dictionary
 			# for i in range(2):
@@ -932,7 +1059,7 @@ elif INSTRUMENT == 'hera47':
 					pass
 			data_fname_full[i] = os.path.join(DATA_PATH, 'ObservingSession-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
 			# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
-			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True)
+			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True, Time_Average=Time_Average_preload, Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload)
 			print('small_Pol_%s is done.' % ['xx', 'yy'][i])
 			
 			# for i in range(2):
@@ -959,7 +1086,7 @@ elif INSTRUMENT == 'hera47':
 					
 				# for i in range(2):
 				timer = time.time()
-				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
+				(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True, Time_Average=Time_Average_preload, Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload)
 				data_freqs_full[i] = data_freqs_full[i] / 1.e6
 				# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
 				findex_list[i] = np.unique(np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))]))
@@ -992,13 +1119,7 @@ elif INSTRUMENT == 'hera47':
 						else:
 							data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, id_f] = np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]:], axis=-1)
 							dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, id_f] = np.mean(dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]:], axis=-1)
-				# data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = np.array([np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]: findex_list[i][id_f+1] if id_f <= len(findex_list[i] - 2) else None], axis = -1) if id_f <= len(findex_list[i] - 2) else np.mean(data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i][id_f]:], axis = -1)  for id_f in range(len(findex_list[i]))])
-				# key[2] = 'xx' if i == 0 else 'yy'
-				# data_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = data_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]  # if i == 0 else uvd_yy.get_data((key[0], key[1]))[:, findex_list[i]]
-				# data_full[i].__delitem__((key[0], key[1], 'xx' if i == 0 else 'yy'))
-				
-				# dflags_ff[i][key[0], key[1], 'xx' if i == 0 else 'yy'] = dflags_full[i][key[0], key[1], 'xx' if i == 0 else 'yy'][:, findex_list[i]]
-				# dflags_full[i].__delitem__((key[0], key[1], 'xx' if i == 0 else 'yy'))
+
 				print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 				# del data_ff[dflags[i].keys()[id_key]]
 				
@@ -1017,138 +1138,128 @@ elif INSTRUMENT == 'hera47':
 				
 				# for i in range(2):
 				model_fname[i] = "/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/ObservingSession-1192115507/2458042/zen.2458042.12552.%s.HH.uv" % ['xx', 'yy'][i]  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
-				# model_fname[i] = os.path.join(DATA_PATH, 'Observation-1192114862/2458042/zen.2458042.12552.%s.HH.uv' % ['xx', 'yy'][i])
-				# model_fname[1] = os.path.join(DATA_PATH, "zen.2458042.12552.xx.HH.uvXA") #/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192114862/2458042/zen.2458042.12552.xx.HH.uv
-				#				(model_dred[i], mflags_dred[i], mantpos_dred[i], mants_dred[i], model_freqs_dred[i], model_times_dred[i], model_lsts_dred[i],
-				#				 model_pols_dred[i]) = hc.abscal.UVData2AbsCalDict(model_fname_dred[i], return_meta=True)
-				# (model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i]) = hc.abscal.UVData2AbsCalDict(model_fname[i], return_meta=True)
-				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True)
+				(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True, Time_Average=Time_Average_preload, Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload)
 				print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 			# specify data file and load into UVData, load into dictionary
 			
-			# for i in range(2):
 			timer = time.time()
-			# data_fname[i] = os.path.join(DATA_PATH, 'Observation-1192201262/2458043/zen.2458043.12552.%s.HH.uvOR' % ['xx', 'yy'][i])
-			# data_fname[i] = '/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192287662/2458043/zen.2458043.12552.%s.HH.uvOR'%['xx', 'yy'][i]
-			# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
-			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True)
-			# data_freqs[i] = data_freqs[i] / 1.e6
-			# autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][ants[i][k], ants[i][k], ['xx', 'yy'][i]]) for k in range(len(ants[i]))]), axis=0)
+			(data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True, Time_Average=Time_Average_preload, Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload)
 			autocorr_data_mfreq[i] = np.mean(np.array([np.abs(data_autos[i][data_autos[i].keys()[k]]) for k in range(len(data_autos[i].keys()))]), axis=0)
 			print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 		
 		if Lst_Hourangle:
 			# for i in range(2):
 			data_lsts[i] = set_lsts_from_time_array_hourangle(data_times[i])
-		
-		# def Compress_Data_byAverage(data=None, dflags=None, Time_Average=12, Frequency_Average=16, data_freqs, data_times, data_lsts, Contain_Autocorr=True, autocorr_data_mfreq=None):
 			
 		
 		if Compress_Average:
-			if i == 0:
-				if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
-					if (data[0][data[0].keys()[0]].shape[0] / Time_Average) < 1.:
-						Time_Average = 1
-				if np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average) != 0:
-					if (data[0][data[0].keys()[0]].shape[1] / Frequency_Average) < 1.:
-						Frequency_Average = 1
+			data[i], dflags[i], autocorr_data_mfreq[i], data_freqs[i], data_times[i], data_lsts[i] = Compress_Data_by_Average(data=data[i], dflags=dflags[i], autocorr_data_mfreq=autocorr_data_mfreq[i], Contain_Autocorr=True,
+			                                                                                                                  data_freqs=data_freqs[i], data_times=data_times[i], data_lsts=data_lsts[i], Time_Average=Time_Average_afterload, Frequency_Average=Frequency_Average_afterload, DicData=Small_ModelData)
 			
-				remove_times = np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average)
-				remove_freqs = np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average)
-				if remove_times == 0:
-					remove_times = -data[0][data[0].keys()[0]].shape[0]
-				if remove_freqs == 0:
-					remove_freqs = -data[0][data[0].keys()[0]].shape[1]
-				print ('Time_Average: %s; Frequency_Average: %s.' % (Time_Average, Frequency_Average))
-				print ('Remove_Times: %s; Remove_Freqs: %s.' % (remove_times, remove_freqs))
-			
-				data_ff = {}
-				dflags_ff = {}
-				autocorr_data_mfreq_ff = {}
-				data_freqs_ff = {}
-				data_times_ff = {}
-				data_lsts_ff = {}
-				
-			# for i in range(2):
-			timer = time.time()
-			data_ff[i] = LastUpdatedOrderedDict()
-			dflags_ff[i] = LastUpdatedOrderedDict()
-			# autocorr_data_mfreq_ff[i] = LastUpdatedOrderedDict()
-			# data_freqs_ff[i] = LastUpdatedOrderedDict()
-			# data_times_ff[i] = LastUpdatedOrderedDict()
-			# data_lsts_ff[i] = LastUpdatedOrderedDict()
-			
-			autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
-			data_freqs[i] = data_freqs[i][: -remove_freqs]
-			data_times[i] = data_times[i][: -remove_times]
-			data_lsts[i] = data_lsts[i][: -remove_times]
-			
-			autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, Time_Average, autocorr_data_mfreq[i].shape[1]), axis=1)
-			autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
-			
-			data_freqs_ff[i] = data_freqs[i].reshape(len(data_freqs[i]) / Frequency_Average, Frequency_Average)[:, 0]
-			data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
-			data_lsts_ff[i] = data_lsts[i].reshape(len(data_lsts[i]) / Time_Average, Time_Average)[:, 0]
-			
-			for id_key, key in enumerate(data[i].keys()):
-				
-				data[i][key] = data[i][key][: -remove_times, : -remove_freqs]
-				# autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
-				dflags[i][key] = dflags[i][key][: -remove_times, : -remove_freqs]
-				# data_freqs[i] = data_freqs[i][: -remove_freqs]
-				# data_times[i] = data_times[i][: -remove_times]
-				# data_lsts[i] = data_lsts[i][: -remove_times]
-				if id_key == 0:
-					print ('rawData_Shape-%s: %s' % (key, data[i][key].shape))
-					print ('rawDflags_Shape-%s: %s' % (key, dflags[i][key].shape))
-					print ('rawAutocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
-					print ('rawData_Freqs: %s' % (len(data_freqs[i])))
-					print ('rawData_Times: %s' % (len(data_times[i])))
-					print ('rawData_Lsts: %s' % (len(data_lsts[i])))
-				
-				data_ff[i][key] = np.mean(data[i][key].reshape(data[i][key].shape[0] / Time_Average, Time_Average, data[i][key].shape[1]), axis=1)
-				data_ff[i][key] = np.mean(data_ff[i][key].reshape(data[i][key].shape[0] / Time_Average, data[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
-				if Small_ModelData:
-					data[i].pop(key)
-				else:
-					data[i].__delitem__(key)
-				
-				# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(Time_Average, autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1]), axis=0)
-				# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
-				
-				dflags_ff[i][key] = np.mean(dflags[i][key].reshape(dflags[i][key].shape[0] / Time_Average, Time_Average, dflags[i][key].shape[1]), axis=1)
-				dflags_ff[i][key] = np.mean(dflags_ff[i][key].reshape(dflags[i][key].shape[0] / Time_Average, dflags[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0
-				if Small_ModelData:
-					dflags[i].pop(key)
-				else:
-					dflags[i].__delitem__(key)
-			
+			# if i == 0:
+			# 	if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
+			# 		if (data[0][data[0].keys()[0]].shape[0] / Time_Average) < 1.:
+			# 			Time_Average = 1
+			# 	if np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average) != 0:
+			# 		if (data[0][data[0].keys()[0]].shape[1] / Frequency_Average) < 1.:
+			# 			Frequency_Average = 1
+			#
+			# 	remove_times = np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average)
+			# 	remove_freqs = np.mod(data[0][data[0].keys()[0]].shape[1], Frequency_Average)
+			# 	if remove_times == 0:
+			# 		remove_times = -data[0][data[0].keys()[0]].shape[0]
+			# 	if remove_freqs == 0:
+			# 		remove_freqs = -data[0][data[0].keys()[0]].shape[1]
+			# 	print ('Time_Average: %s; Frequency_Average: %s.' % (Time_Average, Frequency_Average))
+			# 	print ('Remove_Times: %s; Remove_Freqs: %s.' % (remove_times, remove_freqs))
+			#
+			# 	data_ff = {}
+			# 	dflags_ff = {}
+			# 	autocorr_data_mfreq_ff = {}
+			# 	data_freqs_ff = {}
+			# 	data_times_ff = {}
+			# 	data_lsts_ff = {}
+			#
+			# # for i in range(2):
+			# timer = time.time()
+			# data_ff[i] = LastUpdatedOrderedDict()
+			# dflags_ff[i] = LastUpdatedOrderedDict()
+			# # autocorr_data_mfreq_ff[i] = LastUpdatedOrderedDict()
+			# # data_freqs_ff[i] = LastUpdatedOrderedDict()
+			# # data_times_ff[i] = LastUpdatedOrderedDict()
+			# # data_lsts_ff[i] = LastUpdatedOrderedDict()
+			#
+			# autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
+			# data_freqs[i] = data_freqs[i][: -remove_freqs]
+			# data_times[i] = data_times[i][: -remove_times]
+			# data_lsts[i] = data_lsts[i][: -remove_times]
+			#
+			# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, Time_Average, autocorr_data_mfreq[i].shape[1]), axis=1)
+			# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+			#
 			# data_freqs_ff[i] = data_freqs[i].reshape(len(data_freqs[i]) / Frequency_Average, Frequency_Average)[:, 0]
 			# data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
-			# data_lsts_ff[i] = data_lsts[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
-			print('compress_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
-			
-			data[i] = copy.deepcopy(data_ff[i])
-			dflags[i] = copy.deepcopy(dflags_ff[i])
-			autocorr_data_mfreq[i] = copy.deepcopy(autocorr_data_mfreq_ff[i])
+			# data_lsts_ff[i] = data_lsts[i].reshape(len(data_lsts[i]) / Time_Average, Time_Average)[:, 0]
+			#
+			# for id_key, key in enumerate(data[i].keys()):
+			#
+			# 	data[i][key] = data[i][key][: -remove_times, : -remove_freqs]
+			# 	# autocorr_data_mfreq[i] = autocorr_data_mfreq[i][: -remove_times, : -remove_freqs]
+			# 	dflags[i][key] = dflags[i][key][: -remove_times, : -remove_freqs]
+			# 	# data_freqs[i] = data_freqs[i][: -remove_freqs]
+			# 	# data_times[i] = data_times[i][: -remove_times]
+			# 	# data_lsts[i] = data_lsts[i][: -remove_times]
+			# 	if id_key == 0:
+			# 		print ('rawData_Shape-%s: %s' % (key, data[i][key].shape))
+			# 		print ('rawDflags_Shape-%s: %s' % (key, dflags[i][key].shape))
+			# 		print ('rawAutocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+			# 		print ('rawData_Freqs: %s' % (len(data_freqs[i])))
+			# 		print ('rawData_Times: %s' % (len(data_times[i])))
+			# 		print ('rawData_Lsts: %s' % (len(data_lsts[i])))
+			#
+			# 	data_ff[i][key] = np.mean(data[i][key].reshape(data[i][key].shape[0] / Time_Average, Time_Average, data[i][key].shape[1]), axis=1)
+			# 	data_ff[i][key] = np.mean(data_ff[i][key].reshape(data[i][key].shape[0] / Time_Average, data[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+			# 	if Small_ModelData:
+			# 		data[i].pop(key)
+			# 	else:
+			# 		data[i].__delitem__(key)
+			#
+			# 	# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq[i].reshape(Time_Average, autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1]), axis=0)
+			# 	# autocorr_data_mfreq_ff[i] = np.mean(autocorr_data_mfreq_ff[i].reshape(autocorr_data_mfreq[i].shape[0] / Time_Average, autocorr_data_mfreq[i].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+			#
+			# 	dflags_ff[i][key] = np.mean(dflags[i][key].reshape(dflags[i][key].shape[0] / Time_Average, Time_Average, dflags[i][key].shape[1]), axis=1)
+			# 	dflags_ff[i][key] = np.mean(dflags_ff[i][key].reshape(dflags[i][key].shape[0] / Time_Average, dflags[i][key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0
+			# 	if Small_ModelData:
+			# 		dflags[i].pop(key)
+			# 	else:
+			# 		dflags[i].__delitem__(key)
+			#
+			# # data_freqs_ff[i] = data_freqs[i].reshape(len(data_freqs[i]) / Frequency_Average, Frequency_Average)[:, 0]
+			# # data_times_ff[i] = data_times[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+			# # data_lsts_ff[i] = data_lsts[i].reshape(len(data_times[i]) / Time_Average, Time_Average)[:, 0]
+			# print('compress_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
+			#
+			# data[i] = copy.deepcopy(data_ff[i])
 			# dflags[i] = copy.deepcopy(dflags_ff[i])
-			data_freqs[i] = copy.deepcopy(data_freqs_ff[i])
-			data_times[i] = copy.deepcopy(data_times_ff[i])
-			data_lsts[i] = copy.deepcopy(data_lsts_ff[i])
-			
-			del (data_ff[i])
-			del (dflags_ff[i])
-			del (autocorr_data_mfreq_ff[i])
-			del (data_freqs_ff[i])
-			del (data_times_ff[i])
-			del (data_lsts_ff[i])
-			
-			print ('Data_Shape-%s: %s' % (key, data[i][key].shape))
-			print ('Dflags_Shape-%s: %s' % (key, dflags[i][key].shape))
-			print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
-			print ('Data_Freqs: %s' % (len(data_freqs[i])))
-			print ('Data_Times: %s' % (len(data_times[i])))
-			print ('Data_Lsts: %s' % (len(data_lsts[i])))
+			# autocorr_data_mfreq[i] = copy.deepcopy(autocorr_data_mfreq_ff[i])
+			# # dflags[i] = copy.deepcopy(dflags_ff[i])
+			# data_freqs[i] = copy.deepcopy(data_freqs_ff[i])
+			# data_times[i] = copy.deepcopy(data_times_ff[i])
+			# data_lsts[i] = copy.deepcopy(data_lsts_ff[i])
+			#
+			# del (data_ff[i])
+			# del (dflags_ff[i])
+			# del (autocorr_data_mfreq_ff[i])
+			# del (data_freqs_ff[i])
+			# del (data_times_ff[i])
+			# del (data_lsts_ff[i])
+			#
+			# print ('Data_Shape-%s: %s' % (key, data[i][key].shape))
+			# print ('Dflags_Shape-%s: %s' % (key, dflags[i][key].shape))
+			# print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq[i].shape)
+			# print ('Data_Freqs: %s' % (len(data_freqs[i])))
+			# print ('Data_Times: %s' % (len(data_times[i])))
+			# print ('Data_Lsts: %s' % (len(data_lsts[i])))
 
 	
 	# if Small_ModelData:
@@ -1703,7 +1814,17 @@ elif INSTRUMENT == 'hera47':
 				var_data_dred[i][:, i_ubl] = np.mean(var_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
 			except:
 				pass
-		redundancy[i] = redundancy[i] + (np.array(redundancy_pro[i]) - 1)
+			
+		if Dred_preload:
+			try:
+				redundancy[i] = redundancy[i] + (np.array(redundancy_pro[i]) - 1)
+			except:
+				raise ValueError('Redundancy from preload and afterload does not match each other')
+			
+		else:
+			print('Redundancy_preload: %s'%len(redundancy[i]))
+			redundancy[i] = redundancy_pro[i]
+			
 	# vis_data_dred_mfreq = [[],[]]
 	dflags_dred_mfreq = {}
 	
