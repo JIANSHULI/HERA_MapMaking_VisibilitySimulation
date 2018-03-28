@@ -681,6 +681,159 @@ def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_A
 		return data, dflags, autocorr_data_mfreq, data_freqs, data_times, data_lsts
 	else:
 		return data, dflags, data_freqs, data_times, data_lsts
+	
+	
+def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFreq=True, data_freqs=None, Nfreqs=64, data_times=None, Ntimes=None, FreqScaleFactor=1.e6, Frequency_Select=None, Frequency_Select_Index=None, vis_data_mfreq=None, vis_data=None, tol=5.e-4):
+	
+	antloc = {}
+	
+	if SingleFreq:
+		flist = {}
+		index_freq = {}
+		if Frequency_Select_Index is not None:
+			for i in range(2):
+				index_freq[i] = Frequency_Select_Index[i]
+		elif data_freqs is not None:
+			for i in range(2):
+				flist[i] = np.array(data_freqs[i]) / FreqScaleFactor
+				try:
+					# index_freq[i] = np.where(flist[i] == 150)[0][0]
+					#		index_freq = 512
+					index_freq[i] = np.abs(Frequency_Select - flist[i]).argmin()
+				except:
+					index_freq[i] = len(flist[i]) / 2
+		
+		dflags_sf = {}  # single frequency
+		for i in range(2):
+			dflags_sf[i] = LastUpdatedOrderedDict()
+			for key in dflags[i].keys():
+				dflags_sf[i][key] = dflags[i][key][:, index_freq[i]]
+		
+		if vis_data_mfreq is not None and vis_data is None:
+			vis_data = {}
+			for i in range(2):
+				vis_data[i] = vis_data_mfreq[i][index_freq[i], :, :]  # [pol][ freq, time, bl]
+		elif vis_data is not None:
+			vis_data = vis_data
+		else:
+			raise ValueError('No vis_data provided or calculated from vis_data_mfreq.')
+	
+	# ant locations
+	for i in range(2):
+		antloc[i] = np.array(map(lambda k: antpos[i][k], ants[i]))
+	
+	bls = [[], []]
+	for i in range(2):
+		bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in dflags[i].keys()])
+		# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
+		bls = np.array(bls)
+	
+	bsl_coord = [[], []]
+	bsl_coord[0] = np.array([bls[0][index] for index in bls[0].keys()])
+	bsl_coord[1] = np.array([bls[1][index] for index in bls[1].keys()])
+	# bsl_coord_x=bsl_coord_y=bsl_coord
+	bsl_coord = np.array(bsl_coord)
+	
+	Ubl_list_raw = [[], []]
+	Ubl_list = [[], []]
+	# ant_pos = [[], []]
+	
+	Nubl_raw = np.zeros(2, dtype=int)
+	times_raw = np.zeros(2, dtype=int)
+	redundancy_pro = [[], []]
+	redundancy_pro_mfreq = [[], []]
+	bsl_coord_dred = [[], []]
+	bsl_coord_dred_mfreq = [[], []]
+	vis_data_dred = [[], []]
+	vis_data_dred_mfreq = [[], []]
+	
+	for i in range(2):
+		Ubl_list_raw[i] = np.array(mmvs.arrayinfo.compute_reds_total(antloc[i], tol=tol))  ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
+	# ant_pos[i] = antpos[i]
+	
+	for i in range(2):
+		for i_ubl in range(len(Ubl_list_raw[i])):
+			list_bsl = []
+			for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
+				try:
+					list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
+				except:
+					try:
+						list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1 - i])))
+					except:
+						try:
+							list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
+						except:
+							try:
+								list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
+							except:
+								# print('Baseline:%s%s not in bls[%s]'%(antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
+								pass
+			
+			if len(list_bsl) >= 1:
+				Ubl_list[i].append(list_bsl)
+			else:
+				pass
+	
+	for i in range(2):
+		Nubl_raw[i] = len(Ubl_list[i])
+		times_raw[i] = len(data_times[i]) if data_times is not None else Ntimes
+		bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
+		bsl_coord_dred_mfreq[i] = np.zeros((Nubl_raw[i], 3))
+		vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
+		vis_data_dred_mfreq[i] = np.zeros((len(data_freqs[i]), times_raw[i], Nubl_raw[i]), dtype='complex128') if data_freqs is not None else np.zeros((Nfreqs, times_raw[i], Nubl_raw[i]), dtype='complex128')
+	
+	if SingleFreq:
+		dflags_dred = {}
+		
+		for i in range(2):
+			dflags_dred[i] = LastUpdatedOrderedDict()
+			pol = ['xx', 'yy'][i]
+			
+			for i_ubl in range(Nubl_raw[0]):
+				vis_data_dred[i][:, i_ubl] = np.mean(vis_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
+				bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
+				dflags_dred[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags_sf[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]]
+				redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
+	
+	if MultiFreq:
+		dflags_dred_mfreq = {}
+		
+		for i in range(2):
+			dflags_dred_mfreq[i] = LastUpdatedOrderedDict()
+			pol = ['xx', 'yy'][i]
+			
+			for i_ubl in range(Nubl_raw[0]):
+				vis_data_dred_mfreq[i][:, :, i_ubl] = np.mean(vis_data_mfreq[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
+				bsl_coord_dred_mfreq[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
+				dflags_dred_mfreq[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]]
+				redundancy_pro_mfreq[i].append(len(Ubl_list[i][i_ubl]))
+	
+	if SingleFreq and MultiFreq:
+		if (la.norm(np.array(redundancy_pro[0]) - np.array(redundancy_pro_mfreq[0])) + la.norm(np.array(redundancy_pro[1]) - np.array(redundancy_pro_mfreq[1]))) != 0:
+			raise ValueError('redundancy_pro doesnot match redundancy_pro_mfreq')
+	elif MultiFreq:
+		redundancy_pro = redundancy_pro_mfreq
+	elif not SingleFreq:
+		print ('No De-Redundancy Done.')
+	
+	if SingleFreq and MultiFreq:
+		if (la.norm(bsl_coord_dred[0] - bsl_coord_dred_mfreq[0]) + la.norm(bsl_coord_dred[1] - bsl_coord_dred_mfreq[1])) != 0:
+			raise ValueError('bsl_coord_dred doesnot match bsl_coord_dred_mfreq')
+	elif MultiFreq:
+		bsl_coord_dred = bsl_coord_dred_mfreq
+	elif not SingleFreq:
+		print ('No De-Redundancy Done.')
+	
+	if SingleFreq and MultiFreq:
+		return vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred, Ubl_list
+	elif MultiFreq:
+		return vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred, Ubl_list
+	elif SingleFreq:
+		return vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred, Ubl_list
+	else:
+		return None
+
 
 INSTRUMENT = ''
 
@@ -948,7 +1101,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Select = 150. # MHz
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 5.e-4
+	Tolerance = 5.e-4 # meter, Criterion for De-Redundancy
 	
 	sys.stdout.flush()
 	
@@ -959,7 +1112,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-10., -1., 1.)
+	rcond_list = 10. ** np.arange(-30., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -1748,158 +1901,6 @@ elif INSTRUMENT == 'hera47':
 	
 	####################################################################################################################################################
 	################################################ Unique Base Lines and Remove Redundancy ###########################################################
-	
-	def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFreq=True, data_freqs=None, Nfreqs=64, data_times=None, Ntimes=None, FreqScaleFactor=1.e6, Frequency_Select=None, Frequency_Select_Index=None, vis_data_mfreq=None, vis_data=None, tol=5.e-4):
-
-		antloc = {}
-		
-		if SingleFreq:
-			flist = {}
-			index_freq = {}
-			if Frequency_Select_Index is not None:
-				for i in range(2):
-					index_freq[i] = Frequency_Select_Index[i]
-			elif data_freqs is not None:
-				for i in range(2):
-					flist[i] = np.array(data_freqs[i]) / FreqScaleFactor
-					try:
-						# index_freq[i] = np.where(flist[i] == 150)[0][0]
-						#		index_freq = 512
-						index_freq[i] = np.abs(Frequency_Select - flist[i]).argmin()
-					except:
-						index_freq[i] = len(flist[i]) / 2
-					
-			dflags_sf = {}  # single frequency
-			for i in range(2):
-				dflags_sf[i] = LastUpdatedOrderedDict()
-				for key in dflags[i].keys():
-					dflags_sf[i][key] = dflags[i][key][:, index_freq[i]]
-			
-			if vis_data_mfreq is not None and vis_data is None:
-				vis_data = {}
-				for i in range(2):
-					vis_data[i] = vis_data_mfreq[i][index_freq[i], :, :]  # [pol][ freq, time, bl]
-			elif vis_data is not None:
-				vis_data = vis_data
-			else:
-				raise ValueError('No vis_data provided or calculated from vis_data_mfreq.')
-			
-		# ant locations
-		for i in range(2):
-			antloc[i] = np.array(map(lambda k: antpos[i][k], ants[i]))
-		
-		bls = [[], []]
-		for i in range(2):
-			bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in dflags[i].keys()])
-			# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
-			bls = np.array(bls)
-		
-		bsl_coord = [[], []]
-		bsl_coord[0] = np.array([bls[0][index] for index in bls[0].keys()])
-		bsl_coord[1] = np.array([bls[1][index] for index in bls[1].keys()])
-		# bsl_coord_x=bsl_coord_y=bsl_coord
-		bsl_coord = np.array(bsl_coord)
-		
-		Ubl_list_raw = [[], []]
-		Ubl_list = [[], []]
-		# ant_pos = [[], []]
-		
-		Nubl_raw = np.zeros(2, dtype=int)
-		times_raw = np.zeros(2, dtype=int)
-		redundancy_pro = [[], []]
-		redundancy_pro_mfreq = [[], []]
-		bsl_coord_dred = [[], []]
-		bsl_coord_dred_mfreq = [[], []]
-		vis_data_dred = [[], []]
-		vis_data_dred_mfreq = [[], []]
-		
-		for i in range(2):
-			Ubl_list_raw[i] = np.array(mmvs.arrayinfo.compute_reds_total(antloc[i], tol=tol))  ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
-			# ant_pos[i] = antpos[i]
-
-		for i in range(2):
-			for i_ubl in range(len(Ubl_list_raw[i])):
-				list_bsl = []
-				for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
-					try:
-						list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
-					except:
-						try:
-							list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1 - i])))
-						except:
-							try:
-								list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
-							except:
-								try:
-									list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
-								except:
-									# print('Baseline:%s%s not in bls[%s]'%(antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
-									pass
-				
-				if len(list_bsl) >= 1:
-					Ubl_list[i].append(list_bsl)
-				else:
-					pass
-		
-		for i in range(2):
-			Nubl_raw[i] = len(Ubl_list[i])
-			times_raw[i] = len(data_times[i]) if data_times is not None else Ntimes
-			bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
-			bsl_coord_dred_mfreq[i] = np.zeros((Nubl_raw[i], 3))
-			vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
-			vis_data_dred_mfreq[i] = np.zeros((len(data_freqs[i]), times_raw[i], Nubl_raw[i]), dtype='complex128') if data_freqs is not None else np.zeros((Nfreqs, times_raw[i], Nubl_raw[i]), dtype='complex128')
-
-		if SingleFreq:
-			dflags_dred = {}
-			
-			for i in range(2):
-				dflags_dred[i] = LastUpdatedOrderedDict()
-				pol = ['xx', 'yy'][i]
-				
-				for i_ubl in range(Nubl_raw[0]):
-					vis_data_dred[i][:, i_ubl] = np.mean(vis_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
-					bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
-					dflags_dred[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags_sf[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]]
-					redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
-		
-		if MultiFreq:
-			dflags_dred_mfreq = {}
-			
-			for i in range(2):
-				dflags_dred_mfreq[i] = LastUpdatedOrderedDict()
-				pol = ['xx', 'yy'][i]
-				
-				for i_ubl in range(Nubl_raw[0]):
-					vis_data_dred_mfreq[i][:, :, i_ubl] = np.mean(vis_data_mfreq[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
-					bsl_coord_dred_mfreq[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
-					dflags_dred_mfreq[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]]
-					redundancy_pro_mfreq[i].append(len(Ubl_list[i][i_ubl]))
-		
-		if SingleFreq and MultiFreq:
-			if (la.norm(np.array(redundancy_pro[0]) - np.array(redundancy_pro_mfreq[0])) + la.norm(np.array(redundancy_pro[1]) - np.array(redundancy_pro_mfreq[1]))) != 0:
-				raise ValueError('redundancy_pro doesnot match redundancy_pro_mfreq')
-		elif MultiFreq:
-			redundancy_pro = redundancy_pro_mfreq
-		elif not SingleFreq:
-			print ('No De-Redundancy Done.')
-		
-		if SingleFreq and MultiFreq:
-			if (la.norm(bsl_coord_dred[0] - bsl_coord_dred_mfreq[0]) + la.norm(bsl_coord_dred[1] - bsl_coord_dred_mfreq[1])) != 0:
-				raise ValueError('bsl_coord_dred doesnot match bsl_coord_dred_mfreq')
-		elif MultiFreq:
-			bsl_coord_dred = bsl_coord_dred_mfreq
-		elif not SingleFreq:
-			print ('No De-Redundancy Done.')
-		
-		if SingleFreq and MultiFreq:
-			return vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred, Ubl_list
-		elif MultiFreq:
-			return vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred, Ubl_list
-		elif SingleFreq:
-			return vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred, Ubl_list
-		else:
-			return None
-	
 	
 	SingleFreq = True
 	MultiFreq = True
