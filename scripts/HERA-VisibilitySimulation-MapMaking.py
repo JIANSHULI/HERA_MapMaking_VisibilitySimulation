@@ -1837,11 +1837,11 @@ elif INSTRUMENT == 'hera47':
 		
 		for i in range(2):
 			Nubl_raw[i] = len(Ubl_list[i])
-			times_raw[i] = len(data_times[i]) if data_times != None else Ntimes
+			times_raw[i] = len(data_times[i]) if data_times is not None else Ntimes
 			bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
 			bsl_coord_dred_mfreq[i] = np.zeros((Nubl_raw[i], 3))
 			vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
-			vis_data_dred_mfreq[i] = np.zeros((len(data_freqs[i]), times_raw[i], Nubl_raw[i]), dtype='complex128') if data_freqs != None else np.zeros((Nfreqs, times_raw[i], Nubl_raw[i]), dtype='complex128')
+			vis_data_dred_mfreq[i] = np.zeros((len(data_freqs[i]), times_raw[i], Nubl_raw[i]), dtype='complex128') if data_freqs is not None else np.zeros((Nfreqs, times_raw[i], Nubl_raw[i]), dtype='complex128')
 
 		if SingleFreq:
 			dflags_dred = {}
@@ -1870,7 +1870,7 @@ elif INSTRUMENT == 'hera47':
 					redundancy_pro_mfreq[i].append(len(Ubl_list[i][i_ubl]))
 		
 		if SingleFreq and MultiFreq:
-			if redundancy_pro != redundancy_pro_mfreq:
+			if (la.norm(redundancy_pro[0] - redundancy_pro_mfreq[0]) + la.norm(redundancy_pro[1] - redundancy_pro_mfreq[1])) != 0:
 				raise ValueError('redundancy_pro doesnot match redundancy_pro_mfreq')
 		elif MultiFreq:
 			redundancy_pro = redundancy_pro_mfreq
@@ -1878,7 +1878,7 @@ elif INSTRUMENT == 'hera47':
 			print ('No De-Redundancy Done.')
 		
 		if SingleFreq and MultiFreq:
-			if bsl_coord_dred != bsl_coord_dred_mfreq:
+			if (la.norm(bsl_coord_dred[0] - bsl_coord_dred_mfreq[0]) + la.norm(bsl_coord_dred[1] - bsl_coord_dred_mfreq[1])) != 0:
 				raise ValueError('bsl_coord_dred doesnot match bsl_coord_dred_mfreq')
 		elif MultiFreq:
 			bsl_coord_dred = bsl_coord_dred_mfreq
