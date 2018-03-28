@@ -409,9 +409,10 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				# redundancy = np.append(redundancy[:i], redundancy[i+1:])
 				d.pop(k)
 				f.pop(k)
+				print('Index of Autocorr popped out: %s.'%(str(i) + ': ' + str(k)))
 			else:
 				redundancy = np.append(redundancy, redundancy_temp[i])
-	
+				print('Index of Baselines not popped out: %s'%(str(i) + ': ' + str(k)))
 	# turn into datacontainer
 	data, flags = DataContainer(d), DataContainer(f)
 	autos_pro, autos_flags_pro = DataContainer(autos), DataContainer(autos_flags)
@@ -482,7 +483,9 @@ def UVData_to_dict(uvdata_list, filetype='miriad'):
             flags (dict): dictionary of flags indexed by pol and antenna pairs
         """
 	
-	d, f = {}, {}
+	# d, f = {}, {}
+	d, f = odict(), odict()
+	# d, f = LastUpdatedOrderedDict(), LastUpdatedOrderedDict()
 	for uv_in in uvdata_list:
 		if type(uv_in) == str:
 			fname = uv_in
@@ -527,7 +530,9 @@ def UVData_to_dict_svmemory(uvdata_list, filetype='miriad', svmemory=True):
             flags (dict): dictionary of flags indexed by pol and antenna pairs
         """
 	
-	d, f = {}, {}
+	# d, f = {}, {}
+	d, f = odict(), odict()
+	# d, f = LastUpdatedOrderedDict(), LastUpdatedOrderedDict()
 	print (len(uvdata_list))
 	for id_uv, uv_in in enumerate(uvdata_list):
 		if type(uv_in) == str:
@@ -537,10 +542,13 @@ def UVData_to_dict_svmemory(uvdata_list, filetype='miriad', svmemory=True):
 			getattr(uv_in, 'read_' + filetype)(fname)
 		
 		# iterate over unique baselines
-		for nbl, (i, j) in enumerate(map(uv_in.baseline_to_antnums, np.unique(uv_in.baseline_array))):
+		for nbl, (i, j) in enumerate(map(uv_in.baseline_to_antnums, uv_in.baseline_array.reshape(uv_in.Ntimes, uv_in.Nbls)[0, :])):
+			print('Pair in UVData_to_dict_svmemory: %s(%s, %s)'%(nbl, i, j))
 			if (i, j) not in d:
-				d[i, j] = {}
-				f[i, j] = {}
+				# d[i, j] = {}
+				# f[i, j] = {}
+				d[i, j] = odict()
+				f[i, j] = odict()
 			for ip, pol in enumerate(uv_in.polarization_array):
 				pol = pol2str[pol]
 				new_data = copy.copy(uv_in.get_data((i, j, pol)))
@@ -923,7 +931,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Time_Average_preload = 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
-	Dred_preload = True # Whether to de-redundancy before each file loaded
+	Dred_preload = False # Whether to de-redundancy before each file loaded
 	inplace_preload = True # Change the self when given to the function select_average in uvdata.py.
 	
 	Compress_Average = True
@@ -936,6 +944,10 @@ elif INSTRUMENT == 'hera47':
 	Mocal_time_bin_temp = 20 #30; 600; (362)
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
+	
+	Frequency_Select = 150. # MHz
+	
+	Check_Dred_AFreq_ATime = True
 	
 	sys.stdout.flush()
 	
@@ -1095,7 +1107,7 @@ elif INSTRUMENT == 'hera47':
 				print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 				# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
 				
-				findex = np.where(data_freqs_full[i] == 150)
+				findex = np.where(data_freqs_full[i] == Frequency_Select)
 				# for i in range(2):
 				timer = time.time()
 				data_ff[i] = LastUpdatedOrderedDict()
@@ -1503,7 +1515,7 @@ elif INSTRUMENT == 'hera47':
 		try:
 			# index_freq[i] = np.where(flist[i] == 150)[0][0]
 		#		index_freq = 512
-			index_freq[i] = np.abs(150 - flist[i]).argmin()
+			index_freq[i] = np.abs(Frequency_Select - flist[i]).argmin()
 		except:
 			index_freq[i] = len(flist[i]) / 2
 	
@@ -1731,125 +1743,296 @@ elif INSTRUMENT == 'hera47':
 	####################################################################################################################################################
 	################################################ Unique Base Lines and Remove Redundancy ###########################################################
 	
-	#	np.array(omnical.arrayinfo.compute_reds(antloc)) # Alternate way to compute.
-	Ubl_list_raw = [[], []]
-	Ubl_list = [[], []]
-	ant_pos = [[], []]
-	
-	Nubl_raw = np.zeros(2, dtype=int)
-	times_raw = np.zeros(2, dtype=int)
-	times_raw_list = [[], []]
-	redundancy_pro = [[], []]
-	bsl_coord_dred = [[], []]
-	vis_data_dred = [[], []]
-	vis_data_dred_mfreq = [[], []]
-	
-	for i in range(2):
-		Ubl_list_raw[i] = np.array(mmvs.arrayinfo.compute_reds_total(antloc[i]))  ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
-		# Ubl_list_raw[1] = np.array(mmvs.arrayinfo.compute_reds_total(antloc_yy)) ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
-		ant_pos[i] = antpos[i]
-	# ant_pos[1] = antpos_yy
-	for i in range(2):
-		for i_ubl in range(len(Ubl_list_raw[i])):
-			list_bsl = []
-			for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
-				try:
-					list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
-				except:
+	def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFreq=True, data_freqs=None, Nfreqs=64, data_times=None, Ntimes=None, FreqScaleFactor=1.e6, Frequency_Select=None, Frequency_Select_Index=None, vis_data_mfreq=None, vis_data=None):
+
+		antloc = {}
+		
+		if SingleFreq:
+			flist = {}
+			index_freq = {}
+			if Frequency_Select_Index is not None:
+				for i in range(2):
+					index_freq[i] = Frequency_Select_Index[i]
+			elif data_freqs is not None:
+				for i in range(2):
+					flist[i] = np.array(data_freqs[i]) / FreqScaleFactor
 					try:
-						list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1 - i])))
+						# index_freq[i] = np.where(flist[i] == 150)[0][0]
+						#		index_freq = 512
+						index_freq[i] = np.abs(Frequency_Select - flist[i]).argmin()
+					except:
+						index_freq[i] = len(flist[i]) / 2
+					
+			dflags_sf = {}  # single frequency
+			for i in range(2):
+				dflags_sf[i] = LastUpdatedOrderedDict()
+				for key in dflags[i].keys():
+					dflags_sf[i][key] = dflags[i][key][:, index_freq[i]]
+			
+			if vis_data_mfreq is not None and vis_data is None:
+				vis_data = {}
+				for i in range(2):
+					vis_data[i] = vis_data_mfreq[i][index_freq[i], :, :]  # [pol][ freq, time, bl]
+			elif vis_data is not None:
+				vis_data = vis_data
+			else:
+				raise ValueError('No vis_data provided or calculated from vis_data_mfreq.')
+			
+		# ant locations
+		for i in range(2):
+			antloc[i] = np.array(map(lambda k: antpos[i][k], ants[i]))
+		
+		bls = [[], []]
+		for i in range(2):
+			bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in dflags[i].keys()])
+			# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
+			bls = np.array(bls)
+		
+		bsl_coord = [[], []]
+		bsl_coord[0] = np.array([bls[0][index] for index in bls[0].keys()])
+		bsl_coord[1] = np.array([bls[1][index] for index in bls[1].keys()])
+		# bsl_coord_x=bsl_coord_y=bsl_coord
+		bsl_coord = np.array(bsl_coord)
+		
+		Ubl_list_raw = [[], []]
+		Ubl_list = [[], []]
+		# ant_pos = [[], []]
+		
+		Nubl_raw = np.zeros(2, dtype=int)
+		times_raw = np.zeros(2, dtype=int)
+		redundancy_pro = [[], []]
+		redundancy_pro_mfreq = [[], []]
+		bsl_coord_dred = [[], []]
+		bsl_coord_dred_mfreq = [[], []]
+		vis_data_dred = [[], []]
+		vis_data_dred_mfreq = [[], []]
+		
+		for i in range(2):
+			Ubl_list_raw[i] = np.array(mmvs.arrayinfo.compute_reds_total(antloc[i]))  ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
+			# ant_pos[i] = antpos[i]
+
+		for i in range(2):
+			for i_ubl in range(len(Ubl_list_raw[i])):
+				list_bsl = []
+				for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
+					try:
+						list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
 					except:
 						try:
-							list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
+							list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1 - i])))
 						except:
 							try:
-								list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
+								list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
 							except:
-								# print('Baseline:%s%s not in bls[%s]'%(ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
-								pass
-							
-			if len(list_bsl) >= 1:
-				Ubl_list[i].append(list_bsl)
-			else:
-				pass
-	
-	for i in range(2):
-		Nubl_raw[i] = len(Ubl_list[i])
-		times_raw[i] = len(data_times[i])
-		times_raw_list[i] = data_times[i]
-		bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
-		vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
-		vis_data_dred_mfreq[i] = np.zeros((len(flist[i]), times_raw[i], Nubl_raw[i]), dtype='complex128')
-	
-	try:
-		var_data_dred = [[], []]
-		var_data_dred[0] = np.zeros((times_raw[0], Nubl_raw[0]), dtype='complex128')
-		var_data_dred[1] = np.zeros((times_raw[1], Nubl_raw[1]), dtype='complex128')
-	except:
-		pass
-	
-	########################### Average on Redundant baselines #############################
-	# data_dred = {}
-	dflags_dred = {}
-	
-	for i in range(2):
-		# data_dred[i] = {}
-		# dflags_dred[i] = {}
-		dflags_dred[i] = LastUpdatedOrderedDict()
-		pol = ['xx', 'yy'][i]
+								try:
+									list_bsl.append(bls[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
+								except:
+									# print('Baseline:%s%s not in bls[%s]'%(antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
+									pass
+				
+				if len(list_bsl) >= 1:
+					Ubl_list[i].append(list_bsl)
+				else:
+					pass
 		
-		for i_ubl in range(Nubl_raw[0]):
-			vis_data_dred[i][:, i_ubl] = np.mean(vis_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
-			bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
-			# if Absolute_Calibration_dred:
-			dflags_dred[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags_sf[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]]
-			#				if i == 0:
-			#					#data_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
-			#					dflags_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = dflags[dflags.keys()[Ubl_list[i][i_ubl][0]]]
-			#				else:
-			#					#data_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
-			#					dflags_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = dflags_yy[dflags_yy.keys()[Ubl_list[i][i_ubl][0]]]
-			redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
-			try:
-				var_data_dred[i][:, i_ubl] = np.mean(var_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
-			except:
-				pass
+		for i in range(2):
+			Nubl_raw[i] = len(Ubl_list[i])
+			times_raw[i] = len(data_times[i]) if data_times != None else Ntimes
+			bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
+			vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
+			vis_data_dred_mfreq[i] = np.zeros((len(data_freqs[i]), times_raw[i], Nubl_raw[i]), dtype='complex128') if data_freqs != None else np.zeros((Nfreqs, times_raw[i], Nubl_raw[i]), dtype='complex128')
+
+		if SingleFreq:
+			dflags_dred = {}
 			
+			for i in range(2):
+				dflags_dred[i] = LastUpdatedOrderedDict()
+				pol = ['xx', 'yy'][i]
+				
+				for i_ubl in range(Nubl_raw[0]):
+					vis_data_dred[i][:, i_ubl] = np.mean(vis_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
+					bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
+					dflags_dred[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags_sf[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]]
+					redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
+		
+		if MultiFreq:
+			dflags_dred_mfreq = {}
+			
+			for i in range(2):
+				dflags_dred_mfreq[i] = LastUpdatedOrderedDict()
+				pol = ['xx', 'yy'][i]
+				
+				for i_ubl in range(Nubl_raw[0]):
+					vis_data_dred_mfreq[i][:, :, i_ubl] = np.mean(vis_data_mfreq[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
+					bsl_coord_dred_mfreq[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
+					dflags_dred_mfreq[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]]
+					redundancy_pro_mfreq[i].append(len(Ubl_list[i][i_ubl]))
+		
+		if SingleFreq and MultiFreq:
+			if redundancy_pro != redundancy_pro_mfreq:
+				raise ValueError('redundancy_pro doesnot match redundancy_pro_mfreq')
+		elif MultiFreq:
+			redundancy_pro = redundancy_pro_mfreq
+		elif not SingleFreq:
+			print ('No De-Redundancy Done.')
+		
+		if SingleFreq and MultiFreq:
+			if bsl_coord_dred != bsl_coord_dred_mfreq:
+				raise ValueError('bsl_coord_dred doesnot match bsl_coord_dred_mfreq')
+		elif MultiFreq:
+			bsl_coord_dred = bsl_coord_dred_mfreq
+		elif not SingleFreq:
+			print ('No De-Redundancy Done.')
+		
+		if SingleFreq and MultiFreq:
+			return vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred
+		elif MultiFreq:
+			return vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred
+		elif SingleFreq:
+			return vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred
+		else:
+			return None
+	
+	
+	SingleFreq = True
+	MultiFreq = True
+	if SingleFreq and MultiFreq:
+		vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq)
+	elif MultiFreq:
+		vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=None, Nfreqs=None, data_times=None, Ntimes=60, FreqScaleFactor=None, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq)
+	elif SingleFreq:
+		vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data=vis_data)
+	
+	for i in range(2):
 		if Dred_preload:
 			try:
 				redundancy[i] = redundancy[i] + (np.array(redundancy_pro[i]) - 1)
 			except:
 				raise ValueError('Redundancy from preload and afterload does not match each other')
-			
-		else:
-			print('Redundancy_preload: %s'%len(redundancy[i]))
-			redundancy[i] = redundancy_pro[i]
-			
-	# vis_data_dred_mfreq = [[],[]]
-	dflags_dred_mfreq = {}
-	
-	for i in range(2):
-		# data_dred_mfreq[i] = {}
-		# dflags_dred_mfreq[i] = {}
-		dflags_dred_mfreq[i] = LastUpdatedOrderedDict()
-		pol = ['xx', 'yy'][i]
 		
-		for i_ubl in range(Nubl_raw[0]):
-			vis_data_dred_mfreq[i][:, :, i_ubl] = np.mean(vis_data_mfreq[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
-			# bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
-			# if Absolute_Calibration_dred_mfreq:
-			dflags_dred_mfreq[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]]
-			#				if i == 0:
-			#					#data_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
-			#					dflags_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = dflags[dflags.keys()[Ubl_list[i][i_ubl][0]]]
-			#				else:
-			#					#data_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
-			#					dflags_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = dflags_yy[dflags_yy.keys()[Ubl_list[i][i_ubl][0]]]
-			# redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
-			try:
-				var_data_dred[i][:, i_ubl] = np.mean(var_data[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
-			except:
-				pass
+		else:
+			print('Redundancy_preload: %s' % len(redundancy[i]))
+			redundancy[i] = redundancy_pro[i]
+	
+	#	np.array(omnical.arrayinfo.compute_reds(antloc)) # Alternate way to compute.
+	# Ubl_list_raw = [[], []]
+	# Ubl_list = [[], []]
+	# ant_pos = [[], []]
+	#
+	# Nubl_raw = np.zeros(2, dtype=int)
+	# times_raw = np.zeros(2, dtype=int)
+	# times_raw_list = [[], []]
+	# redundancy_pro = [[], []]
+	# bsl_coord_dred = [[], []]
+	# vis_data_dred = [[], []]
+	# vis_data_dred_mfreq = [[], []]
+	#
+	# for i in range(2):
+	# 	Ubl_list_raw[i] = np.array(mmvs.arrayinfo.compute_reds_total(antloc[i]))  ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
+	# 	# Ubl_list_raw[1] = np.array(mmvs.arrayinfo.compute_reds_total(antloc_yy)) ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
+	# 	ant_pos[i] = antpos[i]
+	# # ant_pos[1] = antpos_yy
+	# for i in range(2):
+	# 	for i_ubl in range(len(Ubl_list_raw[i])):
+	# 		list_bsl = []
+	# 		for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
+	# 			try:
+	# 				list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
+	# 			except:
+	# 				try:
+	# 					list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1 - i])))
+	# 				except:
+	# 					try:
+	# 						list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
+	# 					except:
+	# 						try:
+	# 							list_bsl.append(bls[i].keys().index((ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1 - i])))
+	# 						except:
+	# 							# print('Baseline:%s%s not in bls[%s]'%(ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], ant_pos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], i))
+	# 							pass
+	#
+	# 		if len(list_bsl) >= 1:
+	# 			Ubl_list[i].append(list_bsl)
+	# 		else:
+	# 			pass
+	#
+	# for i in range(2):
+	# 	Nubl_raw[i] = len(Ubl_list[i])
+	# 	times_raw[i] = len(data_times[i])
+	# 	times_raw_list[i] = data_times[i]
+	# 	bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
+	# 	vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
+	# 	vis_data_dred_mfreq[i] = np.zeros((len(flist[i]), times_raw[i], Nubl_raw[i]), dtype='complex128')
+	#
+	# try:
+	# 	var_data_dred = [[], []]
+	# 	var_data_dred[0] = np.zeros((times_raw[0], Nubl_raw[0]), dtype='complex128')
+	# 	var_data_dred[1] = np.zeros((times_raw[1], Nubl_raw[1]), dtype='complex128')
+	# except:
+	# 	pass
+	#
+	# ########################### Average on Redundant baselines #############################
+	# # data_dred = {}
+	# dflags_dred = {}
+	#
+	# for i in range(2):
+	# 	# data_dred[i] = {}
+	# 	# dflags_dred[i] = {}
+	# 	dflags_dred[i] = LastUpdatedOrderedDict()
+	# 	pol = ['xx', 'yy'][i]
+	#
+	# 	for i_ubl in range(Nubl_raw[0]):
+	# 		vis_data_dred[i][:, i_ubl] = np.mean(vis_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
+	# 		bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
+	# 		# if Absolute_Calibration_dred:
+	# 		dflags_dred[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags_sf[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]]
+	# 		#				if i == 0:
+	# 		#					#data_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
+	# 		#					dflags_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = dflags[dflags.keys()[Ubl_list[i][i_ubl][0]]]
+	# 		#				else:
+	# 		#					#data_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
+	# 		#					dflags_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = dflags_yy[dflags_yy.keys()[Ubl_list[i][i_ubl][0]]]
+	# 		redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
+	# 		try:
+	# 			var_data_dred[i][:, i_ubl] = np.mean(var_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
+	# 		except:
+	# 			pass
+	#
+	# 	if Dred_preload:
+	# 		try:
+	# 			redundancy[i] = redundancy[i] + (np.array(redundancy_pro[i]) - 1)
+	# 		except:
+	# 			raise ValueError('Redundancy from preload and afterload does not match each other')
+	#
+	# 	else:
+	# 		print('Redundancy_preload: %s'%len(redundancy[i]))
+	# 		redundancy[i] = redundancy_pro[i]
+	#
+	# # vis_data_dred_mfreq = [[],[]]
+	# dflags_dred_mfreq = {}
+	#
+	# for i in range(2):
+	# 	# data_dred_mfreq[i] = {}
+	# 	# dflags_dred_mfreq[i] = {}
+	# 	dflags_dred_mfreq[i] = LastUpdatedOrderedDict()
+	# 	pol = ['xx', 'yy'][i]
+	#
+	# 	for i_ubl in range(Nubl_raw[0]):
+	# 		vis_data_dred_mfreq[i][:, :, i_ubl] = np.mean(vis_data_mfreq[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
+	# 		# bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
+	# 		# if Absolute_Calibration_dred_mfreq:
+	# 		dflags_dred_mfreq[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]] = dflags[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]]
+	# 		#				if i == 0:
+	# 		#					#data_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
+	# 		#					dflags_dred[i][dflags.keys()[Ubl_list[i][i_ubl][0]]] = dflags[dflags.keys()[Ubl_list[i][i_ubl][0]]]
+	# 		#				else:
+	# 		#					#data_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = vis_data_dred[i][:, i_ubl]
+	# 		#					dflags_dred[i][dflags_yy.keys()[Ubl_list[i][i_ubl][0]]] = dflags_yy[dflags_yy.keys()[Ubl_list[i][i_ubl][0]]]
+	# 		# redundancy_pro[i].append(len(Ubl_list[i][i_ubl]))
+	# 		try:
+	# 			var_data_dred[i][:, i_ubl] = np.mean(var_data[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
+	# 		except:
+	# 			pass
 	
 	# wgts_dred = copy.deepcopy(dflags_dred)
 	
@@ -2011,9 +2194,9 @@ elif INSTRUMENT == 'hera47':
 		#             unit='dBi')
 		plt.savefig(script_dir + '/../Output/%s-dipole-Beam-north-%.2f-bnside-%s.pdf' % (INSTRUMENT, freq, bnside))
 		plt.show(block=False)
-# plt.gcf().clear()
-# plt.clf()
-# plt.close()
+		# plt.gcf().clear()
+		# plt.clf()
+		# plt.close()
 
 print ('%s minutes used for preparing data.'%((time.time()-timer_pre)/60.))
 sys.stdout.flush()
@@ -2219,7 +2402,7 @@ if plot_data_error:
 sys.stdout.flush()
 
 ######################################### Absolute Calibration on Omnicaled Data #############################################
-if Absolute_Calibration_red:
+if Absolute_Calibration_red or Check_Dred_AFreq_ATime:
 	full_redabs_sim_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_redabs.simvis' % (INSTRUMENT, freq, nBL_red_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 	redabs_sim_vis_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_redabs_sim_xx.simvis' % (INSTRUMENT, freq, nBL_red_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 	redabs_sim_vis_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_redabs_sim_yy.simvis' % (INSTRUMENT, freq, nBL_red_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
@@ -2259,6 +2442,23 @@ if Absolute_Calibration_red:
 		autocorr_vis_red_normalized = np.array([autocorr_vis_red[p] / (la.norm(autocorr_vis_red[p]) / la.norm(np.ones_like(autocorr_vis_red[p]))) for p in range(2)])
 	else:
 		autocorr_vis_red_normalized = np.ones((2, nt_used))
+		
+	if Check_Dred_AFreq_ATime:
+		SingleFreq = True
+		MultiFreq = False
+		if SingleFreq and MultiFreq:
+			vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq)
+		elif MultiFreq:
+			vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=None, Nfreqs=None, data_times=None, Ntimes=60, FreqScaleFactor=None, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq)
+		elif SingleFreq:
+			vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data=fullsim_vis_red[:, :-1].transpose(0, 2, 1))
+		
+		try:
+			print('>>>>>>>>>>> Discrepancy between fullsim_vis and vis_data_dred from fullsim_vis_dred xx: %s'%(la.norm(fullsim_vis.transpose(1, 2, 0)[0] - vis_data_dred[0])))
+			print('>>>>>>>>>>> Discrepancy between fullsim_vis and vis_data_dred from fullsim_vis_dred yy: %s' % (la.norm(fullsim_vis.transpose(1, 2, 0)[1] - vis_data_dred[1])))
+		except:
+			raise ValueError('Cannot check De-Redundancy')
+		
 	fullsim_vis_red = fullsim_vis_red[:, :-1].transpose((1, 0, 2))
 	
 	if plot_data_error:
