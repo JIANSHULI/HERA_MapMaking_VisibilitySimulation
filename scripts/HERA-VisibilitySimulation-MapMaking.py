@@ -1839,6 +1839,7 @@ elif INSTRUMENT == 'hera47':
 			Nubl_raw[i] = len(Ubl_list[i])
 			times_raw[i] = len(data_times[i]) if data_times != None else Ntimes
 			bsl_coord_dred[i] = np.zeros((Nubl_raw[i], 3))
+			bsl_coord_dred_mfreq[i] = np.zeros((Nubl_raw[i], 3))
 			vis_data_dred[i] = np.zeros((times_raw[i], Nubl_raw[i]), dtype='complex128')
 			vis_data_dred_mfreq[i] = np.zeros((len(data_freqs[i]), times_raw[i], Nubl_raw[i]), dtype='complex128') if data_freqs != None else np.zeros((Nfreqs, times_raw[i], Nubl_raw[i]), dtype='complex128')
 
