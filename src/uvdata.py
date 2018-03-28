@@ -1264,7 +1264,7 @@ class UVData(UVBase):
     def select_average(self, antenna_nums=None, antenna_names=None, ant_str=None,
                ant_pairs_nums=None, frequencies=None, freq_chans=None,
                times=None, polarizations=None, blt_inds=None, run_check=True,
-               check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1):
+               check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1, tol=5.e-4):
         """
         Select specific antennas, antenna pairs, frequencies, times and
         polarizations to keep in the object while discarding others.
@@ -1428,7 +1428,7 @@ class UVData(UVBase):
             antpos, ants = self.get_ENU_antpos(center=True, pick_data_ants=pick_data_ants)
             antpos = odict(zip(ants, antpos))
             antloc = np.array(map(lambda k: antpos[k], ants))
-            Ubl_list_raw = np.array(mmvs.arrayinfo.compute_reds_total_autocorr(antloc))
+            Ubl_list_raw = np.array(mmvs.arrayinfo.compute_reds_total_autocorr(antloc, tol=tol))
             
             try:
                 print('Length of Ubl_list_raw: %s'%len(Ubl_list_raw))
@@ -1465,6 +1465,10 @@ class UVData(UVBase):
                     # uv_object.Nubls += 1
                     for i_ubl_pair in range(len(Ubl_list_raw[i_ubl])):
                         pair = np.array([antpos.keys()[Ubl_list_raw[i_ubl][i_ubl_pair][0]], antpos.keys()[Ubl_list_raw[i_ubl][i_ubl_pair][1]]])
+                        try:
+                            print('%s Ubsl: %s' %(i_ubl, str(pair)))
+                        except:
+                            print('Redundant Pair not Printed')
                         # if pair[0] == pair[1]:
                         wh1 = np.where(np.logical_and(
                             self.ant_1_array == pair[0], self.ant_2_array == pair[1]))[0]
@@ -2130,7 +2134,7 @@ class UVData(UVBase):
 
     def read_miriad(self, filepath, correct_lat_lon=True, run_check=True,
                     check_extra=True,
-                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True):
+                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4):
         """
         Read in data from a miriad file.
 
@@ -2149,7 +2153,7 @@ class UVData(UVBase):
                              run_check=run_check, check_extra=check_extra,
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
-            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace)
+            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             print('Number of Unique baselines after Dred: %s'%self.Nubls)
@@ -2164,7 +2168,7 @@ class UVData(UVBase):
                                     run_check=run_check, check_extra=check_extra,
                                     run_check_acceptability=run_check_acceptability,
                                     phase_type=phase_type)
-                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace)
+                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol)
                     self += uv2
                     
                     print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
