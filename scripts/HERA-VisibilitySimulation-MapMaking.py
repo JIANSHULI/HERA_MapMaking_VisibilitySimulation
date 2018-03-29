@@ -4275,7 +4275,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 				
 				# beam
 				
-				print "Computing sky weighting A matrix for %s pol, for freq: %s" % (p, f)
+				print "Computing sky weighting A matrix for pol: %s, for freq: %s" % (p, f)
 				sys.stdout.flush()
 				
 				# A[p] = np.zeros((nt_used * len(used_common_ubls), 12 * nside_beamweight ** 2), dtype='complex128')
@@ -4399,7 +4399,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 					# A[:, -1, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_y, tlist=lsts) / 2
 					
 					print "%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), p, f)
-				print('Shape of A[%s]: %s' % (p, str(A[p].shape)))
+				print('Shape of A[%s]: %s' % (p, str(A[:, :, id_p, :, :].shape)))
 				sys.stdout.flush()
 			
 			A = A.reshape(len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used)
@@ -4444,7 +4444,7 @@ AllSky = False
 MaskedSky = True
 Synthesize_MultiFreq = True
 Compute_A = True
-A_path_test = datadir + tag +'test'
+A_path_test = datadir + tag +'test0'
 if Test_A_mfreq:
 	if not Synthesize_MultiFreq:
 		if not MaskedSky:
