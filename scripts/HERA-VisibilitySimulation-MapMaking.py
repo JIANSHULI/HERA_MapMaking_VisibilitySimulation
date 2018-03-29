@@ -4241,7 +4241,9 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 	if AllSky:
 		A_version = A_version
 		A = {}
-		
+		if equatorial_GSM_standard is None and Synthesize_MultiFreq:
+			equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
+			
 		for id_p, p in enumerate(['x', 'y']):
 			pol = p + p
 			print "%i UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(ubls[p]), np.max(np.linalg.norm(ubls[p], axis=1)) / (C / freq), pol)
@@ -4268,8 +4270,6 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 					elif p == 'y':
 						beam_heal_equ = beam_heal_equ_y
 				else:
-					if equatorial_GSM_standard is None:
-						equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
 					if p == 'x':
 						beam_heal_equ = beam_heal_equ_x_mfreq[Flist_select_index[id_p][id_f]]
 					elif p == 'y':
