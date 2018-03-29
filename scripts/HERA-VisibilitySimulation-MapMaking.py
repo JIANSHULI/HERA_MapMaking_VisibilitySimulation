@@ -4268,6 +4268,8 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 					elif p == 'y':
 						beam_heal_equ = beam_heal_equ_y
 				else:
+					if equatorial_GSM_standard is None:
+						equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
 					if p == 'x':
 						beam_heal_equ = beam_heal_equ_x_mfreq[Flist_select_index[id_p][id_f]]
 					elif p == 'y':
@@ -4287,7 +4289,9 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 					print "\r%.1f%% completed" % (100. * float(i) / (12. * nside_beamweight ** 2)),
 					sys.stdout.flush()
 					if abs(dec - lat_degree * PI / 180) <= PI / 2:
-						A[p][id_f, :, i] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts).flatten()
+						if Synthesize_MultiFreq:
+							A[p][id_f, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts).flatten()) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], i] / equatorial_GSM_standard[i])
+						A[p][id_f, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts).flatten())
 				
 				print "%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), pol, f)
 				sys.stdout.flush()
@@ -4440,8 +4444,8 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 
 
 Test_A_mfreq= False
-AllSky = False
-MaskedSky = True
+AllSky = True
+MaskedSky = False
 Synthesize_MultiFreq = True
 Compute_A = True
 A_path_test = datadir + tag +'test0'
