@@ -1222,6 +1222,224 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 		# return A, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map
 
 
+def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT='', full_sim_filename_mfreq='', sim_vis_xx_filename_mfreq='', sim_vis_yy_filename_mfreq='', Force_Compute_Vis=True, Get_beam_GSM=False, Force_Compute_beam_GSM=False, Multi_freq=False, Multi_Sin_freq=False, Fake_Multi_freq=False,
+                              flist=None, freq_index=None, freq=None, equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None,
+                              beam_weight=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None,
+                              beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, tlist=None, Time_Expansion_Factor=1.):
+	if Force_Compute_beam_GSM or Get_beam_GSM:
+		beam_heal_hor_x_mfreq = np.array([local_beam_unpol(flist[0][i])[0] for i in range(len(flist[0]))])
+		beam_heal_hor_y_mfreq = np.array([local_beam_unpol(flist[1][i])[1] for i in range(len(flist[1]))])
+		beam_heal_equ_x_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_x_mfreq[i], 0, PI / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(len(flist[0]))])
+		beam_heal_equ_y_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_y_mfreq[i], 0, PI / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(len(flist[1]))])
+		
+		pca1 = hp.fitsfunc.read_map(script_dir + '/../data/gsm1.fits' + str(nside_standard))
+		pca2 = hp.fitsfunc.read_map(script_dir + '/../data/gsm2.fits' + str(nside_standard))
+		pca3 = hp.fitsfunc.read_map(script_dir + '/../data/gsm3.fits' + str(nside_standard))
+		components = np.loadtxt(script_dir + '/../data/components.dat')
+		scale_loglog = si.interp1d(np.log(components[:, 0]), np.log(components[:, 1]))
+		w1 = si.interp1d(components[:, 0], components[:, 2])
+		w2 = si.interp1d(components[:, 0], components[:, 3])
+		w3 = si.interp1d(components[:, 0], components[:, 4])
+		gsm_standard = {}
+		for i in range(2):
+			gsm_standard[i] = np.exp(scale_loglog(np.log(freq[i]))) * (w1(freq[i]) * pca1 + w2(freq[i]) * pca2 + w3(freq[i]) * pca3)
+		if Multi_freq:
+			gsm_standard_mfreq = {}
+			for p in range(2):
+				gsm_standard_mfreq[p] = np.array([np.exp(scale_loglog(np.log(flist[p][i]))) * (w1(flist[p][i]) * pca1 + w2(flist[p][i]) * pca2 + w3(flist[p][i]) * pca3) for i in range(len(flist[p]))])
+		
+		# rotate sky map and converts to nest
+		equatorial_GSM_standard = np.zeros(12 * nside_standard ** 2, 'float')
+		print "Rotating GSM_standard and converts to nest...",
+		
+		if INSTRUMENT == 'miteor':
+			DecimalYear = 2013.58  # 2013, 7, 31, 16, 47, 59, 999998)
+			JulianEpoch = 2013.58
+		elif INSTRUMENT == 'hera47':
+			DecimalYear = Time(tlist_JD[0], format='jd').decimalyear + (np.mean(Time(tlist_JD, format='jd').decimalyear) - Time(tlist_JD[0], format='jd').decimalyear) * Time_Expansion_Factor
+			JulianEpoch = Time(tlist_JD[0], format='jd').jyear + (np.mean(Time(tlist_JD, format='jd').jyear) - Time(tlist_JD[0], format='jd').jyear) * Time_Expansion_Factor  # np.mean(Time(data_times[0], format='jd').jyear)
+		print('JulianEpoch: %s' % (str(JulianEpoch)))
+		
+		sys.stdout.flush()
+		equ_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=JulianEpoch))
+		ang0, ang1 = hp.rotator.rotateDirection(equ_to_gal_matrix,
+		                                        hpf.pix2ang(nside_standard, range(12 * nside_standard ** 2), nest=True))
+		equatorial_GSM_standard = {}
+		for i in range(2):
+			equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard[i], ang0, ang1)
+		equatorial_GSM_standard_xx = equatorial_GSM_standard[0]
+		equatorial_GSM_standard_yy = equatorial_GSM_standard[1]
+		del (equatorial_GSM_standard)
+		if Multi_freq:
+			equatorial_GSM_standard_mfreq = {}
+			for p in range(2):
+				equatorial_GSM_standard_mfreq[p] = np.array([hpf.get_interp_val(gsm_standard_mfreq[p][i], ang0, ang1) for i in range(len(flist[p]))])
+			equatorial_GSM_standard_mfreq_xx = equatorial_GSM_standard_mfreq[0]
+			equatorial_GSM_standard_mfreq_yy = equatorial_GSM_standard_mfreq[1]
+			del (equatorial_GSM_standard_mfreq)
+		
+		print "done."
+	
+	# if Get_beam_GSM:
+	# 	return
+	
+	if not Multi_freq and not Fake_Multi_freq:
+		if flist is None and freq_index is None and freq is None:
+			raise valueerror('no frequency can be specified.')
+		elif freq is not None:
+			flist = [[freq[0]], [freq[1]]]
+			if flist is not None:
+				freq_index[0] = np.abs(freq[0] - flist[0]).argmin()
+				freq_index[1] = np.abs(freq[1] - flist[1]).argmin()
+		elif flist is not None and freq_index is not None:
+			flist = [[flist[0][freq_index[0]]], [flist[1][freq_index[1]]]]
+		elif flist is not None and freq_index is None:
+			flist = [[flist[0][len(flist[0]) / 2]], [flist[1][len(flist[1]) / 2]]]
+			freq_index = [len(flist[0]) / 2, len(flist[0]) / 2]
+			print ('choose the middle of flist for each pol as default since none has been specified.')
+	
+	else:
+		if flist is None:
+			if Fake_Multi_freq and (nf_used is None or freq_index is None):
+				raise ValueError('Cannot do fake-mfreq simulation without flist provided.')
+			elif Fake_Multi_freq:
+				flist = np.ones((2, nf_used))
+			else:
+				raise ValueError('Cannot do mfreq simulation without flist provided.')
+		elif Multi_Sin_freq or Fake_Multi_freq:
+			if freq_index is not None or freq is not None:
+				if freq_index is None:
+					freq_index = {}
+					for i in range(2):
+						freq_index[i] = np.abs(freq[i] - flist[i]).argmin()
+				elif freq is not None:
+					for i in range(2):
+						if freq_index[i] != np.abs(freq[i] - flist[i]).argmin():
+							print('freq not match freq_index from flist, use freq_index from flist for pol-%s.' % ['xx', 'yy'][i])
+			for i in range(2):
+				freq[i] = flist[i][freq_index[i]]
+				print('Sinfreq from multifreq: %s-%s' % (freq_index[i], freq[i]))
+	
+	if len(flist[0]) != len(flist[1]):
+		raise ValueError('Two pol nf_used not same: %s != %s' % (len(flist[0]), len(flist[1])))
+	nf_used = len(flist[0])
+	
+	try:
+		print('flist: %s MHz;\nnf_used: %s' % (str(flist), nf_used))
+	except:
+		raise ValueError('No flist information successfully processed and printed.')
+	
+	if used_common_ubls is not None and nUBL_used is not None:
+		if len(used_common_ubls) != nUBL_used:
+			raise ValueError('number of used_common_ubls%s doesnot match nUBL_used%s.' % (len(used_common_ubls), nUBL_used))
+	nUBL_used = len(used_common_ubls)
+	
+	if lsts is not None and nt_used is not None:
+		if len(lsts) != nt_used:
+			raise ValueError('number of lsts%s doesnot match nt_used%s.' % (len(lsts), nt_used))
+	nt_used = len(lsts)
+	
+	if not Multi_freq or Fake_Multi_freq:
+		if beam_heal_equ_x is None and beam_heal_equ_x_mfreq is not None:
+			beam_heal_equ_x = beam_heal_equ_x_mfreq[freq_index[0]]
+		elif beam_heal_equ_x is None and beam_heal_equ_x_mfreq is None:
+			raise ValueError('No x beam data.')
+		if beam_heal_equ_y is None and beam_heal_equ_y_mfreq is not None:
+			beam_heal_equ_y = beam_heal_equ_y_mfreq[freq_index[1]]
+		elif beam_heal_equ_y is None and beam_heal_equ_y_mfreq is None:
+			raise ValueError('No y beam data either from sinfreq or multifreq.')
+		beam_heal_equ_x_mfreq = [beam_heal_equ_x]
+		beam_heal_equ_y_mfreq = [beam_heal_equ_y]
+	
+	else:
+		if beam_heal_equ_x_mfreq is None or beam_heal_equ_y_mfreq is None:
+			raise ValueError('No multifreq beam data.')
+	
+	if not Multi_freq or Fake_Multi_freq:
+		if equatorial_GSM_standard_xx is None and equatorial_GSM_standard_mfreq_xx is not None:
+			equatorial_GSM_standard_xx = equatorial_GSM_standard_mfreq_xx[freq_index[0]]
+		elif equatorial_GSM_standard_xx is None and equatorial_GSM_standard_mfreq_xx is None:
+			raise ValueError('No equatorial_GSM_standard_xx data.')
+		if equatorial_GSM_standard_yy is None and equatorial_GSM_standard_mfreq_yy is not None:
+			equatorial_GSM_standard_yy = equatorial_GSM_standard_mfreq_yy[freq_index[1]]
+		elif equatorial_GSM_standard_yy is None and equatorial_GSM_standard_mfreq_yy is None:
+			raise ValueError('No equatorial_GSM_standard data.')
+		
+		equatorial_GSM_standard_mfreq = np.array([[equatorial_GSM_standard_xx], [equatorial_GSM_standard_yy]])
+	
+	else:
+		if beam_heal_equ_x_mfreq is None or beam_heal_equ_y_mfreq is None:
+			raise ValueError('No multifreq beam data.')
+		equatorial_GSM_standard_mfreq = np.array([equatorial_GSM_standard_mfreq_xx, equatorial_GSM_standard_mfreq_yy])
+	
+	if os.path.isfile(full_sim_filename_mfreq) and not Force_Compute_Vis:
+		fullsim_vis_mfreq = np.fromfile(full_sim_filename_mfreq, dtype='complex128').reshape((2, nUBL_used + 1, nt_used, nf_used))
+		fullsim_vis_mfreq[0][:-1].astype('complex128').tofile(sim_vis_xx_filename_mfreq)
+		fullsim_vis_mfreq[1][:-1].astype('complex128').tofile(sim_vis_yy_filename_mfreq)
+	
+	else:
+		
+		fullsim_vis_mfreq = np.zeros((2, nUBL_used + 1, nt_used, nf_used), dtype='complex128')  # since its going to accumulate along the pixels it needs to start with complex128. significant error if start with complex64
+		if Fake_Multi_freq:
+			print('>>>>Freq_index selected not fake before: %s' % (str(freq_index)))
+			freq_index_fakemfreq = copy.deepcopy(freq_index)
+			fullsim_vis, autocorr_vis = Simulate_Visibility_mfreq(full_sim_filename_mfreq='', sim_vis_xx_filename_mfreq='', sim_vis_yy_filename_mfreq='', Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
+			                                                      flist=flist, freq_index=freq_index_fakemfreq, freq=freq, equatorial_GSM_standard_xx=equatorial_GSM_standard_xx, equatorial_GSM_standard_yy=equatorial_GSM_standard_yy, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq_xx, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq_yy, beam_weight=beam_weight,
+			                                                      C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
+			                                                      nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
+			for id_p in range(2):
+				fullsim_vis_mfreq[id_p, :-1, :, freq_index[id_p]] = fullsim_vis[:, id_p, :]
+				fullsim_vis_mfreq[id_p, -1, :, freq_index[id_p]] = autocorr_vis[id_p]
+			# freq_index = freq_index_fakemfreq
+			print('>>>>Freq_index selected not fake: %s' % (str(freq_index)))
+		
+		else:
+			full_sim_ubls = np.concatenate((used_common_ubls, [[0, 0, 0]]), axis=0)  # tag along auto corr
+			full_thetas, full_phis = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
+			full_decs = PI / 2 - full_thetas
+			full_ras = full_phis
+			full_sim_mask = hpf.get_interp_val(beam_weight, full_thetas, full_phis, nest=True) > 0
+			# fullsim_vis_DBG = np.zeros((2, len(used_common_ubls), nt_used, np.sum(full_sim_mask)), dtype='complex128')
+			
+			print "Simulating visibilities, %s, expected time %f min" % (datetime.datetime.now(), 14.6 * nf_used * (nUBL_used / 78.) * (nt_used / 193.) * (np.sum(full_sim_mask) / 1.4e5)),
+			sys.stdout.flush()
+			masked_equ_GSM_mfreq = equatorial_GSM_standard_mfreq[:, :, full_sim_mask]
+			timer = time.time()
+			for id_f, f in enumerate(flist[0]):
+				for p, beam_heal_equ in enumerate([beam_heal_equ_x_mfreq[id_f], beam_heal_equ_y_mfreq[id_f]]):
+					f = flist[p][id_f]
+					for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
+						res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
+						fullsim_vis_mfreq[p, :, :, id_f] += masked_equ_GSM_mfreq[p, id_f, i] * res
+			# fullsim_vis_DBG[p, ..., i] = res[:-1]
+			# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
+			print "simulated visibilities in %f minutes." % ((time.time() - timer) / 60.)
+			try:
+				fullsim_vis_mfreq.astype('complex128').tofile(full_sim_filename_mfreq)
+				fullsim_vis_mfreq[0][:-1, :, :].astype('complex128').tofile(sim_vis_xx_filename_mfreq)
+				fullsim_vis_mfreq[1][:-1, :, :].astype('complex128').tofile(sim_vis_yy_filename_mfreq)
+			except:
+				print('>>>>>>>>>>>>> Not Saved.')
+	
+	autocorr_vis_mfreq = np.abs(np.squeeze(fullsim_vis_mfreq[:, -1]))
+	fullsim_vis_mfreq = np.squeeze(fullsim_vis_mfreq[:, :-1].transpose((1, 0, 2, 3)))  # (uBL, Pol, Times, Freqs)
+	
+	if Multi_Sin_freq and Multi_freq:
+		autocorr_vis = np.concatenate((autocorr_vis_mfreq[0:1, :, freq_index[0]], autocorr_vis_mfreq[1:2, :, freq_index[1]]), axis=0)
+		fullsim_vis = np.concatenate((fullsim_vis_mfreq[:, 0:1, :, freq_index[0]], fullsim_vis_mfreq[:, 1:2, :, freq_index[1]]), axis=1)
+	
+	if Multi_Sin_freq and Multi_freq:
+		print('Shape of Autocorr_vis at %sMHz: %s' % (str(freq), str(autocorr_vis.shape)))
+		print('Shape of Fullsim_vis at %sMHz: %s' % (str(freq), str(fullsim_vis.shape)))
+		print('Shape of Autocorr_vis_mfreq: %s' % (str(autocorr_vis_mfreq.shape)))
+		print('Shape of Fullsim_vis_mfreq: %s' % (str(fullsim_vis_mfreq.shape)))
+		return fullsim_vis_mfreq, autocorr_vis_mfreq, fullsim_vis, autocorr_vis
+	
+	else:
+		print('Shape of Autocorr_vis_mfreq: %s' % (str(autocorr_vis_mfreq.shape)))
+		print('Shape of Fullsim_vis_mfreq: %s' % (str(fullsim_vis_mfreq.shape)))
+		return fullsim_vis_mfreq, autocorr_vis_mfreq
+
 
 INSTRUMENT = ''
 
@@ -1491,7 +1709,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Select = 150. # MHz
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 5.e-4 # meter, Criterion for De-Redundancy
+	Tolerance = 5.e-2 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
 	
@@ -2787,228 +3005,7 @@ if Test_A_mfreq:
 
 
 
-def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT=INSTRUMENT, full_sim_filename_mfreq='', sim_vis_xx_filename_mfreq='', sim_vis_yy_filename_mfreq='', Force_Compute_Vis=True, Get_beam_GSM=False, Force_Compute_beam_GSM=False, Multi_freq=False, Multi_Sin_freq=False, Fake_Multi_freq=False,
-                              flist=None, freq_index=None, freq=None, equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None,
-                              beam_weight=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None,
-                              beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, tlist=None, Time_Expansion_Factor=1.):
-	
-	if Force_Compute_beam_GSM or Get_beam_GSM:
-		beam_heal_hor_x_mfreq = np.array([local_beam_unpol(flist[0][i])[0] for i in range(len(flist[0]))])
-		beam_heal_hor_y_mfreq = np.array([local_beam_unpol(flist[1][i])[1] for i in range(len(flist[1]))])
-		beam_heal_equ_x_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_x_mfreq[i], 0, PI / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(len(flist[0]))])
-		beam_heal_equ_y_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_y_mfreq[i], 0, PI / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(len(flist[1]))])
-		
-		pca1 = hp.fitsfunc.read_map(script_dir + '/../data/gsm1.fits' + str(nside_standard))
-		pca2 = hp.fitsfunc.read_map(script_dir + '/../data/gsm2.fits' + str(nside_standard))
-		pca3 = hp.fitsfunc.read_map(script_dir + '/../data/gsm3.fits' + str(nside_standard))
-		components = np.loadtxt(script_dir + '/../data/components.dat')
-		scale_loglog = si.interp1d(np.log(components[:, 0]), np.log(components[:, 1]))
-		w1 = si.interp1d(components[:, 0], components[:, 2])
-		w2 = si.interp1d(components[:, 0], components[:, 3])
-		w3 = si.interp1d(components[:, 0], components[:, 4])
-		gsm_standard = {}
-		for i in range(2):
-			gsm_standard[i] = np.exp(scale_loglog(np.log(freq[i]))) * (w1(freq[i]) * pca1 + w2(freq[i]) * pca2 + w3(freq[i]) * pca3)
-		if Multi_freq:
-			gsm_standard_mfreq = {}
-			for p in range(2):
-				gsm_standard_mfreq[p] = np.array([np.exp(scale_loglog(np.log(flist[p][i]))) * (w1(flist[p][i]) * pca1 + w2(flist[p][i]) * pca2 + w3(flist[p][i]) * pca3) for i in range(len(flist[p]))])
-		
-		# rotate sky map and converts to nest
-		equatorial_GSM_standard = np.zeros(12 * nside_standard ** 2, 'float')
-		print "Rotating GSM_standard and converts to nest...",
-		
-		if INSTRUMENT == 'miteor':
-			DecimalYear = 2013.58  # 2013, 7, 31, 16, 47, 59, 999998)
-			JulianEpoch = 2013.58
-		elif INSTRUMENT == 'hera47':
-			DecimalYear = Time(tlist_JD[0], format='jd').decimalyear + (np.mean(Time(tlist_JD, format='jd').decimalyear) - Time(tlist_JD[0], format='jd').decimalyear) * Time_Expansion_Factor
-			JulianEpoch = Time(tlist_JD[0], format='jd').jyear + (np.mean(Time(tlist_JD, format='jd').jyear) - Time(tlist_JD[0], format='jd').jyear) * Time_Expansion_Factor  # np.mean(Time(data_times[0], format='jd').jyear)
-		print('JulianEpoch: %s'%(str(JulianEpoch)))
-		
-		sys.stdout.flush()
-		equ_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=JulianEpoch))
-		ang0, ang1 = hp.rotator.rotateDirection(equ_to_gal_matrix,
-		                                        hpf.pix2ang(nside_standard, range(12 * nside_standard ** 2), nest=True))
-		equatorial_GSM_standard = {}
-		for i in range(2):
-			equatorial_GSM_standard[i] = hpf.get_interp_val(gsm_standard[i], ang0, ang1)
-		equatorial_GSM_standard_xx = equatorial_GSM_standard[0]
-		equatorial_GSM_standard_yy = equatorial_GSM_standard[1]
-		del (equatorial_GSM_standard)
-		if Multi_freq:
-			equatorial_GSM_standard_mfreq = {}
-			for p in range(2):
-				equatorial_GSM_standard_mfreq[p] = np.array([hpf.get_interp_val(gsm_standard_mfreq[p][i], ang0, ang1) for i in range(len(flist[p]))])
-			equatorial_GSM_standard_mfreq_xx = equatorial_GSM_standard_mfreq[0]
-			equatorial_GSM_standard_mfreq_yy = equatorial_GSM_standard_mfreq[1]
-			del (equatorial_GSM_standard_mfreq)
-		
-		print "done."
-		
-		# if Get_beam_GSM:
-		# 	return
-	
-	if not Multi_freq and not Fake_Multi_freq:
-		if flist is None and freq_index is None and freq is None:
-			raise valueerror('no frequency can be specified.')
-		elif freq is not None:
-			flist = [[freq[0]], [freq[1]]]
-			if flist is not None:
-				freq_index[0] = np.abs(freq[0] - flist[0]).argmin()
-				freq_index[1] = np.abs(freq[1] - flist[1]).argmin()
-		elif flist is not None and freq_index is not None:
-			flist = [[flist[0][freq_index[0]]], [flist[1][freq_index[1]]]]
-		elif flist is not None and freq_index is None:
-			flist = [[flist[0][len(flist[0])/2]], [flist[1][len(flist[1])/2]]]
-			freq_index = [len(flist[0])/2, len(flist[0])/2]
-			print ('choose the middle of flist for each pol as default since none has been specified.')
-	  
-	else:
-		if flist is None:
-			if Fake_Multi_freq and (nf_used is None or freq_index is None):
-				raise ValueError('Cannot do fake-mfreq simulation without flist provided.')
-			elif Fake_Multi_freq:
-				flist= np.ones((2, nf_used))
-			else:
-				raise ValueError('Cannot do mfreq simulation without flist provided.')
-		elif Multi_Sin_freq or Fake_Multi_freq:
-			if freq_index is not None or freq is not None:
-				if freq_index is None:
-					freq_index = {}
-					for i in range(2):
-						freq_index[i] = np.abs(freq[i]-flist[i]).argmin()
-				elif freq is not None:
-					for i in range(2):
-						if freq_index[i] != np.abs(freq[i] - flist[i]).argmin():
-							print('freq not match freq_index from flist, use freq_index from flist for pol-%s.'%['xx', 'yy'][i])
-			for i in range(2):
-				freq[i] = flist[i][freq_index[i]]
-				print('Sinfreq from multifreq: %s-%s'%(freq_index[i], freq[i]))
-	
-	if len(flist[0]) != len(flist[1]):
-		raise ValueError('Two pol nf_used not same: %s != %s'%(len(flist[0]), len(flist[1])))
-	nf_used = len(flist[0])
-	
-	try:
-		print('flist: %s MHz;\nnf_used: %s'%(str(flist), nf_used))
-	except:
-		raise ValueError('No flist information successfully processed and printed.')
-		
-	if used_common_ubls is not None and nUBL_used is not None:
-		if len(used_common_ubls) != nUBL_used:
-			raise ValueError('number of used_common_ubls%s doesnot match nUBL_used%s.'%(len(used_common_ubls), nUBL_used))
-	nUBL_used = len(used_common_ubls)
-	
-	if lsts is not None and nt_used is not None:
-		if len(lsts) != nt_used:
-			raise ValueError('number of lsts%s doesnot match nt_used%s.'%(len(lsts), nt_used))
-	nt_used = len(lsts)
-	
-	if not Multi_freq or Fake_Multi_freq:
-		if beam_heal_equ_x is None and beam_heal_equ_x_mfreq is not None:
-			beam_heal_equ_x = beam_heal_equ_x_mfreq[freq_index[0]]
-		elif beam_heal_equ_x is None and beam_heal_equ_x_mfreq is None:
-			raise ValueError('No x beam data.')
-		if beam_heal_equ_y is None and beam_heal_equ_y_mfreq is not None:
-			beam_heal_equ_y = beam_heal_equ_y_mfreq[freq_index[1]]
-		elif beam_heal_equ_y is None and beam_heal_equ_y_mfreq is None:
-			raise ValueError('No y beam data either from sinfreq or multifreq.')
-		beam_heal_equ_x_mfreq = [beam_heal_equ_x]
-		beam_heal_equ_y_mfreq = [beam_heal_equ_y]
-		
-	else:
-		if beam_heal_equ_x_mfreq is None or beam_heal_equ_y_mfreq is None:
-			raise ValueError('No multifreq beam data.')
-	
-	if not Multi_freq or Fake_Multi_freq:
-		if equatorial_GSM_standard_xx is None and equatorial_GSM_standard_mfreq_xx is not None:
-			equatorial_GSM_standard_xx = equatorial_GSM_standard_mfreq_xx[freq_index[0]]
-		elif equatorial_GSM_standard_xx is None and equatorial_GSM_standard_mfreq_xx is None:
-			raise ValueError('No equatorial_GSM_standard_xx data.')
-		if equatorial_GSM_standard_yy is None and equatorial_GSM_standard_mfreq_yy is not None:
-			equatorial_GSM_standard_yy = equatorial_GSM_standard_mfreq_yy[freq_index[1]]
-		elif equatorial_GSM_standard_yy is None and equatorial_GSM_standard_mfreq_yy is None:
-			raise ValueError('No equatorial_GSM_standard data.')
 
-		equatorial_GSM_standard_mfreq = np.array([[equatorial_GSM_standard_xx], [equatorial_GSM_standard_yy]])
-	
-	else:
-		if beam_heal_equ_x_mfreq is None or beam_heal_equ_y_mfreq is None:
-			raise ValueError('No multifreq beam data.')
-		equatorial_GSM_standard_mfreq = np.array([equatorial_GSM_standard_mfreq_xx, equatorial_GSM_standard_mfreq_yy])
-		
-	
-	if os.path.isfile(full_sim_filename_mfreq) and not Force_Compute_Vis:
-		fullsim_vis_mfreq = np.fromfile(full_sim_filename_mfreq, dtype='complex128').reshape((2, nUBL_used + 1, nt_used, nf_used))
-		fullsim_vis_mfreq[0][:-1].astype('complex128').tofile(sim_vis_xx_filename_mfreq)
-		fullsim_vis_mfreq[1][:-1].astype('complex128').tofile(sim_vis_yy_filename_mfreq)
-	
-	else:
-		
-		fullsim_vis_mfreq = np.zeros((2, nUBL_used + 1, nt_used, nf_used), dtype='complex128')  # since its going to accumulate along the pixels it needs to start with complex128. significant error if start with complex64
-		if Fake_Multi_freq:
-			print('>>>>Freq_index selected not fake before: %s' % (str(freq_index)))
-			freq_index_fakemfreq = copy.deepcopy(freq_index)
-			fullsim_vis, autocorr_vis = Simulate_Visibility_mfreq(full_sim_filename_mfreq='', sim_vis_xx_filename_mfreq='', sim_vis_yy_filename_mfreq='', Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
-			                          flist=flist, freq_index=freq_index_fakemfreq, freq=freq, equatorial_GSM_standard_xx=equatorial_GSM_standard_xx, equatorial_GSM_standard_yy=equatorial_GSM_standard_yy, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq_xx, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq_yy, beam_weight=beam_weight,
-			                          C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
-			                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
-			for id_p in range(2):
-				fullsim_vis_mfreq[id_p, :-1, :, freq_index[id_p]] = fullsim_vis[:, id_p, :]
-				fullsim_vis_mfreq[id_p, -1, :, freq_index[id_p]] = autocorr_vis[id_p]
-			# freq_index = freq_index_fakemfreq
-			print('>>>>Freq_index selected not fake: %s'%(str(freq_index)))
-			
-		else:
-			full_sim_ubls = np.concatenate((used_common_ubls, [[0, 0, 0]]), axis=0)  # tag along auto corr
-			full_thetas, full_phis = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
-			full_decs = PI / 2 - full_thetas
-			full_ras = full_phis
-			full_sim_mask = hpf.get_interp_val(beam_weight, full_thetas, full_phis, nest=True) > 0
-			# fullsim_vis_DBG = np.zeros((2, len(used_common_ubls), nt_used, np.sum(full_sim_mask)), dtype='complex128')
-			
-			print "Simulating visibilities, %s, expected time %f min" % (datetime.datetime.now(), 14.6 * nf_used * (nUBL_used / 78.) * (nt_used / 193.) * (np.sum(full_sim_mask) / 1.4e5)),
-			sys.stdout.flush()
-			masked_equ_GSM_mfreq = equatorial_GSM_standard_mfreq[:, :, full_sim_mask]
-			timer = time.time()
-			for id_f, f in enumerate(flist[0]):
-				for p, beam_heal_equ in enumerate([beam_heal_equ_x_mfreq[id_f], beam_heal_equ_y_mfreq[id_f]]):
-					f = flist[p][id_f]
-					for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
-						res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
-						fullsim_vis_mfreq[p, :, :, id_f] += masked_equ_GSM_mfreq[p, id_f, i] * res
-			# fullsim_vis_DBG[p, ..., i] = res[:-1]
-			# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
-			print "simulated visibilities in %f minutes." % ((time.time() - timer) / 60.)
-			try:
-				fullsim_vis_mfreq.astype('complex128').tofile(full_sim_filename_mfreq)
-				fullsim_vis_mfreq[0][:-1, :, :].astype('complex128').tofile(sim_vis_xx_filename_mfreq)
-				fullsim_vis_mfreq[1][:-1, :, :].astype('complex128').tofile(sim_vis_yy_filename_mfreq)
-			except:
-				print('>>>>>>>>>>>>> Not Saved.')
-	
-	
-	autocorr_vis_mfreq = np.abs(np.squeeze(fullsim_vis_mfreq[:, -1]))
-	fullsim_vis_mfreq = np.squeeze(fullsim_vis_mfreq[:, :-1].transpose((1, 0, 2, 3)))  # (uBL, Pol, Times, Freqs)
-	
-	if Multi_Sin_freq and Multi_freq:
-		autocorr_vis = np.concatenate((autocorr_vis_mfreq[0:1, :, freq_index[0]], autocorr_vis_mfreq[1:2, :, freq_index[1]]), axis=0)
-		fullsim_vis = np.concatenate((fullsim_vis_mfreq[:, 0:1, :, freq_index[0]], fullsim_vis_mfreq[:, 1:2, :, freq_index[1]]), axis=1)
-	
-		
-	if Multi_Sin_freq and Multi_freq:
-		print('Shape of Autocorr_vis at %sMHz: %s'%(str(freq), str(autocorr_vis.shape)))
-		print('Shape of Fullsim_vis at %sMHz: %s'%(str(freq), str(fullsim_vis.shape)))
-		print('Shape of Autocorr_vis_mfreq: %s' % (str(autocorr_vis_mfreq.shape)))
-		print('Shape of Fullsim_vis_mfreq: %s' % (str(fullsim_vis_mfreq.shape)))
-		return fullsim_vis_mfreq, autocorr_vis_mfreq, fullsim_vis, autocorr_vis
-	
-	else:
-		print('Shape of Autocorr_vis_mfreq: %s' % (str(autocorr_vis_mfreq.shape)))
-		print('Shape of Fullsim_vis_mfreq: %s' % (str(fullsim_vis_mfreq.shape)))
-		return fullsim_vis_mfreq, autocorr_vis_mfreq
-	
 
 Test_SV_mfreq = False
 flist_test = [flist[0][31:34], flist[1][31:34]]
@@ -4818,7 +4815,7 @@ for id_t_bin in range(precal_time_bin_num):
 			rephases = np.zeros((2, 2))
 			# additive_term = np.zeros_like(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten())
 			# additive_term_incr = np.zeros_like(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten())
-			while (niter == 0 or la.norm(rephases) > .001 or la.norm(additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) / la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) > .001) and niter < 360:
+			while (niter == 0 or la.norm(rephases) > .001 or la.norm(additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) / la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) > .001) and niter < 50:
 				niter += 1
 				
 				if pre_phscal:
