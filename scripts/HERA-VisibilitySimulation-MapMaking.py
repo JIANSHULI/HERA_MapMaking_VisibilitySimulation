@@ -138,7 +138,7 @@ def ATNIA(A, Ni, C, nchunk=20):  # C=AtNiA
 		C[chunk * nchunk:] = np.einsum('ji,jk->ik', A[:, chunk * nchunk:] * Ni[:, None], A)
 
 
-def get_A(additive_A=None):
+def get_A(additive_A=None, A_path='', force_recompute=None, nUBL_used=None, nt_used=None, valid_npix=None, thetas=None, phis=None, used_common_ubls=None, beam_heal_equ_x=None, beam_heal_equ_y=None, lsts=None, freq=None):
 	if os.path.isfile(A_path) and not force_recompute:
 		print "Reading A matrix from %s" % A_path
 		sys.stdout.flush()
@@ -193,6 +193,38 @@ def get_A(additive_A=None):
 		print "done."
 		sys.stdout.flush()
 		return A.astype('complex128')
+
+
+def get_complex_data(real_data, nubl=None, nt=None):
+	if len(real_data.flatten()) != 2 * nubl * 2 * nt:
+		raise ValueError("Incorrect dimensions: data has length %i where nubl %i and nt %i together require length of %i." % (len(real_data), nubl, nt, 2 * nubl * 2 * nt))
+	input_shape = real_data.shape
+	real_data.shape = (2, nubl, 2, nt)
+	result = real_data[0] + 1.j * real_data[1]
+	real_data.shape = input_shape
+	return result
+
+
+def stitch_complex_data(complex_data):
+	return np.concatenate((np.real(complex_data.flatten()), np.imag(complex_data.flatten()))).astype('complex128')
+
+
+def get_vis_normalization(data, clean_sim_data, data_shape=None):
+	a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
+	b = np.linalg.norm(clean_sim_data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
+	return a.dot(b) / b.dot(b)
+
+
+def sol2map(sol, valid_npix=None, npix=None, valid_pix_mask=None, final_index=None):
+	solx = sol[:valid_npix]
+	full_sol = np.zeros(npix)
+	full_sol[valid_pix_mask] = solx / sizes
+	return full_sol[final_index]
+
+
+def sol2additive(sol, valid_npix=None, nUBL_used=None):
+	return np.transpose(sol[valid_npix:].reshape(nUBL_used, 2, 2), (1, 0, 2))  # ubl by pol by re/im before transpose
+
 
 def solve_phase_degen(data_xx, data_yy, model_xx, model_yy, ubls, plot=False):  # data should be time by ubl at single freq. data * phasegensolution = model
 	if data_xx.shape != data_yy.shape or data_xx.shape != model_xx.shape or data_xx.shape != model_yy.shape or data_xx.shape[1] != ubls.shape[0]:
@@ -1709,7 +1741,7 @@ elif INSTRUMENT == 'hera47':
 	Lst_Hourangle = True
 	
 	
-	Nfiles_temp = 73
+	Nfiles_temp = 1
 	
 	Time_Average_preload = 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
@@ -1734,14 +1766,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 3  # temp
-	Synthesize_MultiFreq_start = flist[0][index_freq[0] - Synthesize_MultiFreq_Nfreq / 2]
-	Synthesize_MultiFreq_end = flist[0][index_freq[0] + Synthesize_MultiFreq_Nfreq / 2]
-	Flist_select = [[], []]
-	Flist_select_index = [[], []]
-	for i in range(2):
-		Flist_select[i] = flist[i][index_freq[i] - Synthesize_MultiFreq_Nfreq / 2: index_freq[i] + Synthesize_MultiFreq_Nfreq / 2 + 1]
-		Flist_select_index[i] = np.arange(index_freq[i] - Synthesize_MultiFreq_Nfreq / 2, index_freq[i] + Synthesize_MultiFreq_Nfreq / 2 + 1, 1)
-	Synthesize_MultiFreq_Nfreq = len(Flist_select[0])
+
 	
 	sys.stdout.flush()
 	
@@ -2326,6 +2351,16 @@ elif INSTRUMENT == 'hera47':
 	
 	for i in range(2):
 		autocorr_data[i] = autocorr_data_mfreq[i][:, index_freq[i]]
+	
+	if Synthesize_MultiFreq:
+		Synthesize_MultiFreq_start = flist[0][index_freq[0] - Synthesize_MultiFreq_Nfreq / 2]
+		Synthesize_MultiFreq_end = flist[0][index_freq[0] + Synthesize_MultiFreq_Nfreq / 2]
+		Flist_select = [[], []]
+		Flist_select_index = [[], []]
+		for i in range(2):
+			Flist_select[i] = flist[i][index_freq[i] - Synthesize_MultiFreq_Nfreq / 2: index_freq[i] + Synthesize_MultiFreq_Nfreq / 2 + 1]
+			Flist_select_index[i] = np.arange(index_freq[i] - Synthesize_MultiFreq_Nfreq / 2, index_freq[i] + Synthesize_MultiFreq_Nfreq / 2 + 1, 1)
+		Synthesize_MultiFreq_Nfreq = len(Flist_select[0])
 	
 	print ('\n' + '%s minutes used for loading data' % ((time.time() - timer_loading) / 60.) + '\n')
 	# tempt = data[0][37, 65, 'xx'].reshape(6, 20, 64)
@@ -4761,19 +4796,6 @@ if Erase:
 sys.stdout.flush()
 
 
-def get_complex_data(real_data, nubl=nUBL_used, nt=nt_used):
-	if len(real_data.flatten()) != 2 * nubl * 2 * nt:
-		raise ValueError("Incorrect dimensions: data has length %i where nubl %i and nt %i together require length of %i." % (len(real_data), nubl, nt, 2 * nubl * 2 * nt))
-	input_shape = real_data.shape
-	real_data.shape = (2, nubl, 2, nt)
-	result = real_data[0] + 1.j * real_data[1]
-	real_data.shape = input_shape
-	return result
-
-
-def stitch_complex_data(complex_data):
-	return np.concatenate((np.real(complex_data.flatten()), np.imag(complex_data.flatten()))).astype('complex128')
-
 ################################
 ################################
 ####pre_calibrate################
@@ -4845,7 +4867,7 @@ for id_t_bin in range(precal_time_bin_num):
 				niter += 1
 				
 				if pre_phscal:
-					cdata = get_complex_data(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nt=nt_precal_used)
+					cdata = get_complex_data(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used)
 					for p, pol in enumerate(['xx', 'yy']):
 						# rephase = omni.solve_phase_degen_fast(cdata[:, p].transpose(), cdata[:, p].transpose(), fullsim_vis[:, p].transpose(), fullsim_vis[:, p].transpose(), used_common_ubls)
 						rephase = solve_phase_degen(cdata[:, p].transpose(), cdata[:, p].transpose(), fullsim_vis[:, p, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].transpose(), fullsim_vis[:, p, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].transpose(), used_common_ubls)
@@ -4863,19 +4885,25 @@ for id_t_bin in range(precal_time_bin_num):
 				additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = real_additive_A[:, n_prefit_amp:].dot(additive_sol[n_prefit_amp:]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
 				data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] -= additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)]
 				additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] += additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)]
-				print ("additive fraction", la.norm(additive_term_incr) / la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()))
-			
-			cadd = get_complex_data(additive_term)
+				try:
+					print ("additive fraction", la.norm(additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) / la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()))
+				except:
+					print('No additive fraction printed.')
+					
+			# cadd = get_complex_data(additive_term)
 			
 			if pre_ampcal:
-				data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nt=nt_precal_used) / additive_sol[:n_prefit_amp, None]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
+				data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used) / additive_sol[:n_prefit_amp, None]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
 				if comply_ps2mod_autocorr or Use_AbsCal or Use_Fullsim_Noise:
 					pass
 				else:
-					Ni.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(Ni.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nt=nt_precal_used) * additive_sol[:n_prefit_amp, None] ** 2).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
-				additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nt=nt_precal_used) / additive_sol[:n_prefit_amp, None]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
+					Ni.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(Ni.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used) * additive_sol[:n_prefit_amp, None] ** 2).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
+				additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used) / additive_sol[:n_prefit_amp, None]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
 				
 				print('Additive_sol: %s' % additive_sol[:n_prefit_amp])
+
+cadd = get_complex_data(additive_term, nubl=nUBL_used, nt=nt_used)
+
 try:
 	print 'saving data to', os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_nubl%s_nt%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none')
 	np.savez(os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_%s_%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'),
@@ -4894,9 +4922,9 @@ try:
 	if plot_data_error:
 		# plt.clf()
 		
-		cdata = get_complex_data(data)
-		crdata = get_complex_data(raw_data)  # / (additive_sol[0] * (pre_ampcal) + (not pre_ampcal))
-		cNi = get_complex_data(Ni)
+		cdata = get_complex_data(data, nubl=nUBL_used, nt=nt_used)
+		crdata = get_complex_data(raw_data, nubl=nUBL_used, nt=nt_used)  # / (additive_sol[0] * (pre_ampcal) + (not pre_ampcal))
+		cNi = get_complex_data(Ni, nubl=nUBL_used, nt=nt_used)
 		
 		fun = np.abs
 		srt = sorted((lsts - lst_offset) % 24. + lst_offset)
@@ -4996,24 +5024,6 @@ gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thre
                     flist=flist, Flist_select=None, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight,
                     used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
 
-
-def get_vis_normalization(data, clean_sim_data):
-	a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
-	b = np.linalg.norm(clean_sim_data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
-	return a.dot(b) / b.dot(b)
-
-
-def sol2map(sol):
-	solx = sol[:valid_npix]
-	full_sol = np.zeros(npix)
-	full_sol[valid_pix_mask] = solx / sizes
-	return full_sol[final_index]
-
-
-def sol2additive(sol):
-	return np.transpose(sol[valid_npix:].reshape(nUBL_used, 2, 2), (1, 0, 2))  # ubl by pol by re/im before transpose
-
-
 try:
 	if plot_pixelization:
 		##################################################################
@@ -5033,7 +5043,7 @@ try:
 			plt.savefig(script_dir + '/../Output/%s-%sMHz-dipole-beam_weight-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
 			hpv.mollview(np.log10(equatorial_GSM_standard), min=0, max=4, coord=plotcoord, title='GSM', nest=True)
 			plt.savefig(script_dir + '/../Output/GSM-3C-for-%s-%sMHz-bnside-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
-			hpv.mollview(np.log10(sol2map(fake_solution)[:len(equatorial_GSM_standard)]), min=0, max=4, coord=plotcoord,
+			hpv.mollview(np.log10(sol2map(fake_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index)[:len(equatorial_GSM_standard)]), min=0, max=4, coord=plotcoord,
 			             title='GSM gridded', nest=True)
 			plt.savefig(script_dir + '/../Output/maskedfsol_GSM-3C-%s-%sMHz-dipole-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
 			hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start), max=np.log2(nside_standard),
@@ -5204,9 +5214,9 @@ sys.stdout.flush()
 #
 #
 # if not fit_for_additive:
-# 	A = get_A()
+# 	A = get_A(A_path=A_path, force_recompute=force_recompute, nUBL_used=nUBL_used, nt_used=nt_used, valid_npix=valid_npix, thetas=thetas, phis=phis, used_common_ubls=used_common_ubls, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, lsts=lsts, freq=freq)
 # else:
-# 	A = get_A(additive_A)
+# 	A = get_A(additive_A, A_path=A_path, force_recompute=force_recompute, nUBL_used=nUBL_used, nt_used=nt_used, valid_npix=valid_npix, thetas=thetas, phis=phis, used_common_ubls=used_common_ubls, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, lsts=lsts, freq=freq)
 #
 #
 # Ashape0, Ashape1 = A.shape
@@ -5231,11 +5241,11 @@ clean_sim_data = A.dot(fake_solution.astype(A.dtype))
 
 try:
 	if plot_data_error:
-		cdata = get_complex_data(data)
-		cdynamicmodel = get_complex_data(clean_sim_data)
-		cNi = get_complex_data(Ni)
+		cdata = get_complex_data(data, nubl=nUBL_used, nt=nt_used)
+		cdynamicmodel = get_complex_data(clean_sim_data, nubl=nUBL_used, nt=nt_used)
+		cNi = get_complex_data(Ni, nubl=nUBL_used, nt=nt_used)
 		if pre_calibrate:
-			cadd = get_complex_data(additive_term)
+			cadd = get_complex_data(additive_term, nubl=nUBL_used, nt=nt_used)
 		
 		fun = np.imag
 		srt = sorted((lsts - lst_offset) % 24. + lst_offset)
@@ -5286,7 +5296,7 @@ try:
 			except:
 				pass
 		# plt.clf()
-		plt.plot(la.norm(used_common_ubls, axis=-1) * freq / C, np.sum(2. / np.real(get_complex_data(Ni)), axis=-1)[:, 0] ** .5 / la.norm(fullsim_vis, axis=-1)[:, 0], 'b+', label='noise error(%s-%s-dipole-beam_weight-bnside-%s-nside_standard-%s)' % (INSTRUMENT, freq, bnside, nside_standard))
+		plt.plot(la.norm(used_common_ubls, axis=-1) * freq / C, np.sum(2. / np.real(get_complex_data(Ni, nubl=nUBL_used, nt=nt_used)), axis=-1)[:, 0] ** .5 / la.norm(fullsim_vis, axis=-1)[:, 0], 'b+', label='noise error(%s-%s-dipole-beam_weight-bnside-%s-nside_standard-%s)' % (INSTRUMENT, freq, bnside, nside_standard))
 		#	plt.legend()
 		#	plt.xlabel('Baseline Length (wavelength)')
 		#	plt.ylabel('Relative RMS Error')
@@ -5304,7 +5314,7 @@ try:
 except:
 	print ('Error when Plotting Comparison of Full and Dyna Simulation Results.')
 
-vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis))
+vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis), data_shape=data_shape)
 print "Normalization from visibilities", vis_normalization
 
 Del = True
@@ -5578,7 +5588,7 @@ try:
 				if pre_calibrate:
 					figure_W[5], = plt.plot(qaz_add[ri, u, p], 'x')
 				if fit_for_additive:
-					figure_W[6], = plt.plot(autocorr_vis_normalized[p] * sol2additive(w_solution)[p, u, ri])
+					figure_W[6], = plt.plot(autocorr_vis_normalized[p] * sol2additive(w_solution, valid_npix=valid_npix, nUBL_used=nUBL_used)[p, u, ri])
 				figure_W[7], = plt.plot(best_fit[ri, u, p] - qaz_data[ri, u, p])
 				figure_W[8], = plt.plot(Ni.reshape((2, nUBL_used, 2, nt_used))[ri, u, p] ** -.5)
 				if pre_calibrate:
@@ -5616,7 +5626,7 @@ def plot_IQU(solution, title, col, shape=(2,3), coord='C'):
 	# I = Es[0] + Es[3]
 	# Q = Es[0] - Es[3]
 	# U = Es[1] + Es[2]
-	I = sol2map(solution)
+	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index)
 	plotcoordtmp = coord
 	hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
 #if col == shape[0] * shape[1]:
@@ -5627,7 +5637,7 @@ def plot_IQU_unlimit(solution, title, col, shape=(2,3), coord='C'):
 	# I = Es[0] + Es[3]
 	# Q = Es[0] - Es[3]
 	# U = Es[1] + Es[2]
-	I = sol2map(solution)
+	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index)
 	plotcoordtmp = coord
 	hpv.mollview(np.log10(I), coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
 #if col == shape[0] * shape[1]:
@@ -5827,7 +5837,7 @@ if True:  # and S_type == 'none':
 				point_vec = np.zeros_like(fake_solution).astype('complex128')
 				
 				point_vec[np.argmin(la.norm(valid_thetas_phis - [theta, phi], axis=-1))] = 1
-				spreaded = sol2map(AtNiAi.dotv(AtNiA.dot(point_vec)))
+				spreaded = sol2map(AtNiAi.dotv(AtNiA.dot(point_vec)), valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index)
 				spreaded /= np.max(spreaded)
 				fwhm_mask = np.abs(spreaded) >= .5
 				masked_max_ind = np.argmax(spreaded[fwhm_mask])
