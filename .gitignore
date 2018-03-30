@@ -2,7 +2,7 @@
 *.so
 *.pyc
 src/*.pyc
-*.py
+# *.py
 *.DS_Store
 Output/
 build/
