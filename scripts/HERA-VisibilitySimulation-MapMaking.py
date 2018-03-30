@@ -1737,7 +1737,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Data_Deteriorate = False
 	
-	Time_Expansion_Factor = 73. if Use_SimulatedData else 1.
+	Time_Expansion_Factor = 3. if Use_SimulatedData else 1.
 	Lst_Hourangle = True
 	
 	
@@ -1762,7 +1762,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Select = 150. # MHz
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 5.e-2 # meter, Criterion for De-Redundancy
+	Tolerance = 1.e-2 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 3  # temp
@@ -3134,6 +3134,9 @@ full_sim_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nsid
 sim_vis_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 sim_vis_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 
+fullsim_vis=None
+autocorr_vis=None
+autocorr_vis_normalized=None
 fullsim_vis, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
                                                                       flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
                                                                       C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
@@ -3277,11 +3280,20 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 	sim_vis_yy_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[1]))
 	
 	
-	fullsim_vis_mfreq, autocorr_vis_mfreq, fullsim_vis_mfreq_sf, autocorr_vis_mfreq_sf = \
+	fullsim_vis_mfreq, autocorr_vis_mfreq, autocorr_vis_mfreq_normalized, fullsim_vis_mfreq_sf, autocorr_vis_mfreq_sf, autocorr_vis_mfreq_sf_normalized = \
 		Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq,
-		                          Force_Compute_Vis=True, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[150., 150.],
+		                          Force_Compute_Vis=False, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[freq, freq],
 		                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 		                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
+	
+	try:
+		if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
+			print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
+		else:
+			print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
+	except:
+		print('SinFreq-MultiFreq Visibility Simulation NOT Comparared.')
+	
 	
 	# if simulation_opt == 1:
 	#
