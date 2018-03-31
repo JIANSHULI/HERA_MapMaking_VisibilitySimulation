@@ -1,11 +1,13 @@
 #!/usr/bin/python
 
+import time, ephem, sys, os, resource, datetime, warnings
+Timer_Start = time.time()
+
 import simulate_visibilities.Bulm as Bulm
 import simulate_visibilities.simulate_visibilities as sv
 import numpy as np
 import numpy.linalg as la
 import scipy.linalg as sla
-import time, ephem, sys, os, resource, datetime, warnings
 import aipy as ap
 import os
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
@@ -45,6 +47,7 @@ import aipy.miriad as apm
 import re
 import copy
 from hera_cal import utils, firstcal, cal_formats, redcal
+
 
 PI = np.pi
 TPI = PI * 2
@@ -5889,5 +5892,11 @@ if True:  # and S_type == 'none':
 			iplot += 1
 
 sys.stdout.flush()
+
+Timer_End = time.time()
+try:
+	print('>>>>>>>>>>>>>>>>>> Total Used Time: %s seconds. <<<<<<<<<<<<<<<<<<<<'%(Timer_End - Timer_Start))
+except:
+	print('No Used Time Printed.')
 
 # Mac Code
