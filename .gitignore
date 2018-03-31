@@ -18,6 +18,7 @@ docs/_templates
 
 # Data files
 hera_cal/data/test_output/*
+data/
 
 # Test notebooks
 hera_cal/notebooks

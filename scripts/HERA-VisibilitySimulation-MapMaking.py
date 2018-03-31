@@ -27,7 +27,8 @@ from HERA_MapMaking_VisibilitySimulation import UVData as UVData_HR
 from HERA_MapMaking_VisibilitySimulation import UVCal as UVCal_HR
 from HERA_MapMaking_VisibilitySimulation import UVFITS as UVFITS_HR
 import hera_cal as hc
-from hera_cal.data import DATA_PATH
+from hera_cal.data import DATA_PATH as data_path_heracal
+from HERA_MapMaking_VisibilitySimulation import DATA_PATH
 from collections import OrderedDict as odict
 from pyuvdata import utils as uvutils
 import copy
