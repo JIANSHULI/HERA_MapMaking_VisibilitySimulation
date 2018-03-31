@@ -1748,7 +1748,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Time_Average_preload = 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
-	Dred_preload = True # Whether to de-redundancy before each file loaded
+	Dred_preload = False # Whether to de-redundancy before each file loaded
 	inplace_preload = True # Change the self when given to the function select_average in uvdata.py.
 	
 	Compress_Average = True
@@ -1993,7 +1993,7 @@ elif INSTRUMENT == 'hera47':
 		
 		if Compress_Average:
 			data[i], dflags[i], autocorr_data_mfreq[i], data_freqs[i], data_times[i], data_lsts[i] = Compress_Data_by_Average(data=data[i], dflags=dflags[i], autocorr_data_mfreq=autocorr_data_mfreq[i], Contain_Autocorr=True,
-			                                                                                                                  data_freqs=data_freqs[i], data_times=data_times[i], data_lsts=data_lsts[i], Time_Average=Time_Average_afterload, Frequency_Average=Frequency_Average_afterload, DicData=Small_ModelData)
+			                                                                                                                  data_freqs=data_freqs[i], data_times=data_times[i], data_lsts=data_lsts[i], Time_Average=Time_Average_afterload, Frequency_Average=Frequency_Average_afterload, DicData=Small_ModelData, pol=['xx', 'yy'][i])
 			
 			# if i == 0:
 			# 	if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
@@ -3660,7 +3660,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred:
 			plt.colorbar()
 			plt.title(pol + ' model PHS {}'.format(bl_dred_mfreq[i]))
 			plt.show(block=False)
-			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_model-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][p], freq, nUBL_used, nt_used, bnside, nside_standard))
+			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_model-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
 			# plt.cla()
 			
 			plt.figure(90000000 + 10 * i)
@@ -3674,7 +3674,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred:
 			plt.colorbar()
 			plt.title(pol + ' data PHS {}'.format(bl_dred_mfreq[i]))
 			plt.show(block=False)
-			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_data-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][p], freq, nUBL_used, nt_used, bnside, nside_standard))
+			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_data-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
 			# plt.cla()
 			
 			####################### after ABS Calibration #########################
@@ -3689,7 +3689,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred:
 			uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='phs', mx=np.pi, drng=2 * np.pi)
 			plt.colorbar()
 			plt.title(pol + ' abs_caled data PHS {}'.format(bl_dred_mfreq[i]))
-			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_data-caled-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][p], freq, nUBL_used, nt_used, bnside, nside_standard))
+			plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_data-caled-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
 			plt.show(block=False)
 			# plt.cla()
 		except:
