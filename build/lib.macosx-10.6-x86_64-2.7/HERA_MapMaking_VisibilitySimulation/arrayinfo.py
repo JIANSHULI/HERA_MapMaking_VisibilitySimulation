@@ -56,7 +56,7 @@ def compute_reds(antpos, tol=0.1):
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
     return [v for v in ublgp.values() if len(v) > 1] # no such thing as redundancy of one
     
-def compute_reds_total(antpos, tol=0.1):
+def compute_reds_total(antpos, tol=5.e-4):
     '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
     list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
     fall within the specified tolerance of each other.  'antpos' is a (nant,3) array of antenna positions.'''
@@ -90,7 +90,7 @@ def compute_reds_total(antpos, tol=0.1):
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
     return [v for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
 
-def compute_reds_total_autocorr(antpos, tol=0.1):
+def compute_reds_total_autocorr(antpos, tol=5.e-5):
     '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
     list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
     fall within the specified tolerance of each other.  'antpos' is a (nant,3) array of antenna positions.'''

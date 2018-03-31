@@ -1536,13 +1536,15 @@ try:
 	__file__
 except NameError:
 	# script_dir = '/Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/simulate_visibilities/scripts'
-	script_dir = os.path.join(DATA_PATH, '../../../HERA_MapMaking_VisibilitySimulation/scripts')
+	# script_dir = os.path.join(DATA_PATH, '../../../HERA_MapMaking_VisibilitySimulation/scripts')
+	script_dir = os.path.join(DATA_PATH, '../scripts')
 	pixel_directory = script_dir
-	print 'Run IPython'
+	print ('Run IPython: %s'%script_dir)
+	
 else:
 	script_dir = os.path.dirname(os.path.realpath(__file__))
 	pixel_directory = script_dir
-	print 'Run Python'
+	print ('Run Python： %s'%script_dir)
 
 ###########################################################
 ################ data file and load beam #################
@@ -2362,7 +2364,7 @@ elif INSTRUMENT == 'hera47':
 			Flist_select_index[i] = np.arange(index_freq[i] - Synthesize_MultiFreq_Nfreq / 2, index_freq[i] + Synthesize_MultiFreq_Nfreq / 2 + 1, 1)
 		Synthesize_MultiFreq_Nfreq = len(Flist_select[0])
 	
-	print ('\n' + '%s minutes used for loading data' % ((time.time() - timer_loading) / 60.) + '\n')
+	print ('\n' + '>>>>>>>>>>>>>>>>%s minutes used for loading data' % ((time.time() - timer_loading) / 60.) + '\n')
 	# tempt = data[0][37, 65, 'xx'].reshape(6, 20, 64)
 	
 	################# Select Frequency ####################
@@ -2812,7 +2814,13 @@ elif INSTRUMENT == 'hera47':
 	used_redundancy[0] = np.array(redundancy[0])[ubl_index['x'] - 1]
 	used_redundancy[1] = np.array(redundancy[0])[ubl_index['y'] - 1]
 	
-	print '>>>>>>Used nUBL = %i, nt = %i.' % (nUBL_used, nt_used)
+	print('Selected Data Frequencies: ')
+	print(flist[0])
+	print(flist[1])
+	
+	print('Selected Single Frequency: %s MHz'%freq)
+	
+	print '>>>>>>>>>>Used nUBL = %s, nt = %s, nf = %s.' % (nUBL_used, nt_used, nf_used)
 	sys.stdout.flush()
 	
 	######################### Beam Pattern #############################
@@ -2822,7 +2830,7 @@ elif INSTRUMENT == 'hera47':
 	beam_nside = hp.npix2nside(beam_E.shape[1])
 	beam_freqs = fits.getdata(filename, extname='FREQS')
 	
-	print('Frequencies: ')
+	print('Beam Data Frequencies: ')
 	print(beam_freqs)
 	
 	# select only 100-200 MHz data
@@ -2866,7 +2874,7 @@ elif INSTRUMENT == 'hera47':
 		# plt.clf()
 		# plt.close()
 
-print ('%s minutes used for preparing data.'%((time.time()-timer_pre)/60.))
+print ('>>>>>>>>>>>>>>%s minutes used for preparing data.'%((time.time()-timer_pre)/60.))
 sys.stdout.flush()
 
 #################
