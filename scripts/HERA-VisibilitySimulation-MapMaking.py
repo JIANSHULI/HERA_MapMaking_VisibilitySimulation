@@ -2093,7 +2093,7 @@ def PointSource_Calibration(data_var_xx_filename_pscal='', data_var_yy_filename_
 		return vis_data_dred_mfreq_pscal, autocorr_data_dred_mfreq_pscal, vis_data_dred_pscal
 
 
-def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre_addcal=False, comply_ps2mod_autocorr=False, Use_AbsCal=False, Use_Fullsim_Noise=False, Precal_time_bin_temp=None, nt_used=None, nUBL_used=None, data_shape=None, cal_times=1, niter_max=50, antpairs=None, ubl_index=None,
+def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre_addcal=False, comply_ps2mod_autocorr=False, Use_PsAbsCal=False, Use_AbsCal=False, Use_Fullsim_Noise=False, Precal_time_bin_temp=None, nt_used=None, nUBL_used=None, data_shape=None, cal_times=1, niter_max=50, antpairs=None, ubl_index=None,
                     autocorr_vis_normalized=None, fullsim_vis=None, data=None, Ni=None, pt_vis=None, pt_sources=None, used_common_ubls=None, freq=None, lsts=None, lst_offset=None, INSTRUMENT=None, Absolute_Calibration_dred_mfreq=False, mocal_time_bin=None, mocal_freq_bin=None, bnside=None, nside_standard=None):
 	if nt_used is not None:
 		if nt_used != len(lsts):
@@ -2202,9 +2202,9 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 				
 				if pre_ampcal:
 					data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used) / additive_sol[:n_prefit_amp, None]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
-					if comply_ps2mod_autocorr or Use_AbsCal or Use_Fullsim_Noise:
+					if comply_ps2mod_autocorr or Use_AbsCal or Use_Fullsim_Noise and not Use_PsAbsCal:
 						pass
-					else:
+					elif not (Use_PsAbsCal and comply_ps2mod_autocorr):
 						Ni.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(Ni.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used) * additive_sol[:n_prefit_amp, None] ** 2).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
 					additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)] = stitch_complex_data(get_complex_data(additive_term.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten(), nubl=nUBL_used, nt=nt_precal_used) / additive_sol[:n_prefit_amp, None]).reshape(2, data_shape['xx'][0], 2, nt_precal_used)
 					
@@ -2515,7 +2515,7 @@ elif INSTRUMENT == 'hera47':
 	
 	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
 	Fake_wgts_dred_mfreq = True  # Remove Flags for Model Calibration.
-	PointSource_AbsCal = True
+	PointSource_AbsCal = False
 	PointSource_AbsCal_SingleFreq = False if PointSource_AbsCal else False
 	Absolute_Calibration_dred_mfreq_pscal = False
 	
@@ -5667,7 +5667,7 @@ sys.stdout.flush()
 ################################
 ################################
 
-data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal,   Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
                                                                        data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
                                                                        lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard)
 
