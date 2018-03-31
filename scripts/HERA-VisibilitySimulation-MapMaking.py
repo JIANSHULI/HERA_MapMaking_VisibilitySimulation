@@ -180,7 +180,7 @@ def get_A(additive_A=None, A_path='', force_recompute=None, nUBL_used=None, nt_u
 		A[:, valid_npix:] = additive_A[:, 1:]
 	# Merge A
 	try:
-		return np.concatenate((np.real(A), np.imag(A))).astype('complex128')
+		return np.concatenate((np.real(A), np.imag(A))).astype('float64')
 	except MemoryError:
 		print "Not enough memory, concatenating A on disk ", A_path + 'tmpre', A_path + 'tmpim',
 		sys.stdout.flush()
@@ -192,11 +192,11 @@ def get_A(additive_A=None, A_path='', force_recompute=None, nUBL_used=None, nt_u
 		os.system("cat %s >> %s" % (A_path + 'tmpim', A_path + 'tmpre'))
 		
 		os.system("rm %s" % (A_path + 'tmpim'))
-		A = np.fromfile(A_path + 'tmpre', dtype='complex128').reshape(Ashape)
+		A = np.fromfile(A_path + 'tmpre', dtype='float64').reshape(Ashape)
 		os.system("rm %s" % (A_path + 'tmpre'))
 		print "done."
 		sys.stdout.flush()
-		return A.astype('complex128')
+		return A.astype('float53')
 
 
 def get_complex_data(real_data, nubl=None, nt=None):
@@ -210,7 +210,7 @@ def get_complex_data(real_data, nubl=None, nt=None):
 
 
 def stitch_complex_data(complex_data):
-	return np.concatenate((np.real(complex_data.flatten()), np.imag(complex_data.flatten()))).astype('complex128')
+	return np.concatenate((np.real(complex_data.flatten()), np.imag(complex_data.flatten()))).astype('float64')
 
 
 def get_vis_normalization(data, clean_sim_data, data_shape=None):
@@ -1247,7 +1247,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 			
 		# Merge A
 		try:
-			return np.concatenate((np.real(A), np.imag(A))).astype('complex128'), gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
+			return np.concatenate((np.real(A), np.imag(A))).astype('float64'), gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
 		except MemoryError:
 			print "Not enough memory, concatenating A on disk ", A_path + 'tmpre', A_path + 'tmpim',
 			sys.stdout.flush()
@@ -1259,11 +1259,11 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 			os.system("cat %s >> %s" % (A_path + 'tmpim', A_path + 'tmpre'))
 			
 			os.system("rm %s" % (A_path + 'tmpim'))
-			A = np.fromfile(A_path + 'tmpre', dtype='complex128').reshape(Ashape)
+			A = np.fromfile(A_path + 'tmpre', dtype='float64').reshape(Ashape)
 			os.system("rm %s" % (A_path + 'tmpre'))
 			print "done."
 			sys.stdout.flush()
-			return A.astype('complex128'), gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map, fake_solution
+			return A.astype('float64'), gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map, fake_solution
 
 
 		# return A, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map
@@ -1747,7 +1747,7 @@ elif INSTRUMENT == 'hera47':
 	Lst_Hourangle = True
 	
 	
-	Nfiles_temp = 1
+	Nfiles_temp = 73
 	
 	Time_Average_preload = 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
@@ -1768,7 +1768,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Select = 150. # MHz
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 1.e-2 # meter, Criterion for De-Redundancy
+	Tolerance = 5.e-4 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 3  # temp
@@ -3485,7 +3485,7 @@ if INSTRUMENT == 'hera47' and (Absolute_Calibration_dred_mfreq or Absolute_Calib
 	#		model_yy = copy.deepcopy(data_yy).astype('complex128')
 	for i in range(2):
 		model_sf[i] = LastUpdatedOrderedDict()
-		model_sf[i] = LastUpdatedOrderedDict()
+		# model_sf[i] = LastUpdatedOrderedDict()
 		model_dred[i] = LastUpdatedOrderedDict()
 		# model_dred_mfreq[i] = LastUpdatedOrderedDict()
 		# data[i] = LastUpdatedOrderedDict()
