@@ -3653,7 +3653,7 @@ elif INSTRUMENT == 'hera47':
 	
 	print('Selected Single Frequency: %s MHz'%freq)
 	
-	print '>>>>>>>>>>Used nUBL = %s, nt = %s, nf = %s.' % (nUBL_used, nt_used, nf_used)
+	print '\n>>>>>>>>>>Used nUBL = %s, nt = %s, nf = %s.\n' % (nUBL_used, nt_used, nf_used)
 	sys.stdout.flush()
 	
 	######################### Beam Pattern #############################
@@ -3707,7 +3707,7 @@ elif INSTRUMENT == 'hera47':
 		# plt.clf()
 		# plt.close()
 
-print ('>>>>>>>>>>>>>>%s minutes used for preparing data.'%((time.time()-timer_pre)/60.))
+print ('\n>>>>>>>>>>>>>>%s minutes used for preparing data.\n'%((time.time()-timer_pre)/60.))
 sys.stdout.flush()
 
 #################
@@ -5291,7 +5291,7 @@ if Synthesize_MultiFreq:
 		except:
 			print('No used_redundancy_sinfreq[%s] Synthesize_Multifreq.'%i)
 		try:
-			used_redundancy[i] = np.squeeze([used_redundancy[0]] * Synthesize_MultiFreq_Nfreq).flatten()
+			used_redundancy[i] = np.squeeze([used_redundancy[i]] * Synthesize_MultiFreq_Nfreq).flatten()
 		except:
 			print('No used_redundancy[%s] Synthesize_Multifreq.'%i)
 		try:
@@ -5308,7 +5308,7 @@ if Synthesize_MultiFreq:
 	except:
 		print('No used_common_ubls_sinfreq Synthesize_Multifreq.')
 	try:
-		used_common_ubls = np.squeeze([used_common_ubls] * Synthesize_MultiFreq_Nfreq).flatten()
+		used_common_ubls = np.squeeze([used_common_ubls] * Synthesize_MultiFreq_Nfreq).reshape(len(used_common_ubls_sinfreq) * Synthesize_MultiFreq_Nfreq, 3)
 	except:
 		print('No used_common_ubls Synthesize_Multifreq.')
 	try:
@@ -6584,7 +6584,7 @@ def plot_IQU(solution, title, col, shape=(2,3), coord='C'):
 	# U = Es[1] + Es[2]
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
-	hpv.mollview(np.log10(I)+1.e-6, min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
 #if col == shape[0] * shape[1]:
 #plt.show(block=False)
 
@@ -6595,7 +6595,7 @@ def plot_IQU_unlimit(solution, title, col, shape=(2,3), coord='C'):
 	# U = Es[1] + Es[2]
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
-	hpv.mollview(np.log10(I)+1.e-6, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.mollview(np.log10(I), coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
 #if col == shape[0] * shape[1]:
 #plt.show(block=False)
 
