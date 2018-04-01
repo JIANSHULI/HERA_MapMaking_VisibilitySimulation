@@ -2191,7 +2191,7 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 				rephases = np.zeros((2, 2))
 				# additive_term = np.zeros_like(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten())
 				# additive_term_incr = np.zeros_like(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten())
-				while (niter == 0 or la.norm(rephases) > .001 or la.norm(additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) / la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) > .001) and niter < 50:
+				while (niter == 0 or la.norm(rephases) > .001 or la.norm(additive_term_incr.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) / la.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])[:, :, :, id_t_bin * precal_time_bin:(id_t_bin * precal_time_bin + nt_precal_used)].flatten()) > .001) and niter < niter_max:
 					niter += 1
 					
 					if pre_phscal:
@@ -2314,7 +2314,10 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 	except:
 		print('Error when Plotting Calibrated Results.')
 	
-	return data, Ni, additive_A, additive_term, additive_sol, precal_time_bin
+	if pre_calibrate:
+		return data, Ni, additive_A, additive_term, additive_sol, precal_time_bin
+	else:
+		return additive_A, additive_term, precal_time_bin
 
 
 
@@ -3801,6 +3804,12 @@ try:
                                  ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
 except:
 	raise ValueError('No A or beam_weight calculated.')
+
+try:
+	del(A)
+	print('A has been successfully deleted.')
+except:
+	print('A not to be deleted.')
 
 ########################################################
 ###################### GSM ############################
@@ -5710,11 +5719,14 @@ sys.stdout.flush()
 ####pre_calibrate################
 ################################
 ################################
-
-data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal,   Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
-                                                                       data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
-                                                                       lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard)
-
+if pre_calibrate:
+	data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal,   Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+	                                                                       data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
+	                                                                       lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard)
+else:
+	additive_A, additive_term, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+	                                                                                     data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
+	                                                                                     lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard)
 
 
 # #####1. antenna based calibration#######
