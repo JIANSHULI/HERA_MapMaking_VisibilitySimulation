@@ -1123,10 +1123,16 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 			beam_weight = beam_weight / np.mean(beam_weight)
 			thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 			beam_weight = hpf.get_interp_val(beam_weight, thetas_standard, phis_standard, nest=True)  # np.array([beam_weight for i in range(nside_standard ** 2 / nside_beamweight ** 2)]).transpose().flatten()
+			try:
+				del (A_got)
+				print('A_got has been successfully deleted.')
+			except:
+				print('No A_got to be deleted.')
 			print "done."
 			sys.stdout.flush()
 		
 		gsm_beamweighted = equatorial_GSM_standard * beam_weight
+		
 		
 		nside_distribution = np.zeros(12 * nside_standard ** 2)
 		final_index = np.zeros(12 * nside_standard ** 2, dtype=int)
@@ -1152,6 +1158,20 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 					fake_solution_map_mfreq_temp[id_f, i] = np.sum(equatorial_GSM_standard_mfreq[f, final_index == i])
 				fake_solution_map_mfreq[id_f] = fake_solution_map_mfreq_temp[id_f, valid_pix_mask]
 		
+		try:
+			del(equatorial_GSM_standard)
+			del(beam_weight)
+			print('equatorial_GSM_standard and beam_weight have been successfully deleted.')
+		except:
+			print('No equatorial_GSM_standard or beam_weight to be deleted.')
+			
+		try:
+			del(equatorial_GSM_standard_mfreq)
+			del(fake_solution_map_mfreq_temp)
+			print('equatorial_GSM_standard_mfreq and fake_solution_map_mfreq_temp have been successfully deleted.')
+		except:
+			print('No equatorial_GSM_standard_mfreq or fake_solution_map_mfreq_temp to be deleted.')
+			
 		sizes = np.array(sizes)[valid_pix_mask]
 		thetas = np.array(thetas)[valid_pix_mask]
 		phis = np.array(phis)[valid_pix_mask]
@@ -4637,18 +4657,28 @@ if Calculate_Data_Noise:
 	N_data['y'] = noise_data['y'] * noise_data['y']
 	
 	Store_Data_Noise = True
+	Re_Save = True
 	
 	if Store_Data_Noise:
 		data_var_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
 		data_var_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
 		if not os.path.isfile(data_var_xx_filename):
 			N_data['x'].astype('float64').tofile(data_var_xx_filename)
+			print('N_data[x] saved to disc.')
+		elif Re_Save:
+			N_data['x'].astype('float64').tofile(data_var_xx_filename)
+			print('N_data[x] saved to disc again.')
 		else:
-			pass
+			print('N_data[x] not saved to disc again.')
+			
 		if not os.path.isfile(data_var_yy_filename):
 			N_data['y'].astype('float64').tofile(data_var_yy_filename)
+			print('N_data[y] saved to disc.')
+		elif Re_Save:
+			N_data['y'].astype('float64').tofile(data_var_yy_filename)
+			print('N_data[y] saved to disc again.')
 		else:
-			pass
+			print('N_data[x] not saved to disc again.')
 	
 	Del = True
 	if Del:
@@ -5378,18 +5408,28 @@ if Synthesize_MultiFreq:
 		N_data['y'] = noise_data['y'] * noise_data['y']
 		
 		Store_Data_Noise = True
+		Re_Save = True
 		
 		if Store_Data_Noise:
 			data_var_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
 			data_var_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
 			if not os.path.isfile(data_var_xx_filename):
 				N_data['x'].astype('float64').tofile(data_var_xx_filename)
+				print('N_data[x] saved to disc.')
+			elif Re_Save:
+				N_data['x'].astype('float64').tofile(data_var_xx_filename)
+				print('N_data[x] saved to disc again.')
 			else:
-				pass
+				print('N_data[x] not saved to disc again.')
+			
 			if not os.path.isfile(data_var_yy_filename):
 				N_data['y'].astype('float64').tofile(data_var_yy_filename)
+				print('N_data[y] saved to disc.')
+			elif Re_Save:
+				N_data['y'].astype('float64').tofile(data_var_yy_filename)
+				print('N_data[y] saved to disc again.')
 			else:
-				pass
+				print('N_data[x] not saved to disc again.')
 		
 		Del = True
 		if Del:
@@ -5658,6 +5698,10 @@ if Erase:
 		del (fullsim_vis_red)
 	except:
 		pass
+	try:
+		del (A)
+	except:
+		print('No A to be deleted.')
 
 sys.stdout.flush()
 
@@ -5952,7 +5996,10 @@ AtNiA_path = datadir + tag + AtNiA_filename
 if os.path.isfile(AtNiA_path) and AtNiA_only and not force_recompute:
 	sys.exit(0)
 
-del(A)
+try:
+	del(A)
+except:
+	print('A has already been successfully deleted.')
 A, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
 	get_A_multifreq(fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq,
 	                flist=flist, Flist_select=None, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight,
