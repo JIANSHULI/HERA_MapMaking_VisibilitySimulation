@@ -662,13 +662,15 @@ def UVData_to_dict_svmemory(uvdata_list, filetype='miriad', svmemory=True):
 	return d, f
 
 
-def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_Average=1, data_freqs=None, data_times=None, data_lsts=None, Contain_Autocorr=True, autocorr_data_mfreq=None, DicData=False, pol=None):
+def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_Average=1, data_freqs=None, data_times=None, data_lsts=None, Contain_Autocorr=True, autocorr_data_mfreq=None, DicData=False, pol=None, use_select_time=False, use_select_freq=False):
 	if np.mod(data[data.keys()[0]].shape[0], Time_Average) != 0:
 		if (data[data.keys()[0]].shape[0] / Time_Average) < 1.:
-			Time_Average = 1
+			# Time_Average = 1
+			Time_Average = np.min((data[data.keys()[0]].shape[0], Time_Average))
 	if np.mod(data[data.keys()[0]].shape[1], Frequency_Average) != 0:
 		if (data[data.keys()[0]].shape[1] / Frequency_Average) < 1.:
-			Frequency_Average = 1
+			# Frequency_Average = 1
+			Frequency_Average = np.min((data[data.keys()[0]].shape[1], Frequency_Average))
 	
 	remove_times = np.mod(data[data.keys()[0]].shape[0], Time_Average)
 	remove_freqs = np.mod(data[data.keys()[0]].shape[1], Frequency_Average)
@@ -719,20 +721,21 @@ def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_A
 			print ('rawData_Times: %s' % (len(data_times)))
 			print ('rawData_Lsts: %s' % (len(data_lsts)))
 		
-		data_ff[key] = np.mean(data[key].reshape(data[key].shape[0] / Time_Average, Time_Average, data[key].shape[1]), axis=1)
-		data_ff[key] = np.mean(data_ff[key].reshape(data[key].shape[0] / Time_Average, data[key].shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+		data_ff[key] = np.mean(data[key].reshape(data[key].shape[0] / Time_Average, Time_Average, data[key].shape[1]), axis=1) if use_select_time else data[key].reshape(data[key].shape[0] / Time_Average, Time_Average, data[key].shape[1])[:, 0, :]
+		data_ff[key] = np.mean(data_ff[key].reshape(data[key].shape[0] / Time_Average, data[key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) if use_select_freq else data_ff[key].reshape(data[key].shape[0] / Time_Average, data[key].shape[1] / Frequency_Average, Frequency_Average)[:, :, 0]
 		if DicData:
 			data.pop(key)
 		else:
 			data.__delitem__(key)
 		
-		dflags_ff[key] = np.mean(dflags[key].reshape(dflags[key].shape[0] / Time_Average, Time_Average, dflags[key].shape[1]), axis=1)
-		dflags_ff[key] = np.mean(dflags_ff[key].reshape(dflags[key].shape[0] / Time_Average, dflags[key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0
+		dflags_ff[key] = np.mean(dflags[key].reshape(dflags[key].shape[0] / Time_Average, Time_Average, dflags[key].shape[1]), axis=1) if use_select_time else dflags[key].reshape(dflags[key].shape[0] / Time_Average, Time_Average, dflags[key].shape[1])[:, 0, :]
+		dflags_ff[key] = (np.mean(dflags_ff[key].reshape(dflags[key].shape[0] / Time_Average, dflags[key].shape[1] / Frequency_Average, Frequency_Average), axis=-1) > 0)  if use_select_freq else (dflags_ff[key].reshape(dflags[key].shape[0] / Time_Average, dflags[key].shape[1] / Frequency_Average, Frequency_Average)[:, :, 0] > 0)
 		if DicData:
 			dflags.pop(key)
 		else:
 			dflags.__delitem__(key)
-	
+		
+		
 	print('compress_Pol_%s is done. %s seconds used.' % (pol, time.time() - timer))
 	
 	data = copy.deepcopy(data_ff)
@@ -744,8 +747,8 @@ def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_A
 	
 	if Contain_Autocorr:
 		autocorr_data_mfreq = autocorr_data_mfreq[: -remove_times, : -remove_freqs]
-		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1]), axis=1)
-		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average), axis=-1)
+		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1]), axis=1) if use_select_time else autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1])[:, 0, :]
+		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average), axis=-1) if use_select_freq else autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average)[:, :, 0]
 		autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
 		del (autocorr_data_mfreq_ff)
 		try:
@@ -970,41 +973,41 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 		print ('Flist_select: %s' % (str(Flist_select)))
 	
 	else:
-		if Flist_select is None:
-			try:
-				if flist is None:
-					Flist_select = [[Reference_Freq[0]], [Reference_Freq[1]]]
-				
+		# if Flist_select is None:
+		try:
+			if flist is None:
+				Flist_select = [[Reference_Freq[0]], [Reference_Freq[1]]]
+			
+			else:
+				if Reference_Freq_Index is not None:
+					for i in range(2):
+						try:
+							Reference_Freq_Index[i] = np.abs(Reference_Freq[i] - flist[i]).argmin()
+							Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
+						except:
+							Reference_Freq_Index[i] = len(flist[i]) / 2
+							Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
 				else:
-					if Reference_Freq_Index is not None:
-						for i in range(2):
-							try:
-								Reference_Freq_Index[i] = np.abs(Reference_Freq[i] - flist[i]).argmin()
-								Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
-							except:
-								Reference_Freq_Index[i] = len(flist[i]) / 2
-								Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
-					else:
-						Reference_Freq_Index = [[], []]
-						for i in range(2):
-							try:
-								Reference_Freq_Index[i] = np.abs(Reference_Freq[i] - flist[i]).argmin()
-								Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
-							except:
-								Reference_Freq_Index[i] = len(flist[i]) / 2
-								Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
-					Flist_select = [[Reference_Freq[0]], [Reference_Freq[1]]]
-					Flist_select_index = {}
-					try:
-						for i in range(2):
-							Flist_select_index[i] = np.zeros_like(Flist_select[i], dtype='int')
-							for k in range(len(Flist_select[i])):
-								Flist_select_index[i][k] = np.abs(Flist_select[i][k] - flist[i]).argmin()
-					except:
-						raise ValueError('Flist_select cannot come from flist.')
-					print ('Reference_Freq_Index: x-%s; y-%s' % (Reference_Freq_Index[0], Reference_Freq_Index[1]))
-			except:
-				raise ValueError('Please specify Reference_Freq for each polarization. ')
+					Reference_Freq_Index = [[], []]
+					for i in range(2):
+						try:
+							Reference_Freq_Index[i] = np.abs(Reference_Freq[i] - flist[i]).argmin()
+							Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
+						except:
+							Reference_Freq_Index[i] = len(flist[i]) / 2
+							Reference_Freq[i] = flist[i][Reference_Freq_Index[i]]
+				Flist_select = [[Reference_Freq[0]], [Reference_Freq[1]]]
+				Flist_select_index = {}
+				try:
+					for i in range(2):
+						Flist_select_index[i] = np.zeros_like(Flist_select[i], dtype='int')
+						for k in range(len(Flist_select[i])):
+							Flist_select_index[i][k] = np.abs(Flist_select[i][k] - flist[i]).argmin()
+				except:
+					raise ValueError('Flist_select cannot come from flist.')
+				print ('Reference_Freq_Index: x-%s; y-%s' % (Reference_Freq_Index[0], Reference_Freq_Index[1]))
+		except:
+			raise ValueError('Please specify Reference_Freq for each polarization. ')
 		
 		print ('Reference_Freq: x-%s; y-%s' % (Reference_Freq[0], Reference_Freq[1]))
 		if flist is not None:
@@ -1270,7 +1273,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 		# Merge A
 		try:
 			if Synthesize_MultiFreq:
-				return np.concatenate((np.real(A), np.imag(A))).astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution, fake_solution_map_mfreq
+				return np.concatenate((np.real(A), np.imag(A))).astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution#, fake_solution_map_mfreq
 			else:
 				return np.concatenate((np.real(A), np.imag(A))).astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
 		except MemoryError:
@@ -1289,7 +1292,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 			print "done."
 			sys.stdout.flush()
 			if Synthesize_MultiFreq:
-				return A.astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map, fake_solution, fake_solution_map_mfreq
+				return A.astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map, fake_solution#, fake_solution_map_mfreq
 			else:
 				return A.astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map, fake_solution
 
@@ -2578,21 +2581,24 @@ elif INSTRUMENT == 'hera47':
 	Lst_Hourangle = True
 	
 	
-	Nfiles_temp = 2
+	Nfiles_temp = 73
 	
-	Time_Average_preload = 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Time_Average_preload = 61 #12 # Number of Times averaged before loaded for each file (keep tails)'
+	Frequency_Average_preload = 32 #16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = True # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = True # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False # Whether to de-redundancy before each file loaded
 	inplace_preload = True # Change the self when given to the function select_average in uvdata.py.
 	
-	Compress_Average = True
-	Time_Average_afterload = 1 if Compress_Average else 1
+	Compress_Average = True # Compress after files loaded.
+	Time_Average_afterload = 2 if Compress_Average else 1
 	Frequency_Average_afterload = 1 if Compress_Average else 1
+	use_select_time = True
+	use_select_freq = True
 	
-	Time_Average = Time_Average_preload * Time_Average_afterload
-	Frequency_Average = Frequency_Average_preload * Frequency_Average_afterload
+	
+	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
+	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
 	Mocal_time_bin_temp = 600 #30; 600; (362)
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
@@ -2601,11 +2607,11 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Select = 150. # MHz, the single frequency as reference.
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 1.e-2 # meter, Criterion for De-Redundancy
+	Tolerance = 3.e-2 # meter, Criterion for De-Redundancy
 	
-	Synthesize_MultiFreq = True
-	Synthesize_MultiFreq_Nfreq = 9  # temp
-	Synthesize_MultiFreq_Step = 2
+	Synthesize_MultiFreq = False
+	Synthesize_MultiFreq_Nfreq = 9 if Synthesize_MultiFreq else 1  # temp
+	Synthesize_MultiFreq_Step = 2 if Synthesize_MultiFreq else 1
 
 	
 	sys.stdout.flush()
@@ -2617,7 +2623,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-50., -1., 1.)
+	rcond_list = 10. ** np.arange(-70., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -2829,8 +2835,9 @@ elif INSTRUMENT == 'hera47':
 			
 		
 		if Compress_Average:
-			data[i], dflags[i], autocorr_data_mfreq[i], data_freqs[i], data_times[i], data_lsts[i] = Compress_Data_by_Average(data=data[i], dflags=dflags[i], autocorr_data_mfreq=autocorr_data_mfreq[i], Contain_Autocorr=True,
-			                                                                                                                  data_freqs=data_freqs[i], data_times=data_times[i], data_lsts=data_lsts[i], Time_Average=Time_Average_afterload, Frequency_Average=Frequency_Average_afterload, DicData=Small_ModelData, pol=['xx', 'yy'][i])
+			data[i], dflags[i], autocorr_data_mfreq[i], data_freqs[i], data_times[i], data_lsts[i] = \
+				Compress_Data_by_Average(data=data[i], dflags=dflags[i], autocorr_data_mfreq=autocorr_data_mfreq[i], Contain_Autocorr=True,
+			                            data_freqs=data_freqs[i], data_times=data_times[i], data_lsts=data_lsts[i], Time_Average=Time_Average_afterload, Frequency_Average=Frequency_Average_afterload, DicData=Small_ModelData, pol=['xx', 'yy'][i],  use_select_time=use_select_time, use_select_freq=use_select_freq)
 			
 			# if i == 0:
 			# 	if np.mod(data[0][data[0].keys()[0]].shape[0], Time_Average) != 0:
@@ -4609,6 +4616,8 @@ elif INSTRUMENT == 'miteor':
 	Frequency_gap_real = 0.5 * 1.e6  # Hz
 
 Integration_Time = np.mean(Time_seperation_real)
+# Integration_Time = Integration_Time / Time_Average_preload if Select_time
+# Integration_Time = Integration_Time / Time_Average if use_select_time
 Frequency_Bin = np.mean(Frequency_gap_real)
 
 Calculate_SimulationData_Noise = True
@@ -4679,7 +4688,7 @@ if Calculate_Data_Noise:
 	N_data['y'] = noise_data['y'] * noise_data['y']
 	
 	Store_Data_Noise = True
-	Re_Save = True
+	Re_Save = False
 	
 	if Store_Data_Noise:
 		data_var_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
@@ -5430,7 +5439,7 @@ if Synthesize_MultiFreq:
 		N_data['y'] = noise_data['y'] * noise_data['y']
 		
 		Store_Data_Noise = True
-		Re_Save = True
+		Re_Save = False
 		
 		if Store_Data_Noise:
 			data_var_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
@@ -6025,7 +6034,7 @@ try:
 	del(A)
 except:
 	print('A has already been successfully deleted.')
-A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution, _ = \
+A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution= \
 	get_A_multifreq(fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=2., valid_pix_thresh = 1.e-4,
 	                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight,
 	                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
@@ -6515,7 +6524,7 @@ sys.stdout.flush()
 
 del (AtNiAi)
 
-A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution, _ = \
+A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution= \
 	get_A_multifreq(fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq,
 	                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight,
 	                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)

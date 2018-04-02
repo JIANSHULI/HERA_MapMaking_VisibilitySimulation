@@ -1646,10 +1646,10 @@ class UVData(UVBase):
             if Frequency_Average != 1:
                 if np.mod(uv_object.Ntimes, Time_Average) != 0:
                     if (uv_object.Ntimes / Time_Average) < 1.:
-                        Time_Average = 1
+                        Time_Average = np.min((uv_object.Ntimes, Time_Average))
                 if np.mod(uv_object.Nfreqs, Frequency_Average) != 0:
                     if (uv_object.Nfreqs / Frequency_Average) < 1.:
-                        Frequency_Average = 1
+                        Frequency_Average = np.min((uv_object.Nfreqs, Frequency_Average))
         
                 remove_times = np.mod(uv_object.Ntimes, Time_Average)
                 remove_freqs = np.mod(uv_object.Nfreqs, Frequency_Average)
@@ -1701,10 +1701,10 @@ class UVData(UVBase):
                 uv_object_time = copy.deepcopy(uv_object)
                 if np.mod(uv_object_time.Ntimes, Time_Average) != 0:
                     if (uv_object_time.Ntimes / Time_Average) < 1.:
-                        Time_Average = 1
+                        Time_Average = np.min((uv_object_time.Ntimes, Time_Average))
                 if np.mod(uv_object_time.Nfreqs, Frequency_Average) != 0:
                     if (uv_object_time.Nfreqs / Frequency_Average) < 1.:
-                        Frequency_Average = 1
+                        Frequency_Average = np.min((uv_object_time.Nfreqs, Frequency_Average))
         
                 remove_times = np.mod(uv_object.Ntimes, Time_Average)
                 remove_freqs = np.mod(uv_object.Nfreqs, Frequency_Average)
