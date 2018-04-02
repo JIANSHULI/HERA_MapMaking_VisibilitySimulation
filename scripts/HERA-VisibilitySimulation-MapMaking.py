@@ -2623,7 +2623,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-70., -1., 1.)
+	rcond_list = 10. ** np.arange(-100., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -2680,12 +2680,15 @@ elif INSTRUMENT == 'hera47':
 	fulldflags = {}
 	
 	data_fnames = {}
-	files_basses = {}
+	files_bases = {}
 	file_times = {}
+	file_JDays = {}
 	
-	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs))
+	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs)) /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192287662/2458044/
 	autocorr_data = {}
-	Nfiles = min(Nfiles_temp, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))
+	
+	Observing_Session = '/ObservingSession-1192287662/2458044/'
+	Nfiles = min(Nfiles_temp, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + Observing_Session))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + Observing_Session))))
 	
 	redundancy = [[],[]]
 	model_redundancy = [[], []]
@@ -2694,14 +2697,22 @@ elif INSTRUMENT == 'hera47':
 	index_freq = {}
 	
 	try:
-		data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))[:Nfiles]
-		data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + '/ObservingSession-1192201262/2458043/'))))[:Nfiles]
+		data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + Observing_Session))))[:Nfiles]
+		data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + Observing_Session))))[:Nfiles]
 		
-		file_times[0] = xxfile_bases = map(os.path.basename, xxfiles)
-		file_times[1] = yyfile_bases = map(os.path.basename, yyfiles)
+		files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
+		files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
 		
 		file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
 		file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
+		
+		file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
+		file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
+		
+		if file_JDays[0] != file_JDays[1]:
+			raise ValueError('Two Pols from diffent days.')
+		else:
+			INSTRUMENT = INSTRUMENT +'-' + str(file_JDays[0])
 		
 		print ('Nfiles: %s' % Nfiles)
 	except:
@@ -3853,7 +3864,7 @@ print "Rotating GSM_standard and converts to nest...",
 if INSTRUMENT == 'miteor':
 	DecimalYear = 2013.58  # 2013, 7, 31, 16, 47, 59, 999998)
 	JulianEpoch = 2013.58
-elif INSTRUMENT == 'hera47':
+elif 'hera47' in INSTRUMENT:
 	DecimalYear = Time(data_times[0][0], format='jd').decimalyear + (np.mean(Time(data_times[0], format='jd').decimalyear) - Time(data_times[0][0], format='jd').decimalyear) * Time_Expansion_Factor
 	JulianEpoch = Time(data_times[0][0], format='jd').jyear + (np.mean(Time(data_times[0], format='jd').jyear) - Time(data_times[0][0], format='jd').jyear) * Time_Expansion_Factor  # np.mean(Time(data_times[0], format='jd').jyear)
 
