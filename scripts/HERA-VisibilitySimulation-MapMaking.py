@@ -2687,7 +2687,7 @@ elif INSTRUMENT == 'hera47':
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs)) /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192287662/2458044/
 	autocorr_data = {}
 	
-	Observing_Session = '/ObservingSession-1192287662/2458044/'
+	Observing_Session = '/ObservingSession-1192287662/2458044/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043
 	Nfiles = min(Nfiles_temp, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + Observing_Session))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + Observing_Session))))
 	
 	redundancy = [[],[]]
@@ -4612,18 +4612,18 @@ sys.stdout.flush()
 ###################################################################################################
 Recal_IntegrationTime = True
 Recal_FrequencyBin = True
-if len(tlist) >= 2 and INSTRUMENT == 'hera47' and Recal_IntegrationTime:
+if len(tlist) >= 2 and 'hera47' in INSTRUMENT and Recal_IntegrationTime:
 	Time_seperation_real = np.array([3600. * np.abs(tlist[i + 1] - tlist[i]) for i in range(len(tlist) - 1)])  # in second
-elif INSTRUMENT == 'hera47':
+elif 'hera47' in INSTRUMENT:
 	Time_seperation_real = 11  # second
-elif INSTRUMENT == 'miteor':
+elif 'hera47' in INSTRUMENT:
 	Time_seperation_real = 2.7  # second
 
-if len(flist) >= 2 and INSTRUMENT == 'hera47' and Recal_FrequencyBin:
+if len(flist) >= 2 and 'hera47' in INSTRUMENT and Recal_FrequencyBin:
 	Frequency_gap_real = np.array([1.e6 * np.abs(flist[0][i + 1] - flist[0][i]) for i in range(len(flist[0]) - 1)])  # Hz
-elif INSTRUMENT == 'hera47':
+elif 'hera47' in INSTRUMENT:
 	Frequency_gap_real = 0.09765625 * 1.e6  # Hz
-elif INSTRUMENT == 'miteor':
+elif 'hera47' in INSTRUMENT:
 	Frequency_gap_real = 0.5 * 1.e6  # Hz
 
 Integration_Time = np.mean(Time_seperation_real)
@@ -4671,7 +4671,7 @@ if Calculate_Data_Noise:
 		noise_data['x'] = (var_data[0].flatten()) ** 0.5
 		noise_data['y'] = (var_data[1].flatten()) ** 0.5
 	
-	elif INSTRUMENT == 'hera47':
+	elif 'hera47' in INSTRUMENT:
 		if Keep_Red:
 			noise_data['x'] = np.array([np.random.normal(0, autocorr_data[0][t_index] / (Integration_Time * Frequency_Bin) ** 0.5, nUBL_used) for t_index in range(len(autocorr_data[0]))], dtype='float64').flatten()  # Not Absolute Calibrated
 			noise_data['y'] = np.array([np.random.normal(0, autocorr_data[1][t_index] / (Integration_Time * Frequency_Bin) ** 0.5, nUBL_used) for t_index in range(len(autocorr_data[1]))], dtype='float64').flatten()
@@ -5365,18 +5365,18 @@ else:
 if Synthesize_MultiFreq:
 	Recal_IntegrationTime = True
 	Recal_FrequencyBin = True
-	if len(tlist) >= 2 and INSTRUMENT == 'hera47' and Recal_IntegrationTime:
+	if len(tlist) >= 2 and 'hera47' in INSTRUMENT and Recal_IntegrationTime:
 		Time_seperation_real = np.array([3600. * np.abs(tlist[i + 1] - tlist[i]) for i in range(len(tlist) - 1)])  # in second
-	elif INSTRUMENT == 'hera47':
+	elif 'hera47' in INSTRUMENT:
 		Time_seperation_real = 11  # second
-	elif INSTRUMENT == 'miteor':
+	elif 'hera47' in INSTRUMENT:
 		Time_seperation_real = 2.7  # second
 	
-	if len(flist) >= 2 and INSTRUMENT == 'hera47' and Recal_FrequencyBin:
+	if len(flist) >= 2 and 'hera47' in INSTRUMENT and Recal_FrequencyBin:
 		Frequency_gap_real = np.array([1.e6 * np.abs(flist[0][i + 1] - flist[0][i]) for i in range(len(flist[0]) - 1)])  # Hz
-	elif INSTRUMENT == 'hera47':
+	elif 'hera47' in INSTRUMENT:
 		Frequency_gap_real = 0.09765625 * 1.e6  # Hz
-	elif INSTRUMENT == 'miteor':
+	elif 'hera47' in INSTRUMENT:
 		Frequency_gap_real = 0.5 * 1.e6  # Hz
 	
 	Integration_Time = np.mean(Time_seperation_real)
@@ -5422,7 +5422,7 @@ if Synthesize_MultiFreq:
 			noise_data['x'] = (var_data[0].flatten()) ** 0.5
 			noise_data['y'] = (var_data[1].flatten()) ** 0.5
 		
-		elif INSTRUMENT == 'hera47':
+		elif 'hera47' in INSTRUMENT:
 			if Keep_Red:
 				noise_data['x'] = np.array([np.random.normal(0, autocorr_data[0][t_index] / (Integration_Time * Frequency_Bin) ** 0.5, nUBL_used) for t_index in range(len(autocorr_data[0]))], dtype='float64').flatten()  # Not Absolute Calibrated
 				noise_data['y'] = np.array([np.random.normal(0, autocorr_data[1][t_index] / (Integration_Time * Frequency_Bin) ** 0.5, nUBL_used) for t_index in range(len(autocorr_data[1]))], dtype='float64').flatten()
