@@ -2604,14 +2604,14 @@ elif 'hera47' in INSTRUMENT:
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
 	
-	Frequency_Select = 150. # MHz, the single frequency as reference.
+	Frequency_Select = 120. # MHz, the single frequency as reference.
 	
 	Check_Dred_AFreq_ATime = False
 	Tolerance = 3.e-2 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
-	Synthesize_MultiFreq_Nfreq = 9 if Synthesize_MultiFreq else 1  # temp
-	Synthesize_MultiFreq_Step = 2 if Synthesize_MultiFreq else 1
+	Synthesize_MultiFreq_Nfreq = 3 if Synthesize_MultiFreq else 1  # temp
+	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 
 	
 	sys.stdout.flush()
@@ -2623,7 +2623,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-15., -1., 1.)
+	rcond_list = 10. ** np.arange(-100., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -2756,7 +2756,7 @@ elif 'hera47' in INSTRUMENT:
 			flist[i] = np.array(data_freqs[i]) / 10 ** 6
 			try:
 				# index_freq[i] = np.where(flist[i] == 150)[0][0]
-				index_freq[i] = np.abs(150 - flist[i]).argmin()
+				index_freq[i] = np.abs(Frequency_Select - flist[i]).argmin()
 			#		index_freq = 512
 			except:
 				index_freq[i] = len(flist[i]) / 2
@@ -2786,7 +2786,7 @@ elif 'hera47' in INSTRUMENT:
 				print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 				# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
 				
-				findex = np.where(data_freqs_full[i] == Frequency_Select)
+				findex = np.abs(data_freqs_full[i] - Frequency_Select).argmin()
 				# for i in range(2):
 				timer = time.time()
 				data_ff[i] = LastUpdatedOrderedDict()
@@ -3354,7 +3354,7 @@ elif 'hera47' in INSTRUMENT:
 			autocorr_data[i] = autocorr_data_mfreq[i][:, index_freq[i]]
 		
 		if Replace_Data and Small_ModelData:
-			findex = np.where(freqs == 150)
+			findex = np.abs(freqs - Frequency_Select).argmin()
 			findex_list = {}
 			autocorr_data_mfreq_ff = {}
 			for i in range(2):
@@ -3953,30 +3953,30 @@ if Test_SV_mfreq:
 	sim_vis_yy_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[1]))
 	
 	fullsim_vis_test_sf, autocorr_vis_test_sf, autocorr_vis_normalized_test_sf = Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
-	                                                                      flist=None, freq_index=None, freq=[150., 150.], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
+	                                                                      flist=None, freq_index=None, freq=[Frequency_Select, Frequency_Select], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
 	                                                                      C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 	                                                                      nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
 
 	fullsim_vis_red_test, autocorr_vis_red_test, autocorr_vis_normalized_red_test = Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_redabs_sim_filename, sim_vis_xx_filename_mfreq=redabs_sim_vis_xx_filename, sim_vis_yy_filename_mfreq=redabs_sim_vis_yy_filename, Force_Compute_Vis=True,  Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_bls_red,
-	                                                                        flist=None, freq_index=None, freq=[150., 150.], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None,
+	                                                                        flist=None, freq_index=None, freq=[Frequency_Select, Frequency_Select], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None,
 	                                                                        beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 	                                                                        nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
 
 	fullsim_vis_mfreq_test, autocorr_vis_mfreq_test, autocorr_vis_mfreq_normalized_test, fullsim_vis_mfreq_sf_test, autocorr_vis_mfreq_sf_test, autocorr_vis_mfreq_normalized_sf_test = \
 		Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq,
-		                          Force_Compute_Vis=True,  Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[150., 150.],
+		                          Force_Compute_Vis=True,  Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[Frequency_Select, Frequency_Select],
 		                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 	                                nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
 	
 	fullsim_vis_mfreq_test_force, autocorr_vis_mfreq_test_force, _, fullsim_vis_mfreq_sf_test_force, autocorr_vis_mfreq_sf_test_force, _ = \
 		Simulate_Visibility_mfreq(script_dir=script_dir, Force_Compute_beam_GSM=True, full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq,
-		                          Force_Compute_Vis=True, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist_test, freq_index=None, freq=[150., 150.],
+		                          Force_Compute_Vis=True, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist_test, freq_index=None, freq=[Frequency_Select, Frequency_Select],
 		                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 		                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, tlist=tlist_JD)
 	
 	fullsim_vis_mfreq_test_fake, autocorr_vis_mfreq_test_fake, _, fullsim_vis_mfreq_sf_test_fake, autocorr_vis_mfreq_sf_test_fake, _ = \
 		Simulate_Visibility_mfreq(script_dir=script_dir, Force_Compute_beam_GSM=True, full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq, Fake_Multi_freq=True,
-		                          Force_Compute_Vis=True, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist_test, freq_index=None, freq=[150., 150.],
+		                          Force_Compute_Vis=True, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist_test, freq_index=None, freq=[Frequency_Select, Frequency_Select],
 		                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 		                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, tlist=tlist_JD)
 
