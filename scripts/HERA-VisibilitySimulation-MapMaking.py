@@ -1333,7 +1333,7 @@ def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT='', full_sim_filename_mf
 		if INSTRUMENT == 'miteor':
 			DecimalYear = 2013.58  # 2013, 7, 31, 16, 47, 59, 999998)
 			JulianEpoch = 2013.58
-		elif INSTRUMENT == 'hera47':
+		elif 'hera47' in INSTRUMENT:
 			DecimalYear = Time(tlist_JD[0], format='jd').decimalyear + (np.mean(Time(tlist_JD, format='jd').decimalyear) - Time(tlist_JD[0], format='jd').decimalyear) * Time_Expansion_Factor
 			JulianEpoch = Time(tlist_JD[0], format='jd').jyear + (np.mean(Time(tlist_JD, format='jd').jyear) - Time(tlist_JD[0], format='jd').jyear) * Time_Expansion_Factor  # np.mean(Time(data_times[0], format='jd').jyear)
 		print('JulianEpoch: %s' % (str(JulianEpoch)))
@@ -1800,7 +1800,7 @@ def PointSource_Calibration(data_var_xx_filename_pscal='', data_var_yy_filename_
 					dec = southern_points[source]['body']._dec
 					# 			pt_vis[i, p] = jansky2kelvin * flux_func[source](freq) * vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
 					pt_vis[i, p] = flux_gsm_ps[source] * vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
-		elif INSTRUMENT == 'hera47':
+		elif 'hera47' in INSTRUMENT:
 			print "Simulating cyg casvisibilities, %s, expected time %.1f min" % (datetime.datetime.now(), 14.6 * (nUBL_used / 78.) * (nt_used / 193.) * (2. / 1.4e5)),
 			sys.stdout.flush()
 			timer = time.time()
@@ -2535,7 +2535,7 @@ if INSTRUMENT == 'miteor':
 	sys.stdout.flush()
 
 
-elif INSTRUMENT == 'hera47':
+elif 'hera47' in INSTRUMENT:
 	Simulation = True
 	Use_SimulatedData = False
 	Use_Simulation_noise = True
@@ -2623,7 +2623,7 @@ elif INSTRUMENT == 'hera47':
 	Frequency_Bin = 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-100., -1., 1.)
+	rcond_list = 10. ** np.arange(-15., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4215,7 +4215,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 	# 	fullsim_vis_mfreq = fullsim_vis_mfreq[:, :-1].transpose((1, 0, 2, 3))  # (uBL, Pol, Times, Freqs)
 
 # if not Model_Calibration:  # and Absolute_Calibration is True:
-# if INSTRUMENT == 'hera47' and (Absolute_Calibration_dred_mfreq or Absolute_Calibration_red or Absolute_Calibration_dred or PointSource_AbsCal or Absolute_Calibration_dred_mfreq_pscal):
+# if 'hera47' in INSTRUMENT and (Absolute_Calibration_dred_mfreq or Absolute_Calibration_red or Absolute_Calibration_dred or PointSource_AbsCal or Absolute_Calibration_dred_mfreq_pscal):
 # 	model_sf = {}
 # 	model_dred = {}
 #
@@ -5598,7 +5598,7 @@ for p in ['x', 'y']:
 			data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
 			#			data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
 			data[pol] = (data[pol].flatten()).conjugate()  # there's a conjugate convention difference
-		elif INSTRUMENT == 'hera47':
+		elif 'hera47' in INSTRUMENT:
 			if From_File_Data:
 				if Use_PsAbsCal:
 					Ni[pol] = 1. / (np.fromfile(data_var_filename_pscal, dtype='float64').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
