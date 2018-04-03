@@ -50,7 +50,7 @@ import aipy.miriad as apm
 import re
 import copy
 from hera_cal import utils, firstcal, cal_formats, redcal
-
+# from HERA_MapMaking_VisibilitySimulation.HERA_MapMaking_VisibilitySimulation_Functions import *
 
 PI = np.pi
 TPI = PI * 2
