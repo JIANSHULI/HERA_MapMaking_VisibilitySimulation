@@ -4,8 +4,10 @@ import time, datetime
 Timer_Start = time.time()
 print('Programme Starts at: %s'%str(datetime.datetime.now()))
 import ephem, sys, os, resource, warnings
-import simulate_visibilities.Bulm as Bulm
-import simulate_visibilities.simulate_visibilities as sv
+# import simulate_visibilities.Bulm as Bulm
+import HERA_MapMaking_VisibilitySimulation.Bulm
+# import simulate_visibilities.simulate_visibilities as sv
+import HERA_MapMaking_VisibilitySimulation.simulate_visibilities as sv
 import numpy as np
 import numpy.linalg as la
 import scipy.linalg as sla

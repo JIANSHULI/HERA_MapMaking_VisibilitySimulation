@@ -27,6 +27,9 @@ from .calfits import *
 from .uvbeam import *
 import version
 
+####### Import HERA_MapMaking_VisibilitySimulation_Functions ##########
+import HERA_MapMaking_VisibilitySimulation_Functions
+
 __version__ = version.version
 try:
     # DATA_PATH = __path__[0] + '/../data'

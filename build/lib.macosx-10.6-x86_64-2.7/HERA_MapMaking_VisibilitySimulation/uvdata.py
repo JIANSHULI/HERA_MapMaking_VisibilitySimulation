@@ -1264,7 +1264,7 @@ class UVData(UVBase):
     def select_average(self, antenna_nums=None, antenna_names=None, ant_str=None,
                ant_pairs_nums=None, frequencies=None, freq_chans=None,
                times=None, polarizations=None, blt_inds=None, run_check=True,
-               check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1, tol=5.e-4):
+               check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1, tol=5.e-4, Select_freq=False, Select_time=False):
         """
         Select specific antennas, antenna pairs, frequencies, times and
         polarizations to keep in the object while discarding others.
@@ -1646,10 +1646,10 @@ class UVData(UVBase):
             if Frequency_Average != 1:
                 if np.mod(uv_object.Ntimes, Time_Average) != 0:
                     if (uv_object.Ntimes / Time_Average) < 1.:
-                        Time_Average = 1
+                        Time_Average = np.min((uv_object.Ntimes, Time_Average))
                 if np.mod(uv_object.Nfreqs, Frequency_Average) != 0:
                     if (uv_object.Nfreqs / Frequency_Average) < 1.:
-                        Frequency_Average = 1
+                        Frequency_Average = np.min((uv_object.Nfreqs, Frequency_Average))
         
                 remove_times = np.mod(uv_object.Ntimes, Time_Average)
                 remove_freqs = np.mod(uv_object.Nfreqs, Frequency_Average)
@@ -1666,16 +1666,24 @@ class UVData(UVBase):
                 uv_object.nsample_array = uv_object.nsample_array[:, :, :-remove_freqs, :]
                 
                 uv_object.freq_array = uv_object.freq_array.reshape(uv_object.freq_array.shape[0], uv_object.Nfreqs / Frequency_Average, Frequency_Average)[:,:,0]
-                uv_object.data_array = np.mean(uv_object.data_array.reshape(uv_object.data_array.shape[0], uv_object.data_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.data_array.shape[3]), axis=-2)
-                uv_object.flag_array = np.mean(uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3]), axis=-2) > 0
-                uv_object.nsample_array = np.mean(uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3]), axis=-2)
+                if not Select_freq:
+                    uv_object.data_array = np.mean(uv_object.data_array.reshape(uv_object.data_array.shape[0], uv_object.data_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.data_array.shape[3]), axis=-2)
+                    uv_object.flag_array = np.mean(uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3]), axis=-2) > 0
+                    uv_object.nsample_array = np.mean(uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3]), axis=-2)
+                else:
+                    uv_object.data_array = uv_object.data_array.reshape(uv_object.data_array.shape[0], uv_object.data_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.data_array.shape[3])[:, :, :, 0, :]
+                    uv_object.flag_array = uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3])[:, :, :, 0, :] > 0
+                    uv_object.nsample_array = uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3])[:, :, :, 0, :]
 
                 freq_arr_use = uv_object.freq_array[0, :]
                 uv_object.Nfreqs = len(freq_arr_use)
                 
                 try:
                     if uv_object.Nfreqs != self.Nfreqs:
-                        history_update_string += ', frequency averaged'
+                        if not Select_freq:
+                            history_update_string += ', frequency averaged'
+                        else:
+                            history_update_string += ', frequency selected'
                 except:
                     print('History not modified.')
                 
@@ -1693,10 +1701,10 @@ class UVData(UVBase):
                 uv_object_time = copy.deepcopy(uv_object)
                 if np.mod(uv_object_time.Ntimes, Time_Average) != 0:
                     if (uv_object_time.Ntimes / Time_Average) < 1.:
-                        Time_Average = 1
+                        Time_Average = np.min((uv_object_time.Ntimes, Time_Average))
                 if np.mod(uv_object_time.Nfreqs, Frequency_Average) != 0:
                     if (uv_object_time.Nfreqs / Frequency_Average) < 1.:
-                        Frequency_Average = 1
+                        Frequency_Average = np.min((uv_object_time.Nfreqs, Frequency_Average))
         
                 remove_times = np.mod(uv_object.Ntimes, Time_Average)
                 remove_freqs = np.mod(uv_object.Nfreqs, Frequency_Average)
@@ -1782,18 +1790,28 @@ class UVData(UVBase):
                         # uv_object_time.Nbls += 1
                         uv_object_time.time_array = np.append(uv_object_time.time_array, uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         uv_object_time.lst_array = np.append(uv_object_time.lst_array, uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
-                        uv_object_time.data_array = np.append(uv_object_time.data_array, np.mean(uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3]), axis=0))
-                        uv_object_time.flag_array = np.append(uv_object_time.flag_array, np.mean(uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3]), axis=0)) > 0
-                        uv_object_time.nsample_array = np.append(uv_object_time.nsample_array, np.mean(uv_object.nsample_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.nsample_array.shape[1], uv_object.nsample_array.shape[2], uv_object.nsample_array.shape[3]), axis=0))
-                        uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, np.mean(uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1]), axis=0))
+                        if not Select_time:
+                            uv_object_time.data_array = np.append(uv_object_time.data_array, np.mean(uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3]), axis=0))
+                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, np.mean(uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3]), axis=0)) > 0
+                            uv_object_time.nsample_array = np.append(uv_object_time.nsample_array, np.mean(uv_object.nsample_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.nsample_array.shape[1], uv_object.nsample_array.shape[2], uv_object.nsample_array.shape[3]), axis=0))
+                            uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, np.mean(uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1]), axis=0))
+                        else:
+                            uv_object_time.data_array = np.append(uv_object_time.data_array, uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3])[0, :, :, :, :])
+                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3])[0, :, :, :, :]) > 0
+                            uv_object_time.nsample_array = np.append(uv_object_time.nsample_array, uv_object.nsample_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.nsample_array.shape[1], uv_object.nsample_array.shape[2], uv_object.nsample_array.shape[3])[0, :, :, :, :])
+                            uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1])[0, :, :])
 
                         uv_object_time.ant_1_array = np.append(uv_object_time.ant_1_array, uv_object.ant_1_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         uv_object_time.ant_2_array = np.append(uv_object_time.ant_2_array, uv_object.ant_2_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         # uv_object.Nants_data = uv_object_time.Nants_data + int(len(set(uv_object_time.ant_1_array.tolist() + uv_object_time.ant_2_array.tolist())))
 
                         if uv_object_time.phase_type == 'drift':
-                            uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, np.mean(uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
-                            uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, np.mean(uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                            if not Select_time:
+                                uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, np.mean(uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                                uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, np.mean(uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                            else:
+                                uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                                uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
 
                         # uv_object_time.redundancy = np.append(uv_object_time.redundancy, nred)
                 if uv_object_time.Ntimes != Ntbin:
@@ -1836,7 +1854,10 @@ class UVData(UVBase):
                 
                 try:
                     if uv_object.Ntimes != self.Ntimes:
-                        history_update_string += ', time averaged'
+                        if not Select_time:
+                            history_update_string += ', time averaged'
+                        else:
+                            history_update_string += ', time selected'
                 except:
                     print('History not modified.')
                 
@@ -2134,7 +2155,7 @@ class UVData(UVBase):
 
     def read_miriad(self, filepath, correct_lat_lon=True, run_check=True,
                     check_extra=True,
-                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4):
+                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False):
         """
         Read in data from a miriad file.
 
@@ -2153,7 +2174,7 @@ class UVData(UVBase):
                              run_check=run_check, check_extra=check_extra,
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
-            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol)
+            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             print('Number of Unique baselines after Dred: %s'%self.Nubls)
@@ -2168,7 +2189,7 @@ class UVData(UVBase):
                                     run_check=run_check, check_extra=check_extra,
                                     run_check_acceptability=run_check_acceptability,
                                     phase_type=phase_type)
-                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol)
+                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time)
                     self += uv2
                     
                     print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
