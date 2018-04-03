@@ -4427,6 +4427,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 # 			wgts_dred = copy.deepcopy(cdflags_dred)
 # 		for k in wgts_dred[i].keys():
 # 			wgts_dred[i][k] = (~wgts_dred[i][k]).astype(np.float)
+sys.stdout.flush()
 
 ##################################################################################################################################################
 ############################################################ Model Calibration  #################################################################
@@ -6537,7 +6538,7 @@ sys.stdout.flush()
 
 del (AtNiAi)
 
-A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution= \
+A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_original= \
 	get_A_multifreq(fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq,
 	                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight,
 	                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
@@ -6638,7 +6639,7 @@ def plot_IQU_unlimit(solution, title, col, shape=(2,3), coord='C'):
 #if col == shape[0] * shape[1]:
 #plt.show(block=False)
 
-
+sys.stdout.flush()
 # crd = 0
 # for coord in ['C', 'CG']:
 #	#plt.clf()

@@ -11,7 +11,7 @@ from distutils.core import setup, Extension
 
 
 ########## hera_dp_vs_mp version ###########
-__version__ = '0.0.2'
+__version__ = '1.0.0'
 
 def indir(dir, files): return [dir+f for f in files]
 def globdir(dir, files):
