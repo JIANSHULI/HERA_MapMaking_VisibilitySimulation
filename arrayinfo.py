@@ -142,7 +142,8 @@ def compute_reds_total_autocorr(antpos, tol=5.e-4):
                 ubl_v[u] = ubl_v[u] * len(ublgp[u]) - ubl_v.pop(nu) * len(ublgp[nu]) # note sign reversal
                 ublgp[u] += [(j,i) for i,j in ublgp.pop(nu)]
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
-    return [np.unique(v, axis=0) for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
+    # return [np.unique(v, axis=0) for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
+    return [list(set(v)) for v in ublgp.values() if len(v) >= 1]  # with such thing as redundancy of one
 
 class ArrayInfo:
     '''Store information about an antenna array needed for computing redundancy and indexing matrices.'''

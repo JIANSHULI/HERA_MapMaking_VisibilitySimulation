@@ -848,7 +848,19 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 	
 	for i in range(2):
 		Ubl_list_raw[i] = np.array(mmvs.arrayinfo.compute_reds_total(antloc[i], tol=tol))  ## Note that a new function has been added into omnical.arrayinfo as "compute_reds_total" which include all ubls not only redundant ones.
-		Ubl_list_raw[i] = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw[i], ex_ants=Badants)
+		try:
+			print('Length of Ubl_list_raw[%s] with Badants: %s' %(i, len(Ubl_list_raw[i])))
+		except:
+			print('No Ubl_list_raw with Badants printing.')
+		Ubl_list_raw[i] = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw[i], ex_ants=map(lambda k:antpos[i].keys().index(k), Badants))
+		try:
+			print('Length of Ubl_list_raw[%s]: %s' %(i, len(Ubl_list_raw)))
+		except:
+			print('No Ubl_list_raw printing.')
+	try:
+		print('Bandants Index: %s'%str(map(lambda k:antpos[i].keys().index(k), Badants)))
+	except:
+		print('Bandants Index not printed.')
 	# ant_pos[i] = antpos[i]
 	
 	for i in range(2):
@@ -2587,15 +2599,15 @@ elif 'hera47' in INSTRUMENT:
 	
 	Nfiles_temp = 73
 	
-	Time_Average_preload = 3 #12 # Number of Times averaged before loaded for each file (keep tails)'
+	Time_Average_preload = 60 #12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 32 #16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = True # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
-	Select_time = False # Use the first time as the selected one every Time_Average_preload time-step.
+	Select_time = True # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = True # Whether to de-redundancy before each file loaded
 	inplace_preload = True # Change the self when given to the function select_average in uvdata.py.
 	
 	Compress_Average = True # Compress after files loaded.
-	Time_Average_afterload = 20 if Compress_Average else 1
+	Time_Average_afterload = 1 if Compress_Average else 1
 	Frequency_Average_afterload = 1 if Compress_Average else 1
 	use_select_time = True
 	use_select_freq = True
@@ -3102,11 +3114,11 @@ elif 'hera47' in INSTRUMENT:
 	SingleFreq = True
 	MultiFreq = True
 	if SingleFreq and MultiFreq:
-		vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance)
+		vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance, Badants=badants)
 	elif MultiFreq:
-		vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=None, Nfreqs=None, data_times=None, Ntimes=60, FreqScaleFactor=None, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance)
+		vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=None, Nfreqs=None, data_times=None, Ntimes=60, FreqScaleFactor=None, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance, Badants=badants)
 	elif SingleFreq:
-		vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data=vis_data, tol=Tolerance)
+		vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, data_freqs=data_freqs, data_times=data_times, Ntimes=60, FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data=vis_data, tol=Tolerance, Badants=badants)
 	
 	for i in range(2):
 		if Dred_preload:

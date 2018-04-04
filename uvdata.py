@@ -1429,7 +1429,11 @@ class UVData(UVBase):
             antpos = odict(zip(ants, antpos))
             antloc = np.array(map(lambda k: antpos[k], ants))
             Ubl_list_raw = np.array(mmvs.arrayinfo.compute_reds_total_autocorr(antloc, tol=tol))
-            Ubl_list_raw = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw, ex_ants=Badants)
+            try:
+                print('Length of Ubl_list_raw with Badants: %s'%len(Ubl_list_raw))
+            except:
+                print('No Ubl_list_raw with Badants printing.')
+            Ubl_list_raw = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw, ex_ants=map(lambda k:antpos[0].keys().index(k), Badants))
             
             try:
                 print('Length of Ubl_list_raw: %s'%len(Ubl_list_raw))
