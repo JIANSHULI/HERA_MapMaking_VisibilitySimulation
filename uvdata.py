@@ -1264,7 +1264,7 @@ class UVData(UVBase):
     def select_average(self, antenna_nums=None, antenna_names=None, ant_str=None,
                ant_pairs_nums=None, frequencies=None, freq_chans=None,
                times=None, polarizations=None, blt_inds=None, run_check=True,
-               check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1, tol=5.e-4, Select_freq=False, Select_time=False):
+               check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
         """
         Select specific antennas, antenna pairs, frequencies, times and
         polarizations to keep in the object while discarding others.
@@ -1429,6 +1429,7 @@ class UVData(UVBase):
             antpos = odict(zip(ants, antpos))
             antloc = np.array(map(lambda k: antpos[k], ants))
             Ubl_list_raw = np.array(mmvs.arrayinfo.compute_reds_total_autocorr(antloc, tol=tol))
+            Ubl_list_raw = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw, ex_ants=Badants)
             
             try:
                 print('Length of Ubl_list_raw: %s'%len(Ubl_list_raw))
@@ -2155,7 +2156,7 @@ class UVData(UVBase):
 
     def read_miriad(self, filepath, correct_lat_lon=True, run_check=True,
                     check_extra=True,
-                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False):
+                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
         """
         Read in data from a miriad file.
 
@@ -2174,7 +2175,7 @@ class UVData(UVBase):
                              run_check=run_check, check_extra=check_extra,
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
-            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time)
+            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             print('Number of Unique baselines after Dred: %s'%self.Nubls)
@@ -2189,7 +2190,7 @@ class UVData(UVBase):
                                     run_check=run_check, check_extra=check_extra,
                                     run_check_acceptability=run_check_acceptability,
                                     phase_type=phase_type)
-                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time)
+                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
                     self += uv2
                     
                     print('Number of Frequencies after Averaging: %s' % self.Nfreqs)

@@ -90,7 +90,7 @@ def compute_reds_total(antpos, tol=5.e-4):
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
     return [v for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
 
-def compute_reds_total_autocorr(antpos, tol=5.e-5):
+def compute_reds_total_autocorr(antpos, tol=5.e-4):
     '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
     list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
     fall within the specified tolerance of each other.  'antpos' is a (nant,3) array of antenna positions.'''
@@ -150,6 +150,34 @@ class ArrayInfo:
         reds = self.compute_reds(tol=tol)
         reds = self.filter_reds(reds, bls=self.totalVisibilityId.keys(), 
                 ex_ants=list(self.badAntenna), ex_ubls=[tuple(p) for p in self.badUBLpair])
+        info = RedundantInfo()
+        info.init_from_reds(reds, self.antennaLocation)
+        return info
+
+    def compute_reds_total(self, tol=0.1):
+        '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
+        list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
+        fall within the specified tolerance of each other.'''
+        return compute_reds_total(self.antennaLocation, tol=tol)
+    def compute_reds_total_autocorr(self, tol=0.1):
+        '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
+        list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
+        fall within the specified tolerance of each other.'''
+        return compute_reds_total_autocorr(self.antennaLocation, tol=tol)
+    
+    def compute_redundantinfo_total(self, tol=1e-6):
+        '''Use provided antenna locations (in arrayinfoPath) to derive redundancy equations'''
+        reds = self.compute_reds_total(tol=tol)
+        reds = self.filter_reds(reds, bls=self.totalVisibilityId.keys(),
+                                ex_ants=list(self.badAntenna), ex_ubls=[tuple(p) for p in self.badUBLpair])
+        info = RedundantInfo()
+        info.init_from_reds(reds, self.antennaLocation)
+        return info
+    def compute_redundantinfo_total_autocorr(self, tol=1e-6):
+        '''Use provided antenna locations (in arrayinfoPath) to derive redundancy equations'''
+        reds = self.compute_reds_total_autocorr(tol=tol)
+        reds = self.filter_reds(reds, bls=self.totalVisibilityId.keys(),
+                                ex_ants=list(self.badAntenna), ex_ubls=[tuple(p) for p in self.badUBLpair])
         info = RedundantInfo()
         info.init_from_reds(reds, self.antennaLocation)
         return info
