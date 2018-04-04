@@ -46,6 +46,7 @@ import omnical
 import omnical.calibration_omni as omni
 from memory_profiler import memory_usage as memuse
 from collections import OrderedDict as odict
+from collections import Counter
 import pandas
 import aipy.miriad as apm
 import re
@@ -852,7 +853,10 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 			print('Length of Ubl_list_raw[%s] with Badants: %s' %(i, len(Ubl_list_raw[i])))
 		except:
 			print('No Ubl_list_raw with Badants printing.')
-		Ubl_list_raw[i] = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw[i], ex_ants=map(lambda k:antpos[i].keys().index(k), Badants))
+		try:
+			Ubl_list_raw[i] = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw[i], ex_ants=map(lambda k:antpos[i].keys().index(k), Badants))
+		except:
+			print('Badants not in the ant-list.')
 		try:
 			print('Length of Ubl_list_raw[%s]: %s' %(i, len(Ubl_list_raw)))
 		except:
@@ -2603,7 +2607,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Average_preload = 32 #16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = True # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = True # Use the first time as the selected one every Time_Average_preload time-step.
-	Dred_preload = True # Whether to de-redundancy before each file loaded
+	Dred_preload = False # Whether to de-redundancy before each file loaded
 	inplace_preload = True # Change the self when given to the function select_average in uvdata.py.
 	
 	Compress_Average = True # Compress after files loaded.
@@ -3167,8 +3171,9 @@ elif 'hera47' in INSTRUMENT:
 	else:
 		tag = '%s-%f' % (INSTRUMENT, freq)
 	tmasks = {}
-	for p in ['x', 'y']:
-		tmasks[p] = np.ones_like(tlist).astype(bool)
+	for id_p, p in enumerate(['x', 'y']):
+		# tmasks[p] = np.ones_like(tlist).astype(bool)
+		tmasks[p] = dflags[id_p][dflags[id_p].keys()[0]][:, index_freq[id_p]]
 	# tmasks[p] = np.zeros_like(tlist).astype(bool)
 	# tmasks[p][[nt/2, nt/2 + 1]] = True # Only use the median 2 times.
 	
@@ -3667,8 +3672,10 @@ elif 'hera47' in INSTRUMENT:
 elif 'hera47' in INSTRUMENT:
 	Frequency_gap_real = 0.5 * 1.e6  # Hz
 
-Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
-Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+# Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+# Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
 
 Calculate_SimulationData_Noise = True
 Calculate_Data_Noise = True
@@ -3899,8 +3906,10 @@ if Synthesize_MultiFreq:
 	elif 'hera47' in INSTRUMENT:
 		Frequency_gap_real = 0.5 * 1.e6  # Hz
 	
-	Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
-	Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+	# Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+	# Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+	Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+	Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
 	
 	Calculate_SimulationData_Noise = True
 	Calculate_Data_Noise = True

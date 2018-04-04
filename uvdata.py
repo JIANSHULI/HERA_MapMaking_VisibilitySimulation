@@ -1433,7 +1433,10 @@ class UVData(UVBase):
                 print('Length of Ubl_list_raw with Badants: %s'%len(Ubl_list_raw))
             except:
                 print('No Ubl_list_raw with Badants printing.')
-            Ubl_list_raw = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw, ex_ants=map(lambda k:antpos.keys().index(k), Badants))
+            try:
+                Ubl_list_raw = mmvs.arrayinfo.filter_reds_total(Ubl_list_raw, ex_ants=map(lambda k:antpos.keys().index(k), Badants))
+            except:
+                print('Bandants not in ant-list.')
             
             try:
                 print('Length of Ubl_list_raw: %s'%len(Ubl_list_raw))
