@@ -858,7 +858,7 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 		except:
 			print('Badants not in the ant-list.')
 		try:
-			print('Length of Ubl_list_raw[%s]: %s' %(i, len(Ubl_list_raw)))
+			print('Length of Ubl_list_raw[%s]: %s' %(i, len(Ubl_list_raw[i])))
 		except:
 			print('No Ubl_list_raw printing.')
 	try:
@@ -2627,7 +2627,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Select = 150. # MHz, the single frequency as reference.
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 3.e-2 # meter, Criterion for De-Redundancy
+	Tolerance = 1.e-2 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 3 if Synthesize_MultiFreq else 1  # temp
@@ -3182,6 +3182,10 @@ elif 'hera47' in INSTRUMENT:
 	# 	data_lsts[i] = data_lsts[i] * LST_Renorm
 	
 	tmask = tmasks['x'] & tmasks['y']
+	try:
+		print('Tmask: %s'%str(tmask))
+	except:
+		print('No Tmask printed.')
 	if Time_Expansion_Factor == 1.:
 		tlist = tlist[tmask]
 		lsts = data_lsts[0][tmask] * LST_Renorm
@@ -3676,6 +3680,10 @@ elif 'hera47' in INSTRUMENT:
 # Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
 Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
 Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+try:
+	print('>>>>>>>>>>>>>>>Integration_Time: %s\n>>>>>>>>>>>>>>>Frequency_Bin: %s'%(Integration_Time, Frequency_Bin))
+except:
+	print('>>>>>>>>>>>>>>>Integration_Time and Frequency_Bin are not printed.')
 
 Calculate_SimulationData_Noise = True
 Calculate_Data_Noise = True
@@ -3910,6 +3918,11 @@ if Synthesize_MultiFreq:
 	# Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
 	Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
 	Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+	try:
+		print('>>>>>>>>>>>>>>>Integration_Time: %s\n>>>>>>>>>>>>>>>Frequency_Bin: %s' % (Integration_Time, Frequency_Bin))
+	except:
+		print('>>>>>>>>>>>>>>>Integration_Time and Frequency_Bin are not printed.')
+	
 	
 	Calculate_SimulationData_Noise = True
 	Calculate_Data_Noise = True
