@@ -824,7 +824,8 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 	
 	bls = [[], []]
 	for i in range(2):
-		bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in dflags[i].keys()])
+		bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
+		# bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in dflags[i].keys()])
 		# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
 		bls = np.array(bls)
 	
@@ -2564,8 +2565,8 @@ if INSTRUMENT == 'miteor':
 
 elif 'hera47' in INSTRUMENT:
 	Simulation = True
-	Use_SimulatedData = False
-	Use_Simulation_noise = True
+	Use_SimulatedData = True
+	Use_Simulation_noise = False
 	From_File_Data = True
 	Keep_Red = False
 	
@@ -2633,7 +2634,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	Frequency_Select = 150. # MHz, the single frequency as reference.
 	Comply2RFI = True # Use RFI_Best as selected frequency.
-	badants_append = [11, 68]
+	badants_append = [11, 26, 68, 84, 121]
 	
 	Check_Dred_AFreq_ATime = False
 	Tolerance = 1.e-2 # meter, Criterion for De-Redundancy
@@ -3124,7 +3125,7 @@ elif 'hera47' in INSTRUMENT:
 	# bls = odict([(x, antpos[x[0]] - antpos[x[1]]) for x in model.keys()])
 	bls = [[], []]
 	for i in range(2):
-		bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in data[i].keys()])
+		bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
 		# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
 		bls = np.array(bls)
 	
@@ -3747,14 +3748,16 @@ elif 'miteor' in INSTRUMENT:
 
 # Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
 # Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-if len(Time_seperation_real) > 1:
-	Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
-else:
+try:
+	if len(Time_seperation_real) > 1:
+		Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+except:
 	Integration_Time = Time_seperation_real * ((Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1))
 	
-if len(Frequency_gap_real) > 1:
-	Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-else:
+try:
+	if len(Frequency_gap_real) > 1:
+		Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+except:
 	Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
 
 
@@ -3994,13 +3997,16 @@ if Synthesize_MultiFreq:
 	
 	# Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
 	# Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-	if len(Time_seperation_real) > 1:
-		Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
-	else:
+	try:
+		if len(Time_seperation_real) > 1:
+			Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+	except:
 		Integration_Time = Time_seperation_real * ((Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1))
-	if len(Frequency_gap_real) > 1:
-		Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-	else:
+	
+	try:
+		if len(Frequency_gap_real) > 1:
+			Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+	except:
 		Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
 	
 	try:
@@ -4378,9 +4384,23 @@ sys.stdout.flush()
 ################################
 ################################
 if pre_calibrate:
-	data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal,   Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+	if Absolute_Calibration_dred_mfreq and PointSource_AbsCal:
+		data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal,   Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
 	                                                                       data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
 	                                                                       lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard)
+	elif Absolute_Calibration_dred_mfreq:
+		data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+		                                                                                     data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
+		                                                                                     lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard)
+	elif PointSource_AbsCal:
+		data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+		                                                                                     data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
+		                                                                                     lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=None, mocal_freq_bin=None, bnside=bnside, nside_standard=nside_standard)
+	else:
+		data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+		                                                                                     data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
+		                                                                                     lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=None, mocal_freq_bin=None, bnside=bnside, nside_standard=nside_standard)
+	
 else:
 	additive_A, additive_term, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
 	                                                                                     data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
@@ -4503,148 +4523,6 @@ print "Memory usage: %fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
 sys.stdout.flush()
 
 
-########################################################################
-########################processing dynamic pixelization######################
-########################################################################
-# gsm_beamweighted = equatorial_GSM_standard * beam_weight
-# if AtNiA_only:
-# 	valid_npix = pixel_scheme_number
-# 	pixel_scheme_file = np.load(pixel_directory + 'pixel_scheme_%i_%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s.npz' % (valid_npix, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard))
-# 	fake_solution_map = pixel_scheme_file['gsm']
-# 	thetas = pixel_scheme_file['thetas']
-# 	phis = pixel_scheme_file['phis']
-# 	sizes = pixel_scheme_file['sizes']
-# 	nside_distribution = pixel_scheme_file['nside_distribution']
-# 	final_index = pixel_scheme_file['final_index']
-# 	npix = pixel_scheme_file['n_fullsky_pix']
-# 	valid_pix_mask = pixel_scheme_file['valid_pix_mask']
-# 	thresh = pixel_scheme_file['thresh']
-# else:
-# 	nside_distribution = np.zeros(12 * nside_standard ** 2)
-# 	final_index = np.zeros(12 * nside_standard ** 2, dtype=int)
-# 	thetas, phis, sizes = [], [], []
-# 	abs_thresh = np.mean(gsm_beamweighted) * thresh
-# 	pixelize(gsm_beamweighted, nside_distribution, nside_standard, nside_start, abs_thresh,
-# 	         final_index, thetas, phis, sizes)
-# 	npix = len(thetas)
-# 	valid_pix_mask = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > valid_pix_thresh * max(gsm_beamweighted)
-# 	valid_npix = np.sum(valid_pix_mask)
-# 	print '>>>>>>VALID NPIX =', valid_npix
-#
-# 	fake_solution_map = np.zeros_like(thetas)
-# 	for i in range(len(fake_solution_map)):
-# 		fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
-# 	fake_solution_map = fake_solution_map[valid_pix_mask]
-# 	sizes = np.array(sizes)[valid_pix_mask]
-# 	thetas = np.array(thetas)[valid_pix_mask]
-# 	phis = np.array(phis)[valid_pix_mask]
-# 	np.savez(pixel_directory + 'pixel_scheme_%i_%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s.npz' % (valid_npix, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard), gsm=fake_solution_map, thetas=thetas, phis=phis, sizes=sizes, nside_distribution=nside_distribution, final_index=final_index,
-# 	         n_fullsky_pix=npix, valid_pix_mask=valid_pix_mask, thresh=thresh)
-# # thresh is in there for idiotic reason  due to unneccessary inclusion of thresh in A filename
-#
-# if not fit_for_additive:
-# 	fake_solution = np.copy(fake_solution_map)
-# else:
-# 	fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
-#
-#
-# def sol2map(sol):
-# 	solx = sol[:valid_npix]
-# 	full_sol = np.zeros(npix)
-# 	full_sol[valid_pix_mask] = solx / sizes
-# 	return full_sol[final_index]
-#
-#
-# def sol2additive(sol):
-# 	return np.transpose(sol[valid_npix:].reshape(nUBL_used, 2, 2), (1, 0, 2))  # ubl by pol by re/im before transpose
-#
-#
-# # final_index_filename = datadir + tag + '_%i.dyind%i_%.3f'%(nside_standard, npix, thresh)
-# # final_index.astype('float32').tofile(final_index_filename)
-# # sizes_filename = final_index_filename.replace('dyind', "dysiz")
-# # np.array(sizes).astype('float32').tofile(sizes_filename)
-# try:
-# 	if plot_pixelization:
-# 		##################################################################
-# 		####################################sanity check########################
-# 		###############################################################
-# 		# npix = 0
-# 		# for i in nside_distribution:
-# 		# npix += i**2/nside_standard**2
-# 		# print npix, len(thetas)
-# 		plotcoord = 'C'
-# 		stds = np.std((equatorial_GSM_standard * beam_weight).reshape(12 * nside_standard ** 2 / 4, 4), axis=1)
-#
-# 		##################################################################
-# 		####################################plotting########################
-# 		###############################################################
-# 		with warnings.catch_warnings():
-# 			warnings.filterwarnings("ignore", category=RuntimeWarning)
-# 			# plt.clf()
-# 			plt.figure(50)
-# 			hpv.mollview(beam_weight, min=0, max=4, coord=plotcoord, title='%s-dipole-beam_weight-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s' % (INSTRUMENT, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'), nest=True)
-# 			plt.savefig(script_dir + '/../Output/%s-%sMHz-dipole-beam_weight-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
-# 			hpv.mollview(np.log10(equatorial_GSM_standard), min=0, max=4, coord=plotcoord, title='GSM', nest=True)
-# 			plt.savefig(script_dir + '/../Output/GSM-3C-for-%s-%sMHz-bnside-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
-# 			hpv.mollview(np.log10(sol2map(fake_solution)[:len(equatorial_GSM_standard)]), min=0, max=4, coord=plotcoord,
-# 			             title='GSM gridded', nest=True)
-# 			plt.savefig(script_dir + '/../Output/maskedfsol_GSM-3C-%s-%sMHz-dipole-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
-# 			hpv.mollview(np.log2(nside_distribution), min=np.log2(nside_start), max=np.log2(nside_standard),
-# 			             coord=plotcoord,
-# 			             title='nside_distribution(count %i %.3f)' % (len(thetas), float(len(thetas)) / (12 * nside_standard ** 2)), nest=True)
-# 			plt.savefig(script_dir + '/../Output/nside_distribution-%s-%sMHz-dipole-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
-# 			hpv.mollview(np.log10(stds / abs_thresh), min=np.log10(thresh) - 3, max=3, coord=plotcoord, title='std-%s-%s-dipole-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'),
-# 			             nest=True)
-# 			plt.savefig(script_dir + '/../Output/stds-beam_weight_GSM-%s-%s-dipole-bnside-%s-nside_standard-%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.pdf' % (INSTRUMENT, freq, bnside, nside_standard, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
-# 			plt.show(block=False)
-# 	# plt.gcf().clear()
-# except:
-# 	print('Error when Plotting GSM Maps.')
-# sys.stdout.flush()
-#
-# ##################################################################
-# ####################compute dynamic A matrix########################
-# ###############################################################
-#
-# A_tag = 'A_dI'
-# if not Synthesize_MultiFreq:
-# 	A_filename = A_tag + '_freq%sMHz_u%i_t%i_mtbin%s-mfbin%s-tbin%s_p%i_n%i_%i_b%i_%.3f_v%.1f' % (freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', valid_npix, nside_start, nside_standard, bnside, thresh, A_version)
-# else:
-# 	A_filename = A_tag + '_freq%sMHz-multifreq%s-%s-%s_u%i_t%i_mtbin%s-mfbin%s-tbin%s_p%i_n%i_%i_b%i_%.3f_v%.1f' % (freq, Synthesize_MultiFreq_Nfreq, Flist_select[0][0], Flist_select[0][-1], nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', valid_npix, nside_start, nside_standard, bnside, thresh, A_version)
-# A_path = datadir + tag + A_filename
-# AtNiA_tag = 'AtNiA_N%s' % vartag
-# if not fit_for_additive:
-# 	AtNiA_tag += "_noadd"
-# elif crosstalk_type == 'autocorr':
-# 	AtNiA_tag += "_autocorr"
-# if pre_ampcal:
-# 	AtNiA_tag += "_ampcal"
-# AtNiA_filename = AtNiA_tag + A_filename
-# AtNiA_path = datadir + tag + AtNiA_filename
-# if os.path.isfile(AtNiA_path) and AtNiA_only and not force_recompute:
-# 	sys.exit(0)
-#
-#
-# if not fit_for_additive:
-# 	A = get_A(A_path=A_path, force_recompute=force_recompute, nUBL_used=nUBL_used, nt_used=nt_used, valid_npix=valid_npix, thetas=thetas, phis=phis, used_common_ubls=used_common_ubls, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, lsts=lsts, freq=freq)
-# else:
-# 	A = get_A(additive_A, A_path=A_path, force_recompute=force_recompute, nUBL_used=nUBL_used, nt_used=nt_used, valid_npix=valid_npix, thetas=thetas, phis=phis, used_common_ubls=used_common_ubls, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, lsts=lsts, freq=freq)
-#
-#
-# Ashape0, Ashape1 = A.shape
-#
-# # for ipix in hpf.ang2pix(nside_standard, thetas, phis, nest=True):
-# #     if
-#
-# print "Memory usage: %fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
-# sys.stdout.flush()
-#
-#
-# def get_vis_normalization(data, clean_sim_data):
-# 	a = np.linalg.norm(data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
-# 	b = np.linalg.norm(clean_sim_data.reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1]), axis=0).flatten()
-# 	return a.dot(b) / b.dot(b)
-#
 sys.stdout.flush()
 ##############
 # simulate visibilities according to the pixelized A matrix

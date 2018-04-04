@@ -1680,7 +1680,7 @@ class UVData(UVBase):
                     uv_object.nsample_array = np.mean(uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3]), axis=-2)
                 else:
                     uv_object.data_array = uv_object.data_array.reshape(uv_object.data_array.shape[0], uv_object.data_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.data_array.shape[3])[:, :, :, 0, :]
-                    uv_object.flag_array = uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3])[:, :, :, 0, :]
+                    uv_object.flag_array = uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3])[:, :, :, 0, :] == 1
                     uv_object.nsample_array = uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3])[:, :, :, 0, :]
 
                 freq_arr_use = uv_object.freq_array[0, :]
@@ -1805,7 +1805,7 @@ class UVData(UVBase):
                             uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, np.mean(uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1]), axis=0))
                         else:
                             uv_object_time.data_array = np.append(uv_object_time.data_array, uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3])[0, :, :, :, :])
-                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3])[0, :, :, :, :])
+                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3])[0, :, :, :, :]) == 1
                             uv_object_time.nsample_array = np.append(uv_object_time.nsample_array, uv_object.nsample_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.nsample_array.shape[1], uv_object.nsample_array.shape[2], uv_object.nsample_array.shape[3])[0, :, :, :, :])
                             uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1])[0, :, :])
 
