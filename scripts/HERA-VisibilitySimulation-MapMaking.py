@@ -2296,8 +2296,9 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 			fun = np.abs
 			srt = sorted((lsts - lst_offset) % 24. + lst_offset)
 			asrt = np.argsort((lsts - lst_offset) % 24. + lst_offset)
-			pncol = min(int(60. / (srt[-1] - srt[0])), 12) if nt_used > 1 else (len(ubl_sort['x']) / 2)
-			us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort['x']
+			# pncol = min(int(60. / (srt[-1] - srt[0])), 12) if nt_used > 1 else (len(ubl_sort['x']) / 2)
+			# us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort['x']
+			us = ubl_sort['x'][::len(ubl_sort['x']) / 12]
 			figure = {}
 			for p in range(2):
 				for nu, u in enumerate(us):
@@ -2575,7 +2576,7 @@ elif 'hera47' in INSTRUMENT:
 	Absolute_Calibration_mfreq = False
 	Absolute_Calibration_dred = False
 	
-	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
+	Absolute_Calibration_dred_mfreq = False  # The only working Model Calibration Method.
 	Fake_wgts_dred_mfreq = False  # Remove Flags for Model Calibration.
 	PointSource_AbsCal = False
 	PointSource_AbsCal_SingleFreq = False if PointSource_AbsCal else False
@@ -2584,11 +2585,11 @@ elif 'hera47' in INSTRUMENT:
 	Use_AbsCal = True if Absolute_Calibration_dred_mfreq else False  # Use Model calculated noise which is just fullsim autocorr calculated noise and data.
 	Use_PsAbsCal = True if PointSource_AbsCal else False  # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise. To use Pscaled data.
 	comply_ps2mod_autocorr = True
-	Use_Fullsim_Noise = True  # Use fullsim autocorr calculated noise.
+	Use_Fullsim_Noise = False  # Use fullsim autocorr calculated noise.
 	
 	Replace_Data = True
 	
-	pre_calibrate = False
+	pre_calibrate = True
 	tag = '-ampcal-' if pre_calibrate else ''  # '-ampcal-' #sys.argv[2]; if use real uncalibrated data, set tag = '-ampcal-' for amplitude calibration.
 	pre_ampcal = ('ampcal' in tag)
 	pre_phscal = True
@@ -2628,9 +2629,9 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Mocal_time_bin_temp = 6 #30; 600; (362)
-	Mocal_freq_bin_temp = 16 #600; 22; 32; (64)
-	Precal_time_bin_temp = 6
+	Mocal_time_bin_temp = 600 #30; 600; (362)
+	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
+	Precal_time_bin_temp = 600
 	
 	Frequency_Select = 150. # MHz, the single frequency as reference.
 	Comply2RFI = True # Use RFI_Best as selected frequency.
@@ -2653,7 +2654,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Bin = 101562.5 #1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-200., -1., 1.)
+	rcond_list = 10. ** np.arange(-13., -1., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4087,8 +4088,8 @@ if Synthesize_MultiFreq:
 		Re_Save = False
 		
 		if Store_Data_Noise:
-			data_var_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
-			data_var_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, nside_standard, bnside)
+			data_var_xx_filename = script_dir + '/../Output/%s_AbsCal-%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_xx.simvis' % (INSTRUMENT, 'AbsCalNoise' if Use_AbsCal else 'DataNoise', freq, nUBL_used + 1, nt_used, nside_standard, bnside)
+			data_var_yy_filename = script_dir + '/../Output/%s_AbsCal-%s_%s_p2_u%i_t%i_nside%i_bnside%i_var_data_yy.simvis' % (INSTRUMENT, 'AbsCalNoise' if Use_AbsCal else 'DataNoise', freq, nUBL_used + 1, nt_used, nside_standard, bnside)
 			if not os.path.isfile(data_var_xx_filename):
 				N_data['x'].astype('float64').tofile(data_var_xx_filename)
 				print('N_data[x] saved to disc.')
@@ -4541,8 +4542,9 @@ try:
 		fun = np.imag
 		srt = sorted((lsts - lst_offset) % 24. + lst_offset)
 		asrt = np.argsort((lsts - lst_offset) % 24. + lst_offset)
-		pncol = min(int(60. / (srt[-1] - srt[0])), 12) if nt_used > 1 else (len(ubl_sort['x']) / 2)
-		us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort['x']
+		# pncol = min(int(60. / (srt[-1] - srt[0])), 12) if nt_used > 1 else (len(ubl_sort['x']) / 2)
+		# us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort['x']
+		us = ubl_sort['x'][::len(ubl_sort['x']) / 12]
 		
 		figure_D = {}
 		for p in range(2):
@@ -4875,9 +4877,9 @@ try:
 		                                 data_shape['xx'][1])  # Full Simulated, Calibrated, reference for normalization
 		if pre_calibrate:
 			qaz_add = np.copy(additive_term).reshape(2, data_shape['xx'][0], 2, data_shape['xx'][1])
-		pncol = min(int(60. / (srt[-1] - srt[0])), 12) if nt_used > 1 else (len(ubl_sort['x']) / 2)
-		us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort[
-			'x']  # [::max(1, len(ubl_sort['x'])/70)]
+		# pncol = min(int(60. / (srt[-1] - srt[0])), 12) if nt_used > 1 else (len(ubl_sort['x']) / 2)
+		# us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort['x']  # [::max(1, len(ubl_sort['x'])/70)]
+		us = ubl_sort['x'][::len(ubl_sort['x']) / 12]
 		best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
 		best_fit_no_additive.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
 		sim_best_fit.shape = (2, data_shape['xx'][0], 2, data_shape['xx'][1])
