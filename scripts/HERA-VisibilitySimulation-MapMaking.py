@@ -2565,7 +2565,7 @@ if INSTRUMENT == 'miteor':
 
 elif 'hera47' in INSTRUMENT:
 	Simulation = True
-	Use_SimulatedData = True
+	Use_SimulatedData = False
 	Use_Simulation_noise = False
 	From_File_Data = True
 	Keep_Red = False
@@ -2575,7 +2575,7 @@ elif 'hera47' in INSTRUMENT:
 	Absolute_Calibration_mfreq = False
 	Absolute_Calibration_dred = False
 	
-	Absolute_Calibration_dred_mfreq = False  # The only working Model Calibration Method.
+	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
 	Fake_wgts_dred_mfreq = False  # Remove Flags for Model Calibration.
 	PointSource_AbsCal = False
 	PointSource_AbsCal_SingleFreq = False if PointSource_AbsCal else False
@@ -2583,12 +2583,12 @@ elif 'hera47' in INSTRUMENT:
 	
 	Use_AbsCal = True if Absolute_Calibration_dred_mfreq else False  # Use Model calculated noise which is just fullsim autocorr calculated noise and data.
 	Use_PsAbsCal = True if PointSource_AbsCal else False  # higher priority over Use_AbsCal and Use_Fullsim_Noise. if comply_ps2mod_autocorr then become just fullsim autocorr calculated noise. To use Pscaled data.
-	comply_ps2mod_autocorr = False
-	Use_Fullsim_Noise = False  # Use fullsim autocorr calculated noise.
+	comply_ps2mod_autocorr = True
+	Use_Fullsim_Noise = True  # Use fullsim autocorr calculated noise.
 	
 	Replace_Data = True
 	
-	pre_calibrate = True
+	pre_calibrate = False
 	tag = '-ampcal-' if pre_calibrate else ''  # '-ampcal-' #sys.argv[2]; if use real uncalibrated data, set tag = '-ampcal-' for amplitude calibration.
 	pre_ampcal = ('ampcal' in tag)
 	pre_phscal = True
@@ -2605,13 +2605,13 @@ elif 'hera47' in INSTRUMENT:
 	
 	Data_Deteriorate = False
 	
-	Time_Expansion_Factor = 3. if Use_SimulatedData else 1.
+	Time_Expansion_Factor = 1. if Use_SimulatedData else 1.
 	Lst_Hourangle = True
 	
 	
 	Nfiles_temp = 73
 	
-	Time_Average_preload = 6 #12 # Number of Times averaged before loaded for each file (keep tails)'
+	Time_Average_preload = 60 #12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 32 #16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = True # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = True # Use the first time as the selected one every Time_Average_preload time-step.
@@ -2629,8 +2629,8 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
 	Mocal_time_bin_temp = 6 #30; 600; (362)
-	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
-	Precal_time_bin_temp = 600
+	Mocal_freq_bin_temp = 16 #600; 22; 32; (64)
+	Precal_time_bin_temp = 6
 	
 	Frequency_Select = 150. # MHz, the single frequency as reference.
 	Comply2RFI = True # Use RFI_Best as selected frequency.
@@ -2717,6 +2717,7 @@ elif 'hera47' in INSTRUMENT:
 	autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs)) /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192287662/2458044/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192114862/2458042
 	autocorr_data = {}
 	
+	# /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1193758938/2458061
 	Observing_Session = '/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Nfiles = min(Nfiles_temp, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + Observing_Session))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + Observing_Session))))
 	
@@ -2914,7 +2915,7 @@ elif 'hera47' in INSTRUMENT:
 		Freq_RFI_Sort[i] = np.argsort(-np.mean(np.array(dflags[i].values()).reshape(np.array(dflags[i].values()).shape[0] * np.array(dflags[i].values()).shape[1], np.array(dflags[i].values()).shape[2]), axis=0))
 		Freq_RFI_Free[i] = np.where(np.mean(np.array(dflags[i].values()).reshape(np.array(dflags[i].values()).shape[0] * np.array(dflags[i].values()).shape[1], np.array(dflags[i].values()).shape[2]), axis=0) >= 0.8)[0]
 		if len(Freq_RFI_Free[i]) >= 1:
-			Freq_RFI_Mid[i] = np.where(np.mean(np.array(dflags[i].values()).reshape(np.array(dflags[i].values()).shape[0] * np.array(dflags[i].values()).shape[1], np.array(dflags[i].values()).shape[2]), axis=0)==1)[0][len(Freq_RFI_Free[i]) / 2]
+			Freq_RFI_Mid[i] = np.where(np.mean(np.array(dflags[i].values()).reshape(np.array(dflags[i].values()).shape[0] * np.array(dflags[i].values()).shape[1], np.array(dflags[i].values()).shape[2]), axis=0) >= 0.8)[0][len(Freq_RFI_Free[i]) / 2]
 		else:
 			Freq_RFI_Mid[i] = Freq_RFI_Sort[i][0]
 	if Freq_RFI_Mid[0] != Freq_RFI_Mid[1]:
