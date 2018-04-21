@@ -22,6 +22,26 @@ def filter_reds(reds, bls=None, ex_bls=None, ants=None, ex_ants=None, ubls=None,
     reds = [[bl for bl in gp if bld.has_key(bl)] for gp in reds]
     return [gp for gp in reds if len(gp) > 1]
 
+def filter_reds_total(reds, bls=None, ex_bls=None, ants=None, ex_ants=None, ubls=None, ex_ubls=None):
+    '''Filter redundancies to include/exclude the specified bls, antennas, and unique bl groups.'''
+    if ubls or ex_ubls:
+        bl2gp = {}
+        for i,gp in enumerate(reds):
+            for bl in gp: bl2gp[bl] = bl2gp[bl[::-1]] = bl2gp.get(bl,[]) + [i]
+        if ubls: ubls = reduce(lambda x,y: x+y, [bl2gp[bl] for bl in ubls if bl2gp.has_key(bl)])
+        else: ubls = range(len(reds))
+        if ex_ubls: ex_ubls = reduce(lambda x,y: x+y, [bl2gp[bl] for bl in ex_ubls if bl2gp.has_key(bl)])
+        else: ex_ubls = []
+        reds = [gp for i,gp in enumerate(reds) if i in ubls and i not in ex_ubls]
+    if bls is None: bls = [bl for gp in reds for bl in gp]
+    if ex_bls: bls = [(i,j) for i,j in bls if (i,j) not in ex_bls and (j,i) not in ex_bls]
+    if ants: bls = [(i,j) for i,j in bls if i in ants and j in ants]
+    if ex_ants: bls = [(i,j) for i,j in bls if i not in ex_ants and j not in ex_ants]
+    bld = {}
+    for bl in bls: bld[bl] = bld[bl[::-1]] = None
+    reds = [[bl for bl in gp if bld.has_key(bl)] for gp in reds]
+    return [gp for gp in reds if len(gp) >= 1]
+
 def compute_reds(antpos, tol=0.1):
     '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
     list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
@@ -90,7 +110,7 @@ def compute_reds_total(antpos, tol=5.e-4):
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
     return [v for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
 
-def compute_reds_total_autocorr(antpos, tol=5.e-5):
+def compute_reds_total_autocorr(antpos, tol=5.e-4):
     '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
     list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
     fall within the specified tolerance of each other.  'antpos' is a (nant,3) array of antenna positions.'''
@@ -122,7 +142,8 @@ def compute_reds_total_autocorr(antpos, tol=5.e-5):
                 ubl_v[u] = ubl_v[u] * len(ublgp[u]) - ubl_v.pop(nu) * len(ublgp[nu]) # note sign reversal
                 ublgp[u] += [(j,i) for i,j in ublgp.pop(nu)]
                 ubl_v[u] /= len(ublgp[u]) # final step in weighted avg of ubl vectors
-    return [np.unique(v, axis=0) for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
+    # return [np.unique(v, axis=0) for v in ublgp.values() if len(v) >= 1] # with such thing as redundancy of one
+    return [list(set(v)) for v in ublgp.values() if len(v) >= 1]  # with such thing as redundancy of one
 
 class ArrayInfo:
     '''Store information about an antenna array needed for computing redundancy and indexing matrices.'''
@@ -150,6 +171,34 @@ class ArrayInfo:
         reds = self.compute_reds(tol=tol)
         reds = self.filter_reds(reds, bls=self.totalVisibilityId.keys(), 
                 ex_ants=list(self.badAntenna), ex_ubls=[tuple(p) for p in self.badUBLpair])
+        info = RedundantInfo()
+        info.init_from_reds(reds, self.antennaLocation)
+        return info
+
+    def compute_reds_total(self, tol=0.1):
+        '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
+        list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
+        fall within the specified tolerance of each other.'''
+        return compute_reds_total(self.antennaLocation, tol=tol)
+    def compute_reds_total_autocorr(self, tol=0.1):
+        '''Return redundancies on the basis of antenna positions.  As in RedundantInfo.init_from_reds, each
+        list element consists of a list of (i,j) antenna indices whose separation vectors (pos[j]-pos[i])
+        fall within the specified tolerance of each other.'''
+        return compute_reds_total_autocorr(self.antennaLocation, tol=tol)
+    
+    def compute_redundantinfo_total(self, tol=1e-6):
+        '''Use provided antenna locations (in arrayinfoPath) to derive redundancy equations'''
+        reds = self.compute_reds_total(tol=tol)
+        reds = self.filter_reds(reds, bls=self.totalVisibilityId.keys(),
+                                ex_ants=list(self.badAntenna), ex_ubls=[tuple(p) for p in self.badUBLpair])
+        info = RedundantInfo()
+        info.init_from_reds(reds, self.antennaLocation)
+        return info
+    def compute_redundantinfo_total_autocorr(self, tol=1e-6):
+        '''Use provided antenna locations (in arrayinfoPath) to derive redundancy equations'''
+        reds = self.compute_reds_total_autocorr(tol=tol)
+        reds = self.filter_reds(reds, bls=self.totalVisibilityId.keys(),
+                                ex_ants=list(self.badAntenna), ex_ubls=[tuple(p) for p in self.badUBLpair])
         info = RedundantInfo()
         info.init_from_reds(reds, self.antennaLocation)
         return info
