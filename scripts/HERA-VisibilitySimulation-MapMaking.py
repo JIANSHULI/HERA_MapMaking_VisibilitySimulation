@@ -3217,7 +3217,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_DataPolsLoad = True if not (Small_ModelData or Model_Calibration or Parallel_Files) else False # Parallel Computing for Loading Two Pols Data
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
 	Parallel_Mulfreq_Visibility = True # Parallel Computing for Multi-Freq Visibility.
-	Parallel_A = False # Parallel Computing for A matrix.
+	Parallel_A = True # Parallel Computing for A matrix.
 	Del_A = True # Whether to delete A and save A to disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False # Parallel Computing for AtNiA (Matrix Multiplication)
 	nchunk = 1 # UseDot to Parallel but not Parallel_AtNiA.
