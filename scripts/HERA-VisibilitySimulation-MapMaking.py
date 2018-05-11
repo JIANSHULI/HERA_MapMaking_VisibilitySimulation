@@ -1334,6 +1334,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 			equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
 		
 		if Parallel_A:
+			timer = time.time()
 			pool = Pool()
 			if not Synthesize_MultiFreq:
 				if beam_heal_equ_x is None:
@@ -1356,6 +1357,7 @@ def get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=Fal
 				
 				A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(hpf.pix2ang(nside_beamweight, n)[1], (PI / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
 				A_list = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], n] / equatorial_GSM_standard[n]) for n in range(12 * nside_beamweight ** 2)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((0, 1, 3, 4, 2))
+			print('Shape of A_list: %s'%(str(A_list.shape)))
 			
 			A = {}
 			for id_p, p in enumerate(['x', 'y']):
