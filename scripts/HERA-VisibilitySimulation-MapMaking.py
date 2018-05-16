@@ -3227,9 +3227,9 @@ elif 'hera47' in INSTRUMENT:
 	
 	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
 	Absolute_Calibration_dred_mfreq_byEachBsl = True # Absolute_Calibration_dred_mfreq once for AbsByUbl_bin ubls (multiprocessing).
-	AbsByUbl_bin = 2 # Number of ubls for each abs_calibartion.
+	AbsByUbl_bin = 10 # Number of ubls for each abs_calibartion.
 	AmpCal_Pro = True # ReCalibrate Amplitude over each time_bin for each frequency.
-	Mocal_time_bin_temp = 3 #30; 600; (362)
+	Mocal_time_bin_temp = 10 #30; 600; (362)
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
 	mocal_time_bin = 0 # For titles, will be recalculated using mocal_time_bin_temp.
@@ -3278,7 +3278,7 @@ elif 'hera47' in INSTRUMENT:
 	Conjugate_CertainBSL2 = False # Whether we conjugate baselines with different x and y coordinates. sign(Y - X)
 	Conjugate_CertainBSL3 = False # Whether we conjugate baselines with different x and y coordinates. sign(Y-X) for same sign, while - for different sign.
 	baseline_safety_low = 0. # Meters
-	baseline_safety_factor = 1. # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor
+	baseline_safety_factor = 0.5 # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor
 	baseline_safety_xx = 0. # Meters
 	baseline_safety_yy = 0. # Meters
 	baseline_safety_xx_max = 200. # Meters
@@ -3288,7 +3288,7 @@ elif 'hera47' in INSTRUMENT:
 	Only_AbsData = False # Whether to use Only Absolute value of the visibility.
 	INSTRUMENT = INSTRUMENT + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
-	Nfiles_temp = 2
+	Nfiles_temp = 20
 	Specific_Files = True # Choose a list of Specific Data Sets.
 	Specific_FileIndex_start = [51, 51] # Starting point of selected data sets. [51, 51]
 	Specific_FileIndex_end = [52, 52] # Ending point of selected data sets. [51, 51]
@@ -3319,17 +3319,18 @@ elif 'hera47' in INSTRUMENT:
 	use_select_time = True
 	use_select_freq = True
 	
-	Tmask_temp_start = 0
-	Tmask_temp_end = 21
+	Tmask_temp = True
+	Tmask_temp_start = 21
+	Tmask_temp_end = 31
 	
 	
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 175. # MHz, the single frequency as reference.
+	Frequency_Select = 150. # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.99 # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.95 # Will be used for choosing good flist by ratio of RFI-Free items.
-	Freq_Low = [125, 125]
+	Freq_Low = [130, 130]
 	Freq_High = [185, 185]
 	Bad_Freqs = [[137.5], [137.5]]
 	Comply2RFI = True # Use RFI_Best as selected frequency.
@@ -3339,7 +3340,7 @@ elif 'hera47' in INSTRUMENT:
 	Tolerance = 5.e-3 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = True
-	Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # temp
+	Synthesize_MultiFreq_Nfreq = 17 if Synthesize_MultiFreq else 1  # temp
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 
 	
@@ -4144,8 +4145,9 @@ elif 'hera47' in INSTRUMENT:
 	# 	data_lsts[i] = data_lsts[i] * LST_Renorm
 	
 	tmask = tmasks['x'] & tmasks['y']
-	tmask[ :np.max([0, Tmask_temp_start])] = False
-	tmask[np.min([Tmask_temp_end, len(tmask)]) :-1] = False
+	if Tmask_temp:
+		tmask[ :np.max([0, Tmask_temp_start])] = False
+		tmask[np.min([Tmask_temp_end, (len(tmask) - 1)]) :len(tmask)] = False
 	try:
 		print('Tmask: %s'%str(tmask))
 	except:
