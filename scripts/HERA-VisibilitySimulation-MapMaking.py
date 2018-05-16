@@ -3319,6 +3319,9 @@ elif 'hera47' in INSTRUMENT:
 	use_select_time = True
 	use_select_freq = True
 	
+	Tmask_temp_start = 0
+	Tmask_temp_end = 21
+	
 	
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
@@ -4141,6 +4144,8 @@ elif 'hera47' in INSTRUMENT:
 	# 	data_lsts[i] = data_lsts[i] * LST_Renorm
 	
 	tmask = tmasks['x'] & tmasks['y']
+	tmask[ :np.max([0, Tmask_temp_start])] = False
+	tmask[np.min([Tmask_temp_end, len(tmask)]) :-1] = False
 	try:
 		print('Tmask: %s'%str(tmask))
 	except:
