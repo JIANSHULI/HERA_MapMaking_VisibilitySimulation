@@ -1971,7 +1971,12 @@ def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT='', full_sim_filename_mf
 			full_sim_mask = hpf.get_interp_val(beam_weight, full_thetas, full_phis, nest=True) > 0
 			# fullsim_vis_DBG = np.zeros((2, len(used_common_ubls), nt_used, np.sum(full_sim_mask)), dtype='complex128')
 			
-			print "Deep Parallel Simulating visibilities, %s, expected time %f min" % (datetime.datetime.now(), 14.6 * nf_used * (nUBL_used / 78.) * (nt_used / 193.) * (np.sum(full_sim_mask) / 1.4e5)),
+			if Parallel_Mulfreq_Visibility_deep:
+				print ("Deep Parallel Simulating visibilities, %s, expected time %f min" % (datetime.datetime.now(), 14.6 * nf_used * (nUBL_used / 78.) * (nt_used / 193.) * (np.sum(full_sim_mask) / 1.4e5)))
+			elif Parallel_Mulfreq_Visibility:
+				print ("Parallel Simulating visibilities, %s, expected time %f min" % (datetime.datetime.now(), 14.6 * nf_used * (nUBL_used / 78.) * (nt_used / 193.) * (np.sum(full_sim_mask) / 1.4e5)))
+			else:
+				print ("Simulating visibilities, %s, expected time %f min" % (datetime.datetime.now(), 14.6 * nf_used * (nUBL_used / 78.) * (nt_used / 193.) * (np.sum(full_sim_mask) / 1.4e5)))
 			sys.stdout.flush()
 			masked_equ_GSM_mfreq = equatorial_GSM_standard_mfreq[:, :, full_sim_mask]
 			timer = time.time()
@@ -2796,15 +2801,15 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 					
 					print('Additive_sol: %s' % additive_sol[:n_prefit_amp])
 	
-	# try:
-	# 	if Use_AbsCal or Use_Fullsim_Noise or (Use_PsAbsCal and comply_ps2mod_autocorr) and scale_noise:
-	# 		vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis), data_shape=data_shape)
-	# 		Ni /= vis_normalization ** 2
-	# 		print('Ni rescaled after pre_calibration, divided by %s.'%vis_normalization)
-	# except:
-	# 	print('Could not scale noise after pre_calibration toward data amplitude.')
+		# try:
+		# 	if Use_AbsCal or Use_Fullsim_Noise or (Use_PsAbsCal and comply_ps2mod_autocorr) and scale_noise:
+		# 		vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis), data_shape=data_shape)
+		# 		Ni /= vis_normalization ** 2
+		# 		print('Ni rescaled after pre_calibration, divided by %s.'%vis_normalization)
+		# except:
+		# 	print('Could not scale noise after pre_calibration toward data amplitude.')
 	
-	cadd = get_complex_data(additive_term, nubl=nUBL_used, nt=nt_used)
+		cadd = get_complex_data(additive_term, nubl=nUBL_used, nt=nt_used)
 	
 	try:
 		print 'saving data to', os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_nubl%s_nt%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none')
@@ -3233,9 +3238,9 @@ elif 'hera47' in INSTRUMENT:
 	
 	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
 	Absolute_Calibration_dred_mfreq_byEachBsl = True # Absolute_Calibration_dred_mfreq once for AbsByUbl_bin ubls (multiprocessing).
-	AbsByUbl_bin = 10 # Number of ubls for each abs_calibartion.
+	AbsByUbl_bin = 2 # Number of ubls for each abs_calibartion.
 	AmpCal_Pro = True # ReCalibrate Amplitude over each time_bin for each frequency.
-	Mocal_time_bin_temp = 10 #30; 600; (362)
+	Mocal_time_bin_temp = 3 #30; 600; (362)
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
 	mocal_time_bin = 0 # For titles, will be recalculated using mocal_time_bin_temp.
@@ -3294,10 +3299,11 @@ elif 'hera47' in INSTRUMENT:
 	Only_AbsData = False # Whether to use Only Absolute value of the visibility.
 	INSTRUMENT = INSTRUMENT + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
-	Nfiles_temp = 20
+	Observing_Session = '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
+	Nfiles_temp = 1
 	Specific_Files = True # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [51, 51] # Starting point of selected data sets. [51, 51]
-	Specific_FileIndex_end = [52, 52] # Ending point of selected data sets. [51, 51]
+	Specific_FileIndex_start = [4, 4] # Starting point of selected data sets. [51, 51]
+	Specific_FileIndex_end = [5, 5] # Ending point of selected data sets. [51, 51]
 	Parallel_Files = True # Parallel Computing for Loading Files
 	Parallel_DataPolsLoad = True if not (Small_ModelData or Model_Calibration or Parallel_Files) else False # Parallel Computing for Loading Two Pols Data
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
@@ -3325,7 +3331,7 @@ elif 'hera47' in INSTRUMENT:
 	use_select_time = True
 	use_select_freq = True
 	
-	Tmask_temp = True
+	Tmask_temp = False
 	Tmask_temp_start = 21
 	Tmask_temp_end = 31
 	
@@ -3333,20 +3339,20 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 150. # MHz, the single frequency as reference.
+	Frequency_Select = 175. # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.99 # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.95 # Will be used for choosing good flist by ratio of RFI-Free items.
-	Freq_Low = [130, 130]
-	Freq_High = [185, 185]
-	Bad_Freqs = [[137.5], [137.5]]
+	Freq_Low = [110, 110]
+	Freq_High = [190, 190]
+	Bad_Freqs = [[], []] #[[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True # Use RFI_Best as selected frequency.
-	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 121]
+	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]
 	
 	Check_Dred_AFreq_ATime = False
 	Tolerance = 5.e-3 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = True
-	Synthesize_MultiFreq_Nfreq = 17 if Synthesize_MultiFreq else 1  # temp
+	Synthesize_MultiFreq_Nfreq = 13 if Synthesize_MultiFreq else 1  # temp
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 
 	
@@ -3426,7 +3432,7 @@ elif 'hera47' in INSTRUMENT:
 	autocorr_data = {}
 	
 	# /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1193758938/2458061  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192114862/2458042
-	Observing_Session = '/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
+	# Observing_Session = '/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Nfiles = min(Nfiles_temp, len(glob.glob("{0}/zen.*.*.xx.HH.uvOR".format(DATA_PATH + Observing_Session))), len(glob.glob("{0}/zen.*.*.yy.HH.uvOR".format(DATA_PATH + Observing_Session))))
 	
 	redundancy = [[],[]]
@@ -3477,7 +3483,7 @@ elif 'hera47' in INSTRUMENT:
 			if file_JDays[0] != file_JDays[1]:
 				raise ValueError('Two Pols from diffent days.')
 			else:
-				INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + '-SDx%s%s'%(Specific_FileIndex_start[0], Specific_FileIndex_end[1]) + ('-CjBs' if Conjugate_CertainBSL else '') + ('-CjBs2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
+				INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + '-SDx%s%s'%(Specific_FileIndex_start[0], Specific_FileIndex_end[0]) + ('-CjBs' if Conjugate_CertainBSL else '') + ('-CjBs2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
 			print ('Nfiles: %s' % Nfiles)
 	except:
 		pass
@@ -3788,13 +3794,18 @@ elif 'hera47' in INSTRUMENT:
 		# flist[i] = np.array(data_freqs[i]) / 10 ** 6
 		try:
 			flist[i] = np.array(data_freqs[i]) / 10 ** 6
-			Freq_RFI_AlmostFree_bool[i] = Freq_RFI_AlmostFree_bool[i] * (flist[i] > Freq_Low[i]) * (flist[i] < Freq_High[i])
+			Freq_RFI_AlmostFree_bool[i] = Freq_RFI_AlmostFree_bool[i] * (flist[i] >= Freq_Low[i]) * (flist[i] <= Freq_High[i])
 			for bq in Bad_Freqs[i]:
 				Freq_RFI_AlmostFree_bool[i] *= (flist[i] != bq)
 			flist[i] = np.array(data_freqs[i][Freq_RFI_AlmostFree_bool[i]]) / 10 ** 6
-			flist[i] = flist[i][(flist[i] > Freq_Low[i]) * (flist[i] < Freq_High[i])]
+			flist[i] = flist[i][(flist[i] >= Freq_Low[i]) * (flist[i] <= Freq_High[i])]
 		except:
 			print('flist[%s] not calculated or already calculated.'%i)
+			
+	if len(flist[0]) != len(flist[1]):
+		flist[np.argmax([len(flist[0]), len(flist[1])])] = flist[np.argmax([len(flist[0]), len(flist[1])])][len(flist[np.argmax([len(flist[0]), len(flist[1])])]) - len(flist[np.argmin([len(flist[0]), len(flist[1])])]) :len(flist[np.argmax([len(flist[0]), len(flist[1])])])]
+	
+	for i in range(2):
 		try:
 			# index_freq[i] = np.where(flist[i] == 150)[0][0]
 		#		index_freq = 512
@@ -4530,8 +4541,8 @@ autocorr_vis=None
 autocorr_vis_normalized=None
 fullsim_vis, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
                                                                       flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
-                                                                      C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep,
-                                                                      nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full)
+                                                                      C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
+                                                                      beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=True)
 
 fullsim_vis = fullsim_vis[:, :, tmask]
 autocorr_vis = autocorr_vis[:, tmask]
@@ -4559,7 +4570,7 @@ if Absolute_Calibration_red or Check_Dred_AFreq_ATime:
 	
 	fullsim_vis_red, autocorr_vis_red = Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_redabs_sim_filename, sim_vis_xx_filename_mfreq=redabs_sim_vis_xx_filename, sim_vis_yy_filename_mfreq=redabs_sim_vis_yy_filename, Force_Compute_Vis=True,  Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_bls_red,
 	                                                                        flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None,
-	                                                                        beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep,
+	                                                                        beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility,
 	                                                                        nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full)
 	
 	
@@ -4586,8 +4597,73 @@ if Absolute_Calibration_red or Check_Dred_AFreq_ATime:
 # Parallel_Mulfreq_Visibility = True
 
 if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_MultiFreq:  # Used 9.4 min. 64*9*60*12280
-	if Parallel_Mulfreq_Visibility and not Parallel_Mulfreq_Visibility_deep:
-		# pass
+	try:
+		if Parallel_Mulfreq_Visibility and not Parallel_Mulfreq_Visibility_deep:
+			# pass
+			full_sim_filename_mfreq = {}
+			sim_vis_xx_filename_mfreq = {}
+			sim_vis_yy_filename_mfreq = {}
+			for id_f in range(len(flist[0])):
+				full_sim_filename_mfreq[id_f] = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s.simvis' % (INSTRUMENT, flist[0][id_f], nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
+				sim_vis_xx_filename_mfreq[id_f] = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_xx.simvis' % (INSTRUMENT, flist[0][id_f], nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
+				sim_vis_yy_filename_mfreq[id_f] = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy.simvis' % (INSTRUMENT, flist[1][id_f], nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
+			
+			pool = Pool()
+			multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
+			                                                                    None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+			                                                                    beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
+			                                                                    beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)) for id_f in range(len(flist[0]))]
+			multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
+			fullsim_vis_mfreq = np.array([multifreq_list[id_f, 0] for id_f in range(len(flist[0]))]).transpose((1, 2, 3, 0))
+			autocorr_vis_mfreq = np.array([multifreq_list[id_f, 1] for id_f in range(len(flist[0]))]).transpose((1, 2, 0))
+			autocorr_vis_mfreq_normalized = np.array([multifreq_list[id_f, 2] for id_f in range(len(flist[0]))]).transpose((1, 2, 0))
+			
+			del(multifreq_list_process)
+			del(multifreq_list)
+			
+			fullsim_vis_mfreq_sf = np.concatenate((fullsim_vis_mfreq[:, 0:1, tmask, index_freq[0]], fullsim_vis_mfreq[:, 1:2, tmask, index_freq[1]]), axis=1)
+			autocorr_vis_mfreq_sf = np.concatenate((autocorr_vis_mfreq[0:1, tmask, index_freq[0]], autocorr_vis_mfreq[1:2, tmask, index_freq[1]]), axis=0)
+			autocorr_vis_mfreq_sf_normalized = np.concatenate((autocorr_vis_mfreq_normalized[0:1, tmask, index_freq[0]], autocorr_vis_mfreq_normalized[1:2, tmask, index_freq[1]]), axis=0)
+			try:
+				if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
+					print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
+				else:
+					print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
+			except:
+				print('SinFreq-MultiFreq Visibility Simulation NOT Comparared.')
+		# fullsim_vis_mfreq, autocorr_vis_mfreq, autocorr_vis_mfreq_normalized
+		
+		# Simulate_Visibility_mfreq(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
+		#                      None, None, [flist[0][id_f], flist[1][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+		#                      beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
+		#                      beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)
+		else:
+			# Parallel_Mulfreq_Visibility_deep = False
+			full_sim_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t-full%i_tave%s_fave%s_nside%i_bnside%i_texp%s_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
+			sim_vis_xx_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t-full%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_xx_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
+			sim_vis_yy_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t-full%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[1]))
+			
+			
+			fullsim_vis_mfreq, autocorr_vis_mfreq, autocorr_vis_mfreq_normalized, fullsim_vis_mfreq_sf, autocorr_vis_mfreq_sf, autocorr_vis_mfreq_sf_normalized = \
+				Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep,
+				                          Force_Compute_Vis=False, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[freq, freq],
+				                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
+				                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts_full)
+			
+			
+			fullsim_vis_mfreq_sf = fullsim_vis_mfreq_sf[:, :, tmask]
+			autocorr_vis_mfreq_sf = autocorr_vis_mfreq_sf[:, tmask]
+			autocorr_vis_mfreq_sf_normalized = autocorr_vis_mfreq_sf_normalized[:, tmask]
+			
+			try:
+				if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
+					print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
+				else:
+					print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
+			except:
+				print('SinFreq-MultiFreq Visibility Simulation NOT Comparared.')
+				
+	except:
 		full_sim_filename_mfreq = {}
 		sim_vis_xx_filename_mfreq = {}
 		sim_vis_yy_filename_mfreq = {}
@@ -4597,51 +4673,29 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 			sim_vis_yy_filename_mfreq[id_f] = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy.simvis' % (INSTRUMENT, flist[1][id_f], nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 		
 		pool = Pool()
-		multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
-		                                                                    None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
-		                                                                    beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
-		                                                                    beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)) for id_f in range(len(flist[0]))]
-		multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
+		try:
+			multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
+			                                                                            None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+			                                                                            beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
+			                                                                            beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., True)) for id_f in range(len(flist[0]))]
+			multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
+		except:
+			multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
+			                                                                            None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+			                                                                            beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
+			                                                                            beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)) for id_f in range(len(flist[0]))]
+			multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
+			
 		fullsim_vis_mfreq = np.array([multifreq_list[id_f, 0] for id_f in range(len(flist[0]))]).transpose((1, 2, 3, 0))
 		autocorr_vis_mfreq = np.array([multifreq_list[id_f, 1] for id_f in range(len(flist[0]))]).transpose((1, 2, 0))
 		autocorr_vis_mfreq_normalized = np.array([multifreq_list[id_f, 2] for id_f in range(len(flist[0]))]).transpose((1, 2, 0))
 		
-		del(multifreq_list_process)
-		del(multifreq_list)
+		del (multifreq_list_process)
+		del (multifreq_list)
 		
 		fullsim_vis_mfreq_sf = np.concatenate((fullsim_vis_mfreq[:, 0:1, tmask, index_freq[0]], fullsim_vis_mfreq[:, 1:2, tmask, index_freq[1]]), axis=1)
 		autocorr_vis_mfreq_sf = np.concatenate((autocorr_vis_mfreq[0:1, tmask, index_freq[0]], autocorr_vis_mfreq[1:2, tmask, index_freq[1]]), axis=0)
 		autocorr_vis_mfreq_sf_normalized = np.concatenate((autocorr_vis_mfreq_normalized[0:1, tmask, index_freq[0]], autocorr_vis_mfreq_normalized[1:2, tmask, index_freq[1]]), axis=0)
-		try:
-			if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
-				print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
-			else:
-				print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
-		except:
-			print('SinFreq-MultiFreq Visibility Simulation NOT Comparared.')
-	# fullsim_vis_mfreq, autocorr_vis_mfreq, autocorr_vis_mfreq_normalized
-	
-	# Simulate_Visibility_mfreq(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
-	#                      None, None, [flist[0][id_f], flist[1][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
-	#                      beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
-	#                      beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)
-	else:
-		full_sim_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t-full%i_tave%s_fave%s_nside%i_bnside%i_texp%s_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
-		sim_vis_xx_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t-full%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_xx_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[0]))
-		sim_vis_yy_filename_mfreq = script_dir + '/../Output/%s_p2_u%i_t-full%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy_mfreq%s-%s-%s.simvis' % (INSTRUMENT, nUBL_used + 1, nt, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor, np.min(flist[0]), np.max(flist[0]), len(flist[1]))
-		
-		
-		fullsim_vis_mfreq, autocorr_vis_mfreq, autocorr_vis_mfreq_normalized, fullsim_vis_mfreq_sf, autocorr_vis_mfreq_sf, autocorr_vis_mfreq_sf_normalized = \
-			Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep,
-			                          Force_Compute_Vis=False, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[freq, freq],
-			                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
-			                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts_full)
-		
-		
-		fullsim_vis_mfreq_sf = fullsim_vis_mfreq_sf[:, :, tmask]
-		autocorr_vis_mfreq_sf = autocorr_vis_mfreq_sf[:, tmask]
-		autocorr_vis_mfreq_sf_normalized = autocorr_vis_mfreq_sf_normalized[:, tmask]
-		
 		try:
 			if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
 				print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
@@ -6333,5 +6387,6 @@ for var, obj in locals().items():
 	# print (var, sys.getsizeof(obj))
 print (sorted(VariableMemory_Used, key=VariableMemory_Used.__getitem__, reverse=True))
 
+# exit()
 
 # Mac Code
