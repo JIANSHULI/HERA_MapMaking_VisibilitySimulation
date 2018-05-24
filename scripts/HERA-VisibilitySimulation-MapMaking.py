@@ -1032,7 +1032,8 @@ def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_A
 
 def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFreq=True, Conjugate_CertainBSL=False, Conjugate_CertainBSL2=False, Conjugate_CertainBSL3=False, data_freqs=None, Nfreqs=64, data_times=None, Ntimes=None, FreqScaleFactor=1.e6, Frequency_Select=None, Frequency_Select_Index=None,
                   Flist_select_index=None, Synthesize_MultiFreq=False, vis_data_mfreq=None, vis_data=None,
-                  tol=5.e-4, Badants=[], freq=None, nside_standard=None, C=299.792458, 	baseline_safety_low = 30., baseline_safety_factor = 0.5, baseline_safety_xx = 10., baseline_safety_yy = 30., baseline_safety_xx_max = 70., baseline_safety_yy_max = 70., RFI_Free_Thresh=0.1, RFI_AlmostFree_Thresh=0.2, RFI_Free_Thresh_bslStrengthen=1.):
+                  tol=5.e-4, Badants=[], freq=None, nside_standard=None, C=299.792458, 	baseline_safety_low = 30., baseline_safety_factor = 0.5, baseline_safety_xx = 10., baseline_safety_yy = 30., baseline_safety_zz=0., baseline_safety_xx_max = 70., baseline_safety_yy_max = 70., baseline_safety_zz_max=0.05,
+                  RFI_Free_Thresh=0.1, RFI_AlmostFree_Thresh=0.2, RFI_Free_Thresh_bslStrengthen=1.):
 	
 	antloc = {}
 	
@@ -1080,30 +1081,29 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 	
 	# bls = [[], []]
 	# for i in range(2):
-	# 	bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys() if ])
+	# 	bls[i] = odict([(x, (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
+	# 	# bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
 	# 	# bls[i] = odict([(x, antpos[i][x[0]] - antpos[i][x[1]]) for x in dflags[i].keys()])
 	# 	# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
-	# 	bls = np.array(bls)
+	# bls = np.array(bls)
 	
 	bls = [[], []]
 	# bls_test = [[], []]
 	for i in range(2):
 		bls[i] = odict()
 		for x in data[i].keys():
-			if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
-					and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max):
-				if Conjugate_CertainBSL:
-					bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])
-				elif Conjugate_CertainBSL2:
+			if Conjugate_CertainBSL:
+				bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])
+			elif Conjugate_CertainBSL2:
+				bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])
+			elif Conjugate_CertainBSL3:
+				if np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == 1:
 					bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])
-				elif Conjugate_CertainBSL3:
-					if np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == 1:
-						bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])
-					elif np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == -1:
-						bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])
-				else:
-					bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])
-		# bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
+				elif np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == -1:
+					bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])
+			else:
+				bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])
+	# bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
 	# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
 	bls = np.array(bls)
 	
@@ -1151,17 +1151,20 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 		for i_ubl in range(len(Ubl_list_raw[i])):
 			list_bsl = []
 			for i_ubl_pair in range(len(Ubl_list_raw[i][i_ubl])):
-				try:
-					if np.mean(np.array(dflags[i][antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i]][:, Flist_select_index[i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) \
-							and np.mean(np.array(dflags[1-i][antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][0]], antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1-i]][:, Flist_select_index[1-i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen):
-						list_bsl.append(data[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
-				except:
+				x = [antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]]]
+				if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
+						and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
 					try:
-						if np.mean(np.array(dflags[i][antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i]][:, Flist_select_index[i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) \
-								and np.mean(np.array(dflags[1-i][antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][1]], antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1-i]][:, Flist_select_index[1-i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen):
-							list_bsl.append(data[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
+						if np.mean(np.array(dflags[i][antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i]][:, Flist_select_index[i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) \
+								and np.mean(np.array(dflags[1-i][antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][0]], antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][1-i]][:, Flist_select_index[1-i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen):
+							list_bsl.append(data[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % ['xx', 'yy'][i])))
 					except:
-						continue
+						try:
+							if np.mean(np.array(dflags[i][antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i]][:, Flist_select_index[i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) \
+									and np.mean(np.array(dflags[1-i][antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][1]], antpos[1-i].keys()[Ubl_list_raw[1-i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][1-i]][:, Flist_select_index[1-i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen):
+								list_bsl.append(data[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % ['xx', 'yy'][i])))
+						except:
+							continue
 	
 			
 			if len(list_bsl) >= 1:
@@ -2048,8 +2051,8 @@ def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT='', full_sim_filename_mf
 
 
 def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Calibration_dred=False, Fake_wgts_dred_mfreq=False, re_cal_times=1, antpos=None, Bandpass_Constrain=True,
-                            Mocal_time_bin_temp=None, nt_used=None, lsts=None, Mocal_freq_bin_temp=None, flist=None, fullsim_vis_mfreq=None, vis_data_dred_mfreq=None, dflags_dred_mfreq=None, add_Autobsl=False, autocorr_vis_mfreq=None, autocorr_data_mfreq=None, bl_dred_mfreq_select=8,
-                            INSTRUMENT=None, used_common_ubls=None, freq=None, nUBL_used=None, bnside=None, nside_standard=None, AmpCal_Pro=False, Index_Freq=0):
+                            Mocal_time_bin_temp=None, nt_used=None, lsts=None, Mocal_freq_bin_temp=None, flist=None, fullsim_vis_mfreq=None, vis_data_dred_mfreq=None, dflags_dred_mfreq=None, add_Autobsl=False, autocorr_vis_mfreq=None, autocorr_data_mfreq=None, bl_dred_mfreq_select=0,
+                            INSTRUMENT=None, used_common_ubls=None, freq=None, nUBL_used=None, bnside=None, nside_standard=None, AmpCal_Pro=False, Index_Freq=0, MocalAmp=False):
 	if nt_used is not None:
 		if nt_used != len(lsts):
 			raise ValueError('nt_used doesnot match len(lsts).')
@@ -2186,18 +2189,26 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 					
 					if Bandpass_Constrain:
 						# run amp linsolve
-						DPAC_dred_mfreq[i].abs_amp_logcal()
+						if MocalAmp:
+							DPAC_dred_mfreq[i].abs_amp_logcal()
 						# run phs linsolve
 						DPAC_dred_mfreq[i].TT_phs_logcal(zero_psi=False, four_pol=False)
 						# apply to data
-						abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data, (DPAC_dred_mfreq[i].abs_psi_gain, DPAC_dred_mfreq[i].TT_Phi_gain, DPAC_dred_mfreq[i].abs_eta_gain), gain_convention='divide')
+						if MocalAmp:
+							abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data, (DPAC_dred_mfreq[i].abs_psi_gain, DPAC_dred_mfreq[i].TT_Phi_gain, DPAC_dred_mfreq[i].abs_eta_gain), gain_convention='divide')
+						else:
+							abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data, (DPAC_dred_mfreq[i].TT_Phi_gain))
 					else:
 						# run amp logcal
-						DPAC_dred_mfreq[i].amp_logcal()
+						if MocalAmp:
+							DPAC_dred_mfreq[i].amp_logcal()
 						# run phase calibration
 						DPAC_dred_mfreq[i].phs_logcal()
 						# apply to data
-						abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data, (DPAC_dred_mfreq[i].ant_eta_gain, DPAC_dred_mfreq[i].ant_phi_gain))
+						if MocalAmp:
+							abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data, (DPAC_dred_mfreq[i].ant_eta_gain, DPAC_dred_mfreq[i].ant_phi_gain))
+						else:
+							abs_corr_data_dred_mfreq[i] = hc.abscal.apply_gains(DPAC_dred_mfreq[i].data, (DPAC_dred_mfreq[i].ant_phi_gain))
 				
 				for key_id, key in enumerate(dflags_dred_mfreq[i].keys()):
 					if not AmpCal_Pro:
@@ -2227,7 +2238,7 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 		for i in range(2):  # add another redundant 'for loop' for testing plotting.
 			pol = ['xx', 'yy'][i]
 			try:
-				plt.figure(80000000 + 10 * i + Index_Freq)
+				plt.figure(80000000 + 1000 * i + Index_Freq)
 				fig3[i], axes3[i] = plt.subplots(2, 1, figsize=(12, 8))
 				plt.sca(axes3[i][0])
 				uvt.plot.waterfall(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :], mode='log', mx=6, drng=4)
@@ -2241,7 +2252,7 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 				plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_model-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
 				# plt.cla()
 				
-				plt.figure(90000000 + 10 * i + Index_Freq)
+				plt.figure(90000000 + 1000 * i + Index_Freq)
 				fig3_data[i], axes3_data[i] = plt.subplots(2, 1, figsize=(12, 8))
 				plt.sca(axes3_data[i][0])
 				uvt.plot.waterfall(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=2, drng=6)
@@ -2257,10 +2268,13 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 				
 				####################### after ABS Calibration #########################
 				
-				plt.figure(8000000 + 10 * i + Index_Freq)
+				plt.figure(8000000 + 1000 * i + Index_Freq)
 				fig3_data_abscorr[i], axes3_data_abscorr[i] = plt.subplots(2, 1, figsize=(12, 8))
 				plt.sca(axes3_data_abscorr[i][0])
-				uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=6, drng=6)
+				if MocalAmp:
+					uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=6, drng=6)
+				else:
+					uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=2, drng=6)
 				plt.colorbar()
 				plt.title(pol + ' abs_caled data AMP {}'.format(bl_dred_mfreq[i]))
 				plt.sca(axes3_data_abscorr[i][1])
@@ -3247,6 +3261,7 @@ elif 'hera47' in INSTRUMENT:
 	Absolute_Calibration_dred_mfreq_byEachBsl = False # Absolute_Calibration_dred_mfreq once for AbsByUbl_bin ubls (multiprocessing).
 	AbsByUbl_bin = 2 # Number of ubls for each abs_calibartion.
 	AmpCal_Pro = False # ReCalibrate Amplitude over each time_bin for each frequency.
+	MocalAmp = True # Whether to Calibrate Amplitude by Mocal or not.
 	Mocal_time_bin_temp = 60 #30; 600; (362)
 	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
@@ -3255,7 +3270,7 @@ elif 'hera47' in INSTRUMENT:
 	Fake_wgts_dred_mfreq = False  # Remove Flags for Model Calibration.
 	Bandpass_Constrain = True # use constrained solver or not.
 	re_cal_times = 1 # number of iteration of mfreq-calibration.
-	INSTRUMENT = INSTRUMENT + ('-UB%s'%AbsByUbl_bin if Absolute_Calibration_dred_mfreq_byEachBsl else '') + ('-APro' if AmpCal_Pro else '')
+	INSTRUMENT = INSTRUMENT + ('-UB%s'%AbsByUbl_bin if Absolute_Calibration_dred_mfreq_byEachBsl else '') + ('-APro' if AmpCal_Pro else '') + ('-MA' if MocalAmp else '')
 	
 	PointSource_AbsCal = False
 	PointSource_AbsCal_SingleFreq = False if PointSource_AbsCal else False
@@ -3292,22 +3307,25 @@ elif 'hera47' in INSTRUMENT:
 	Time_Expansion_Factor = 1. if Use_SimulatedData else 1.
 	Lst_Hourangle = True
 	
-	Conjugate_CertainBSL = False # Whether we conjugate baselines with different x and y coordinates. Different Sign.
+	Conjugate_CertainBSL = True # Whether we conjugate baselines with different x and y coordinates. Different Sign.
 	Conjugate_CertainBSL2 = False # Whether we conjugate baselines with different x and y coordinates. sign(Y - X)
 	Conjugate_CertainBSL3 = False # Whether we conjugate baselines with different x and y coordinates. sign(Y-X) for same sign, while - for different sign.
 	baseline_safety_low = 0. # Meters
 	baseline_safety_factor = 0.5 # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor
 	baseline_safety_xx = 0. # Meters
 	baseline_safety_yy = 0. # Meters
+	baseline_safety_zz = 0.
 	baseline_safety_xx_max = 200. # Meters
 	baseline_safety_yy_max = 200. # Meters
+	baseline_safety_zz_max = 0.1 # Meters
+	
 	
 	Real_Visibility = False # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
 	Only_AbsData = False # Whether to use Only Absolute value of the visibility.
 	INSTRUMENT = INSTRUMENT + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
 	Observing_Session = '/ObservingSession-1192201262/2458043/' #'/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Nfiles_temp = 1
+	Nfiles_temp = 73
 	Specific_Files = True # Choose a list of Specific Data Sets.
 	Specific_FileIndex_start = [51, 51] # Starting point of selected data sets. [51, 51]
 	Specific_FileIndex_end = [52, 52] # Ending point of selected data sets. [51, 51]
@@ -3348,8 +3366,8 @@ elif 'hera47' in INSTRUMENT:
 	
 	Frequency_Select = 150. # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.085 # Will be used for choosing good selected freq by ratio of RFI-Free items.
-	RFI_AlmostFree_Thresh = 0.09 # Will be used for choosing good flist by ratio of RFI-Free items.
-	RFI_Free_Thresh_bslStrengthen = 10.**-4 # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
+	RFI_AlmostFree_Thresh = 0.085 # Will be used for choosing good flist by ratio of RFI-Free items.
+	RFI_Free_Thresh_bslStrengthen = 10.**-1 # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
 	Freq_Low = [100, 100]
 	Freq_High = [200, 200]
 	Bad_Freqs = [[], []] #[[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
@@ -3359,7 +3377,7 @@ elif 'hera47' in INSTRUMENT:
 	Check_Dred_AFreq_ATime = False
 	Tolerance = 5.e-3 # meter, Criterion for De-Redundancy
 	
-	Synthesize_MultiFreq = True
+	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 13 if Synthesize_MultiFreq else 1  # temp
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 	
@@ -3381,14 +3399,15 @@ elif 'hera47' in INSTRUMENT:
 	
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
-	thresh = 2  # .2#2.#.03125#
-	valid_pix_thresh = 10**(-4.)
+	thresh = 0.2  # .2#2.#.03125#
+	valid_pix_thresh = 10**(-5.)
 	Use_BeamWeight = False # Use beam_weight for calculating valid_pix_mask.
 	
-	nside_start = 32  # starting point to calculate dynamic A
-	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
-	nside_beamweight = 32  # undynamic A matrix shape
+	nside_start = 64  # starting point to calculate dynamic A
+	nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
+	nside_beamweight = 64  # undynamic A matrix shape
 	bnside = 64  # beam pattern data resolution
+	Add_GroundPlane2BeamPattern = True # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
 	if 'ampcal' in tag:
@@ -4051,8 +4070,8 @@ elif 'hera47' in INSTRUMENT:
 	for i in range(2):
 		bls[i] = odict()
 		for x in data[i].keys():
-			if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy)\
-					and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max):
+			if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
+					and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
 				if Conjugate_CertainBSL:
 					bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])
 				elif Conjugate_CertainBSL2:
@@ -4083,19 +4102,19 @@ elif 'hera47' in INSTRUMENT:
 		vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
 		                                                                                                                             data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
 		                                                                                                                             FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance, Badants=badants, freq=freq, nside_standard=nside_standard,
-		                                                                                                                             baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy,
+		                                                                                                                             baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
 		                                                                                                                             baseline_safety_xx_max = baseline_safety_xx_max, baseline_safety_yy_max = baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)
 	elif MultiFreq:
 		vis_data_dred_mfreq, redundancy_pro, dflags_dred_mfreq, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
 		                                                                                                 data_freqs=None, Nfreqs=None, data_times=None, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, FreqScaleFactor=1.e6,
 		                                                                                                 Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance, Badants=badants, freq=freq, nside_standard=nside_standard,
-		                                                                                                 baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy,
+		                                                                                                 baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
 		                                                                                                 baseline_safety_xx_max = baseline_safety_xx_max, baseline_safety_yy_max = baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)
 	elif SingleFreq:
 		vis_data_dred, redundancy_pro, dflags_dred, bsl_coord_dred, Ubl_list = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
 		                                                                                     data_freqs=data_freqs, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
 		                                                                                     FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data=vis_data, tol=Tolerance, Badants=badants, freq=freq, nside_standard=nside_standard,
-		                                                                                     baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy,
+		                                                                                     baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
 		                                                                                     baseline_safety_xx_max = baseline_safety_xx_max, baseline_safety_yy_max = baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)
 	
 	for i in range(2):
@@ -4214,7 +4233,8 @@ elif 'hera47' in INSTRUMENT:
 	for p in ['x', 'y']:
 		# ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl' % (p, p, nUBL, 3)
 		bls_red[p] = globals()['bsl_coord_' + p]
-	common_bls_red = np.array([u for u in bls_red['x'] if (u in bls_red['y'] or -u in bls_red['y'])])
+	# common_bls_red = np.array([u for u in bls_red['x'] if (u in bls_red['y'] or -u in bls_red['y'])])
+	common_bls_red = np.array([u for u in bls_red['x'] if (u in bls_red['y'])])
 	
 	used_common_bls_red = common_bls_red[la.norm(common_bls_red, axis=-1) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor]  # [np.argsort(la.norm(common_ubls, axis=-1))[10:]]     #remove shorted 10
 	nBL_red_used = len(used_common_bls_red)
@@ -4224,7 +4244,7 @@ elif 'hera47' in INSTRUMENT:
 		for p in ['x', 'y']:
 			# ubl_filename = datadir + tag + '_%s%s_%i_%i.ubl' % (p, p, nUBL, 3)
 			ubls[p] = globals()['bsl_coord_' + p]
-		common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
+		common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'])])
 	
 	else:
 		nUBL = len(bsl_coord_dred[0])
@@ -4232,7 +4252,7 @@ elif 'hera47' in INSTRUMENT:
 		for i in range(2):
 			p = ['x', 'y'][i]
 			ubls[p] = bsl_coord_dred[i]
-		common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
+		common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'])])
 	
 	# common_ubls = np.array([u for u in ubls['x'] if (u in ubls['y'] or -u in ubls['y'])])
 	# manually filter UBLs
@@ -4275,6 +4295,8 @@ elif 'hera47' in INSTRUMENT:
 	# take East pol and rotate to get North pol
 	Nfreqs = len(beam_freqs)
 	beam_theta, beam_phi = hp.pix2ang(64, np.arange(64 ** 2 * 12))
+	if Add_GroundPlane2BeamPattern:
+		beam_E[:, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0. # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
 	# R = hp.Rotator(rot=[0,0,-np.pi/2], deg=False)
 	R = hp.Rotator(rot=[-np.pi / 2, 0, 0], deg=False)
 	beam_theta2, beam_phi2 = R(beam_theta, beam_phi)
@@ -4371,12 +4393,17 @@ sys.stdout.flush()
 sys.stdout.flush()
 
 try:
-	A, beam_weight = get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True, A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A,
+	A, beam_weight = get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True, A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=True,
                                  Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=None,
                                  ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
 	
 except:
-	raise ValueError('No A or beam_weight calculated.')
+	try:
+		A, beam_weight = get_A_multifreq(fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True, A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=False,
+		                                 Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=None,
+		                                 ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
+	except:
+		raise ValueError('No A or beam_weight calculated.')
 
 try:
 	del(A)
@@ -4748,7 +4775,7 @@ if Absolute_Calibration_dred_mfreq_byEachBsl:
 	                                                                         Mocal_time_bin_temp, nt, lsts_full, Mocal_freq_bin_temp, flist, fullsim_vis_mfreq[id_bin * AbsByUbl_bin: np.min([(id_bin + 1) * AbsByUbl_bin, nUBL_used])],
 	                                                                         [vis_data_dred_mfreq[0][:, :, id_bin * AbsByUbl_bin: np.min([(id_bin + 1) * AbsByUbl_bin, nUBL_used])], vis_data_dred_mfreq[1][:, :, id_bin * AbsByUbl_bin: np.min([(id_bin + 1) * AbsByUbl_bin, nUBL_used])]],
 	                                                                         [dflags_dred_mfreq_ublbin[0][id_bin], dflags_dred_mfreq_ublbin[1][id_bin]], add_Autobsl, autocorr_vis_mfreq, autocorr_data_mfreq, 0,
-	                                                                         INSTRUMENT, used_common_ubls[None, id_bin * AbsByUbl_bin], freq, nUBL_used, bnside, nside_standard, AmpCal_Pro, id_bin)) for id_bin in range(AbsByUbl_bin_number)]
+	                                                                         INSTRUMENT, used_common_ubls[None, id_bin * AbsByUbl_bin], freq, nUBL_used, bnside, nside_standard, AmpCal_Pro, id_bin, MocalAmp)) for id_bin in range(AbsByUbl_bin_number)]
 	AbsByUbl_list = np.array([p.get() for p in AbsByUbl_list_process])
 	
 	vis_data_dred_mfreq_abscal = np.array([np.concatenate(np.array([AbsByUbl_list[id_bin, 0][0][:, :, :].transpose((2, 0, 1)) for id_bin in range(AbsByUbl_bin_number)]), axis=0).transpose((1, 2, 0)),
@@ -4813,7 +4840,7 @@ else:
 		vis_data_dred_mfreq_abscal, autocorr_data_dred_mfreq_abscal, vis_data_dred_abscal, autocorr_data_dred_abscal, mocal_time_bin, mocal_freq_bin = \
 			Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, Absolute_Calibration_dred=Absolute_Calibration_dred, Fake_wgts_dred_mfreq=Fake_wgts_dred_mfreq, Bandpass_Constrain=Bandpass_Constrain, re_cal_times=re_cal_times,
 			                        antpos=antpos, Mocal_time_bin_temp=Mocal_time_bin_temp, nt_used=nt, lsts=lsts_full, Mocal_freq_bin_temp=Mocal_freq_bin_temp, flist=flist,
-			                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_mfreq, bl_dred_mfreq_select=bl_dred_mfreq_select, AmpCal_Pro=AmpCal_Pro)
+			                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_mfreq, bl_dred_mfreq_select=bl_dred_mfreq_select, AmpCal_Pro=AmpCal_Pro, MocalAmp=MocalAmp)
 		
 
 
@@ -4989,7 +5016,7 @@ if Absolute_Calibration_dred_mfreq_pscal:
 	vis_data_dred_mfreq_pscal_abscal, autocorr_data_dred_mfreq_pscal_abscal, vis_data_dred_pscal_abscal, autocorr_data_dred_pscal_abscal, _, _ = \
 		Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, Absolute_Calibration_dred=Absolute_Calibration_dred, Fake_wgts_dred_mfreq=Fake_wgts_dred_mfreq, Bandpass_Constrain=Bandpass_Constrain, re_cal_times=re_cal_times,
 		                        antpos=antpos, Mocal_time_bin_temp=Mocal_time_bin_temp, nt_used=nt_used, lsts=lsts, Mocal_freq_bin_temp=Mocal_freq_bin_temp, flist=flist,
-		                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq_pscal, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_dred_mfreq_pscal, bl_dred_mfreq_select=8)
+		                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq_pscal, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_dred_mfreq_pscal, bl_dred_mfreq_select=8, AmpCal_Pro=AmpCal_Pro, MocalAmp=MocalAmp)
 
 sys.stdout.flush()
 
