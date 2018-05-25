@@ -3043,7 +3043,10 @@ def source2file(ra, lon=21.428305555, lat=-30.72152, duration=2.0, offset=0.0, s
 
 
 def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, fullsim_vis_mfreq=None, vis_data_dred=None, vis_data_dred_mfreq=None, used_common_ubls=None, index_freq=None, Flist_select_index=None, Synthesize_MultiFreq=False, BadBaseline_Threshold=2):
+	
 	GoodBaseline_Bool = np.array([np.ones(len(used_common_ubls)).astype('bool'), np.ones(len(used_common_ubls)).astype('bool')])
+	Bad_Baseline_List = [[], []]
+	Good_Baseline_List = [[], []]
 	
 	if dflags_dred is not None:
 		if np.sum((np.array(dflags_dred[0].keys())[:, :2].astype('int') - np.array(dflags_dred[1].keys())[:, :2].astype('int')) == 0) != 2 * len(used_common_ubls):
@@ -3074,7 +3077,13 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 						print('%s not popped out.' % (str(key)))
 					
 					GoodBaseline_Bool[id_p][id_key] = False
-	
+					Bad_Baseline_List[id_p].append(key)
+				else:
+					Good_Baseline_List[id_p].append(key)
+					
+			Bad_Baseline_List[id_p] = np.array(Bad_Baseline_List[id_p])
+			Good_Baseline_List[id_p] = np.array(Good_Baseline_List[id_p])
+			
 	else:
 		for id_p in range(2):
 			for id_key, key in enumerate(dflags_dred_mfreq[id_p].keys()):
@@ -3088,20 +3097,28 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 						print('%s not popped out.' % (str(key)))
 					
 					GoodBaseline_Bool[id_p][id_key] = False
+					Bad_Baseline_List[id_p].append(key)
+				else:
+					Good_Baseline_List[id_p].append(key)
+					
+			Bad_Baseline_List[id_p] = np.array(Bad_Baseline_List[id_p])
+			Good_Baseline_List[id_p] = np.array(Good_Baseline_List[id_p])
 	
 	if not np.sum(GoodBaseline_Bool[0] != GoodBaseline_Bool[1]) == 0:
 		raise ValueError('GoodBaseline, two pols donnot match.')
 	else:
 		GoodBaseline_Bool = GoodBaseline_Bool[0] & GoodBaseline_Bool[1]
+		Bad_Baseline_List = np.array(Bad_Baseline_List)
+		Good_Baseline_List = np.array(Good_Baseline_List)
 	
 	print('>>>>>>>>>>>>>>> Number of Good Baseline after comparing to Simulation with STD Ratio %s: %s' % (BadBaseline_Threshold, np.sum(GoodBaseline_Bool)))
 	
 	if dflags_dred is not None and dflags_dred_mfreq is not None:
-		return GoodBaseline_Bool, dflags_dred_mfreq, dflags_dred
+		return GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq, dflags_dred
 	elif dflags_dred_mfreq is None:
-		return GoodBaseline_Bool, dflags_dred
+		return GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred
 	else:
-		return GoodBaseline_Bool, dflags_dred_mfreq
+		return GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq
 	
 	
 
@@ -3330,8 +3347,8 @@ elif 'hera47' in INSTRUMENT:
 	AbsByUbl_bin = 2 # Number of ubls for each abs_calibartion.
 	AmpCal_Pro = False # ReCalibrate Amplitude over each time_bin for each frequency.
 	MocalAmp = True # Whether to Calibrate Amplitude by Mocal or not.
-	Mocal_time_bin_temp = 60 #30; 600; (362)
-	Mocal_freq_bin_temp = 600 #600; 22; 32; (64)
+	Mocal_time_bin_temp = 3 #30; 600; (362)
+	Mocal_freq_bin_temp = 1 #600; 22; 32; (64)
 	Precal_time_bin_temp = 600
 	mocal_time_bin = 0 # For titles, will be recalculated using mocal_time_bin_temp.
 	mocal_freq_bin = 0 # For titiles, will be recalculated using mocal_freq_bin_temp.
@@ -3388,12 +3405,12 @@ elif 'hera47' in INSTRUMENT:
 	baseline_safety_zz_max = 2.1 # Meters
 	
 	Exclude_BadBaselines_Comparing2Simulation = True # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
-	BadBaseline_Threshold = 1.5 # Ratio threshold between angles of visibilities of data and simulation.
+	BadBaseline_Threshold = 1.2 # Ratio threshold between angles of visibilities of data and simulation.
 	
 	
 	Real_Visibility = False # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
 	Only_AbsData = False # Whether to use Only Absolute value of the visibility.
-	INSTRUMENT = INSTRUMENT + ('-ExB' if Exclude_BadBaselines_Comparing2Simulation else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
+	INSTRUMENT = INSTRUMENT + ('-ExB%s'%(BadBaseline_Threshold) if Exclude_BadBaselines_Comparing2Simulation else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
 	Observing_Session = '/ObservingSession-1192201262/2458043/' #'/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Nfiles_temp = 73
@@ -3449,7 +3466,7 @@ elif 'hera47' in INSTRUMENT:
 	Tolerance = 5.e-3 # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
-	Synthesize_MultiFreq_Nfreq = 13 if Synthesize_MultiFreq else 1  # temp
+	Synthesize_MultiFreq_Nfreq = 37 if Synthesize_MultiFreq else 1  # tempr
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 	
 	
@@ -3462,7 +3479,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Bin = 101562.5 #1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-10., 20., 1.)
+	rcond_list = 10. ** np.arange(-2., 20., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4750,7 +4767,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 			autocorr_vis_mfreq_sf = np.concatenate((autocorr_vis_mfreq[0:1, tmask, index_freq[0]], autocorr_vis_mfreq[1:2, tmask, index_freq[1]]), axis=0)
 			autocorr_vis_mfreq_sf_normalized = np.concatenate((autocorr_vis_mfreq_normalized[0:1, tmask, index_freq[0]], autocorr_vis_mfreq_normalized[1:2, tmask, index_freq[1]]), axis=0)
 			try:
-				if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
+				if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.**-3):
 					print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
 				else:
 					print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
@@ -4781,7 +4798,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 			autocorr_vis_mfreq_sf_normalized = autocorr_vis_mfreq_sf_normalized[:, tmask]
 			
 			try:
-				if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.-3):
+				if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.**-3):
 					print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
 				else:
 					print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
@@ -4822,7 +4839,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 		autocorr_vis_mfreq_sf = np.concatenate((autocorr_vis_mfreq[0:1, tmask, index_freq[0]], autocorr_vis_mfreq[1:2, tmask, index_freq[1]]), axis=0)
 		autocorr_vis_mfreq_sf_normalized = np.concatenate((autocorr_vis_mfreq_normalized[0:1, tmask, index_freq[0]], autocorr_vis_mfreq_normalized[1:2, tmask, index_freq[1]]), axis=0)
 		try:
-			if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.-3):
+			if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.**-3):
 				print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
 			else:
 				print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
@@ -4844,7 +4861,7 @@ sys.stdout.flush()
 # BadBaseline_Threshold = 2.
 
 if Exclude_BadBaselines_Comparing2Simulation:
-	GoodBaseline_Bool, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=vis_data_dred_mfreq, used_common_ubls=used_common_ubls,
+	GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=vis_data_dred_mfreq, used_common_ubls=used_common_ubls,
 	                                                                   index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold)
 		
 	if fullsim_vis is not None:
@@ -4857,6 +4874,12 @@ if Exclude_BadBaselines_Comparing2Simulation:
 	if vis_data_dred_mfreq is not None:
 		for i in range(2):
 			vis_data_dred_mfreq[i] = vis_data_dred_mfreq[i][:, :, GoodBaseline_Bool]
+	
+	# import collections
+	Bad_Ants_List = np.concatenate((Bad_Baseline_List[0][:, :2].astype('int')[:, 0], Bad_Baseline_List[0][:, :2].astype('int')[:, 1]), axis=0)
+	Bad_Ants_Counts = Counter(Bad_Ants_List)
+	Good_Ants_List = np.concatenate((Good_Baseline_List[0][:, :2].astype('int')[:, 0], Good_Baseline_List[0][:, :2].astype('int')[:, 1]), axis=0)
+	Good_Ants_Counts = Counter(Good_Ants_List)
 	
 	used_common_ubls = used_common_ubls[GoodBaseline_Bool]
 	nUBL_used = len(used_common_ubls)
