@@ -3405,7 +3405,7 @@ elif 'hera47' in INSTRUMENT:
 	baseline_safety_zz_max = 2.1 # Meters
 	
 	Exclude_BadBaselines_Comparing2Simulation = True # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
-	BadBaseline_Threshold = 1.2 # Ratio threshold between angles of visibilities of data and simulation.
+	BadBaseline_Threshold = 1.1 # Ratio threshold between angles of visibilities of data and simulation.
 	
 	
 	Real_Visibility = False # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
