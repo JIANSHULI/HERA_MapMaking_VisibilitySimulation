@@ -1993,11 +1993,11 @@ def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT='', full_sim_filename_mf
 			if Parallel_Mulfreq_Visibility_deep:
 				beam_heal_equ_mfreq = {0: beam_heal_equ_x_mfreq, 1: beam_heal_equ_y_mfreq}
 				Visibility_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(full_ras[full_sim_mask][n], full_decs[full_sim_mask][n], full_sim_ubls, f, None, beam_heal_equ_mfreq[id_p][id_f], None, lsts, False)) for n in range(len(full_ras[full_sim_mask]))] for id_f,f in enumerate(flist[id_p])] for id_p in range(2)])
-				fullsim_vis_mfreq = np.array([[np.dot(np.array([Visibility_multiprocess_list[id_p][id_f][n].get() for n in range(len(full_ras[full_sim_mask]))]).transpose(1, 2, 0), masked_equ_GSM_mfreq[id_p, id_f, :]) for id_f,f in enumerate(flist[id_p])] for id_p in range(2)]).transpose(0, 2, 3, 1)
+				fullsim_vis_mfreq = np.array([[np.dot(np.array([Visibility_multiprocess_list[id_p][id_f][n].get() for n in range(len(full_ras[full_sim_mask]))]).transpose(1, 2, 0), masked_equ_GSM_mfreq[id_p, id_f, :]) for id_f,f in enumerate(flist[id_p])] for id_p in range(2)]).transpose(0, 2, 3, 1) * 0.5
 				print('Shape of fullsim_vis_mfreq parallel computed: %s' %(str(fullsim_vis_mfreq.shape)))
 				
 			else:
-				for id_f, f in enumerate(flist[0]):
+				for id_f in range(len(flist[0])):
 					for p, beam_heal_equ in enumerate([beam_heal_equ_x_mfreq[id_f], beam_heal_equ_y_mfreq[id_f]]):
 						f = flist[p][id_f]
 						for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
@@ -2052,7 +2052,7 @@ def Simulate_Visibility_mfreq(script_dir='', INSTRUMENT='', full_sim_filename_mf
 
 def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Calibration_dred=False, Fake_wgts_dred_mfreq=False, re_cal_times=1, antpos=None, Bandpass_Constrain=True,
                             Mocal_time_bin_temp=None, nt_used=None, lsts=None, Mocal_freq_bin_temp=None, flist=None, fullsim_vis_mfreq=None, vis_data_dred_mfreq=None, dflags_dred_mfreq=None, add_Autobsl=False, autocorr_vis_mfreq=None, autocorr_data_mfreq=None, bl_dred_mfreq_select=0,
-                            INSTRUMENT=None, used_common_ubls=None, freq=None, nUBL_used=None, bnside=None, nside_standard=None, AmpCal_Pro=False, Index_Freq=0, MocalAmp=False):
+                            INSTRUMENT=None, used_common_ubls=None, freq=None, nUBL_used=None, bnside=None, nside_standard=None, AmpCal_Pro=False, index_freq=None, Index_Freq=0, MocalAmp=False):
 	if nt_used is not None:
 		if nt_used != len(lsts):
 			raise ValueError('nt_used doesnot match len(lsts).')
@@ -2215,7 +2215,7 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 						vis_data_dred_mfreq_abscal[i][id_f_bin * mocal_freq_bin:id_f_bin * mocal_freq_bin + nf_mocal_used, id_t_bin * mocal_time_bin:id_t_bin * mocal_time_bin + nt_mocal_used, key_id] = abs_corr_data_dred_mfreq[i][key].transpose()
 					else:
 						vis_data_dred_mfreq_abscal[i][id_f_bin * mocal_freq_bin:id_f_bin * mocal_freq_bin + nf_mocal_used, id_t_bin * mocal_time_bin:id_t_bin * mocal_time_bin + nt_mocal_used, key_id] = abs_corr_data_dred_mfreq[i][key].transpose() * (np.sum(np.abs(model_dred_mfreq[i][key].transpose()), axis=-1) / np.sum(np.abs(abs_corr_data_dred_mfreq[i][key].transpose()), axis=-1)).reshape(nf_mocal_used, 1)
-					# vis_data_dred_mfreq_abscal[i][:, :, key_id] = np.real(abs_corr_data_dred_mfreq[i][key].transpose()) + np.abs(np.imag(abs_corr_data_dred_mfreq[i][key].transpose()))*1j
+				# vis_data_dred_mfreq_abscal[i][:, :, key_id] = np.real(abs_corr_data_dred_mfreq[i][key].transpose()) + np.abs(np.imag(abs_corr_data_dred_mfreq[i][key].transpose()))*1j
 				if add_Autobsl:
 					autocorr_data_dred_mfreq_abscal[i][id_t_bin * mocal_time_bin:id_t_bin * mocal_time_bin + nt_mocal_used, id_f_bin * mocal_freq_bin:id_f_bin * mocal_freq_bin + nf_mocal_used] = abs_corr_data_dred_mfreq[i][auto_select_dred_mfreq[i]]
 				else:
@@ -2250,8 +2250,11 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 				plt.title(pol + ' model PHS {}'.format(bl_dred_mfreq[i]))
 				plt.show(block=False)
 				plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_model-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
-				# plt.cla()
-				
+			# plt.cla()
+			except:
+				print('Error when Plotting Mocal Results for Model Data.')
+			
+			try:
 				plt.figure(90000000 + 1000 * i + Index_Freq)
 				fig3_data[i], axes3_data[i] = plt.subplots(2, 1, figsize=(12, 8))
 				plt.sca(axes3_data[i][0])
@@ -2264,10 +2267,12 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 				plt.title(pol + ' data PHS {}'.format(bl_dred_mfreq[i]))
 				plt.show(block=False)
 				plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_data-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
-				# plt.cla()
-				
-				####################### after ABS Calibration #########################
-				
+			# plt.cla()
+			except:
+				print('Error when Plotting Mocal Results for raw Data.')
+			
+			####################### after ABS Calibration #########################
+			try:
 				plt.figure(8000000 + 1000 * i + Index_Freq)
 				fig3_data_abscorr[i], axes3_data_abscorr[i] = plt.subplots(2, 1, figsize=(12, 8))
 				plt.sca(axes3_data_abscorr[i][0])
@@ -2285,7 +2290,7 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 				plt.show(block=False)
 			# plt.cla()
 			except:
-				print('Error when Plotting Mocal Results.')
+				print('Error when Plotting Mocal Results for Calibrated Data.')
 	except:
 		print('No Plotting for Model_Calibration Results.')
 	
@@ -3037,6 +3042,69 @@ def source2file(ra, lon=21.428305555, lat=-30.72152, duration=2.0, offset=0.0, s
 	return (lst, jd, utc_range, utc_center, source_files, source_utc_range, source_utc_center)
 
 
+def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, fullsim_vis_mfreq=None, vis_data_dred=None, vis_data_dred_mfreq=None, used_common_ubls=None, index_freq=None, Flist_select_index=None, Synthesize_MultiFreq=False, BadBaseline_Threshold=2):
+	GoodBaseline_Bool = np.array([np.ones(len(used_common_ubls)).astype('bool'), np.ones(len(used_common_ubls)).astype('bool')])
+	
+	if dflags_dred is not None:
+		if np.sum((np.array(dflags_dred[0].keys())[:, :2].astype('int') - np.array(dflags_dred[1].keys())[:, :2].astype('int')) == 0) != 2 * len(used_common_ubls):
+			raise ValueError('dflags_dred, Two Pols have different Baselines.')
+		else:
+			print('dflags_dred, Two Pols have same baselines.')
+	
+	if dflags_dred_mfreq is not None:
+		if np.sum((np.array(dflags_dred_mfreq[0].keys())[:, :2].astype('int') - np.array(dflags_dred_mfreq[1].keys())[:, :2].astype('int')) == 0) != 2 * len(used_common_ubls):
+			raise ValueError('dflags_dred_mfreq, Two Pols have different Baselines.')
+		else:
+			print('dflags_dred_mfreq, Two Pols have same baselines.')
+	
+	if not Synthesize_MultiFreq:
+		
+		if fullsim_vis is None:
+			fullsim_vis = np.concatenate((fullsim_vis_mfreq[:, 0, :, index_freq[0]], fullsim_vis_mfreq[:, 1, :, index_freq[1]]), axis=1)
+		
+		for id_p in range(2):
+			for id_key, key in enumerate(dflags_dred[id_p].keys()):
+				if (np.max([np.std(np.angle(fullsim_vis[id_key, 0])), np.std(np.angle(vis_data_dred[0][:, id_key]))]) / np.min([np.std(np.angle(fullsim_vis[id_key, 0])), np.std(np.angle(vis_data_dred[0][:, id_key]))])) > BadBaseline_Threshold \
+						or (np.max([np.std(np.angle(fullsim_vis[id_key, 1])), np.std(np.angle(vis_data_dred[1][:, id_key]))]) / np.min([np.std(np.angle(fullsim_vis[id_key, 1])), np.std(np.angle(vis_data_dred[1][:, id_key]))])) > BadBaseline_Threshold:
+					
+					try:
+						dflags_dred[id_p].pop(key)
+						dflags_dred_mfreq[id_p].pop(key)
+					except:
+						print('%s not popped out.' % (str(key)))
+					
+					GoodBaseline_Bool[id_p][id_key] = False
+	
+	else:
+		for id_p in range(2):
+			for id_key, key in enumerate(dflags_dred_mfreq[id_p].keys()):
+				if np.max(np.array([np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, :, Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], :, id_key]))]) / np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, :, Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], :, id_key]))]) for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold \
+						or np.max(np.array([np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, :, Flist_select_index[1][id_f]])), np.std(np.angle(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], :, id_key]))]) / np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, :, Flist_select_index[1][id_f]])), np.std(np.angle(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], :, id_key]))]) for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold:
+					
+					try:
+						dflags_dred_mfreq[id_p].pop(key)
+						dflags_dred[id_p].pop(key)
+					except:
+						print('%s not popped out.' % (str(key)))
+					
+					GoodBaseline_Bool[id_p][id_key] = False
+	
+	if not np.sum(GoodBaseline_Bool[0] != GoodBaseline_Bool[1]) == 0:
+		raise ValueError('GoodBaseline, two pols donnot match.')
+	else:
+		GoodBaseline_Bool = GoodBaseline_Bool[0] & GoodBaseline_Bool[1]
+	
+	print('>>>>>>>>>>>>>>> Number of Good Baseline after comparing to Simulation with STD Ratio %s: %s' % (BadBaseline_Threshold, np.sum(GoodBaseline_Bool)))
+	
+	if dflags_dred is not None and dflags_dred_mfreq is not None:
+		return GoodBaseline_Bool, dflags_dred_mfreq, dflags_dred
+	elif dflags_dred_mfreq is None:
+		return GoodBaseline_Bool, dflags_dred
+	else:
+		return GoodBaseline_Bool, dflags_dred_mfreq
+	
+	
+
 
 INSTRUMENT = ''
 
@@ -3317,12 +3385,15 @@ elif 'hera47' in INSTRUMENT:
 	baseline_safety_zz = 0.
 	baseline_safety_xx_max = 200. # Meters
 	baseline_safety_yy_max = 200. # Meters
-	baseline_safety_zz_max = 0.1 # Meters
+	baseline_safety_zz_max = 2.1 # Meters
+	
+	Exclude_BadBaselines_Comparing2Simulation = True # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
+	BadBaseline_Threshold = 1.5 # Ratio threshold between angles of visibilities of data and simulation.
 	
 	
 	Real_Visibility = False # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
 	Only_AbsData = False # Whether to use Only Absolute value of the visibility.
-	INSTRUMENT = INSTRUMENT + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
+	INSTRUMENT = INSTRUMENT + ('-ExB' if Exclude_BadBaselines_Comparing2Simulation else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
 	Observing_Session = '/ObservingSession-1192201262/2458043/' #'/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Nfiles_temp = 73
@@ -3403,9 +3474,9 @@ elif 'hera47' in INSTRUMENT:
 	valid_pix_thresh = 10**(-5.)
 	Use_BeamWeight = False # Use beam_weight for calculating valid_pix_mask.
 	
-	nside_start = 64  # starting point to calculate dynamic A
-	nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
-	nside_beamweight = 64  # undynamic A matrix shape
+	nside_start = 32  # starting point to calculate dynamic A
+	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+	nside_beamweight = 32  # undynamic A matrix shape
 	bnside = 64  # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
 	
@@ -3830,9 +3901,19 @@ elif 'hera47' in INSTRUMENT:
 			flist[i] = flist[i][(flist[i] >= Freq_Low[i]) * (flist[i] <= Freq_High[i])]
 		except:
 			print('flist[%s] not calculated or already calculated.'%i)
+	
+	for i in range(2):
+		flist[i] = np.array(np.sort(list(set(flist[0]).intersection(flist[1]))))
+		for id_f in range(len(Freq_RFI_AlmostFree_bool[i])):
+			if (np.array(data_freqs[i][id_f]) / 10 ** 6) not in flist[i]:
+				Freq_RFI_AlmostFree_bool[i][id_f] = False
 			
-	if len(flist[0]) != len(flist[1]):
-		flist[np.argmax([len(flist[0]), len(flist[1])])] = flist[np.argmax([len(flist[0]), len(flist[1])])][len(flist[np.argmax([len(flist[0]), len(flist[1])])]) - len(flist[np.argmin([len(flist[0]), len(flist[1])])]) :len(flist[np.argmax([len(flist[0]), len(flist[1])])])]
+	# if len(flist[0]) != len(flist[1]):
+	# 	flist[np.argmax([len(flist[0]), len(flist[1])])] = flist[np.argmax([len(flist[0]), len(flist[1])])][len(flist[np.argmax([len(flist[0]), len(flist[1])])]) - len(flist[np.argmin([len(flist[0]), len(flist[1])])]) :len(flist[np.argmax([len(flist[0]), len(flist[1])])])]
+	
+	# Common_Freq_Bool = (flist[0] == flist[1])
+	# if np.sum(Common_Freq_Bool) < 1:
+	# 	raise ValueError('No Common RFI Almost Free Frequency found.')
 	
 	for i in range(2):
 		try:
@@ -3842,11 +3923,12 @@ elif 'hera47' in INSTRUMENT:
 		except:
 			index_freq[i] = len(flist[i]) / 2
 		
-		if Comply2RFI and index_freq[i] not in Freq_RFI_Free[i] and not np.mean(np.array(dflags[i].values()).reshape(np.array(dflags[i].values()).shape[0] * np.array(dflags[i].values()).shape[1], np.array(dflags[i].values()).shape[2]), axis=0)[index_freq[i]] <= RFI_AlmostFree_Thresh:
-			index_freq[i] = Freq_RFI_Free[i][np.abs(index_freq[i] - Freq_RFI_Free[i]).argmin()] #Freq_RFI_Mid[i]
-			print('>>>>>index_freq[%s] replaced by closest Freq_RFI_Free[%s]'%(i, i))
-		elif Comply2RFI:
-			print('Frequency_Select[%s] is also (almost) RFI_Free. No Replacement.'%i)
+		# if Comply2RFI and index_freq[i] not in Freq_RFI_Free[i]:
+		# 	index_freq[i] = Freq_RFI_Free[i][np.abs(index_freq[i] - Freq_RFI_Free[i]).argmin()] #Freq_RFI_Mid[i]
+		# 	print('>>>>>index_freq[%s] replaced by closest Freq_RFI_Free[%s]'%(i, i))
+		# elif Comply2RFI:
+		# 	print('Frequency_Select[%s] is also (almost) RFI_Free. No Replacement.'%i)
+		
 		
 		try:
 			data[i], dflags[i], autocorr_data_mfreq[i], data_freqs[i], data_times[i], data_lsts[i] = \
@@ -4653,7 +4735,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 			
 			pool = Pool()
 			multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
-			                                                                    None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+			                                                                    None, None, [flist[0][id_f], flist[1][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
 			                                                                    beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
 			                                                                    beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)) for id_f in range(len(flist[0]))]
 			multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
@@ -4689,7 +4771,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 			
 			fullsim_vis_mfreq, autocorr_vis_mfreq, autocorr_vis_mfreq_normalized, fullsim_vis_mfreq_sf, autocorr_vis_mfreq_sf, autocorr_vis_mfreq_sf_normalized = \
 				Simulate_Visibility_mfreq(full_sim_filename_mfreq=full_sim_filename_mfreq, sim_vis_xx_filename_mfreq=sim_vis_xx_filename_mfreq, sim_vis_yy_filename_mfreq=sim_vis_yy_filename_mfreq, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep,
-				                          Force_Compute_Vis=False, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=None, freq=[freq, freq],
+				                          Force_Compute_Vis=False, Multi_freq=True, Multi_Sin_freq=True, used_common_ubls=used_common_ubls, flist=flist, freq_index=index_freq, freq=[freq, freq],
 				                          equatorial_GSM_standard_xx=None, equatorial_GSM_standard_yy=None, equatorial_GSM_standard_mfreq_xx=equatorial_GSM_standard_mfreq, equatorial_GSM_standard_mfreq_yy=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, C=299.792458, nUBL_used=None, nUBL_used_mfreq=None,
 				                          nt_used=None, nside_standard=nside_standard, nside_start=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts_full)
 			
@@ -4699,7 +4781,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 			autocorr_vis_mfreq_sf_normalized = autocorr_vis_mfreq_sf_normalized[:, tmask]
 			
 			try:
-				if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
+				if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.-3):
 					print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
 				else:
 					print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
@@ -4718,13 +4800,13 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 		pool = Pool()
 		try:
 			multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
-			                                                                            None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+			                                                                            None, None, [flist[0][id_f], flist[1][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
 			                                                                            beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
 			                                                                            beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., True)) for id_f in range(len(flist[0]))]
 			multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
 		except:
 			multifreq_list_process = [pool.apply_async(Simulate_Visibility_mfreq, args=(script_dir, INSTRUMENT, full_sim_filename_mfreq[id_f], sim_vis_xx_filename_mfreq[id_f], sim_vis_yy_filename_mfreq[id_f], True, False, False, False, False, False, '',
-			                                                                            None, None, [flist[0][id_f], flist[0][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
+			                                                                            None, None, [flist[0][id_f], flist[1][id_f]], equatorial_GSM_standard, equatorial_GSM_standard, None, None,
 			                                                                            beam_weight, 299.792458, used_common_ubls, None, None, None, nside_standard, None, None,
 			                                                                            beam_heal_equ_x, beam_heal_equ_y, None, None, lsts_full, tlist, True, 1., False)) for id_f in range(len(flist[0]))]
 			multifreq_list = np.array([np.array(p.get()) for p in multifreq_list_process])
@@ -4740,7 +4822,7 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 		autocorr_vis_mfreq_sf = np.concatenate((autocorr_vis_mfreq[0:1, tmask, index_freq[0]], autocorr_vis_mfreq[1:2, tmask, index_freq[1]]), axis=0)
 		autocorr_vis_mfreq_sf_normalized = np.concatenate((autocorr_vis_mfreq_normalized[0:1, tmask, index_freq[0]], autocorr_vis_mfreq_normalized[1:2, tmask, index_freq[1]]), axis=0)
 		try:
-			if not (np.prod(fullsim_vis_mfreq_sf == fullsim_vis) and np.prod(autocorr_vis_mfreq_sf == autocorr_vis) and np.prod(autocorr_vis_mfreq_sf_normalized == autocorr_vis_normalized)):
+			if not (np.sum(np.abs(fullsim_vis_mfreq_sf - fullsim_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf - autocorr_vis)) <= 10.**-3 and np.sum(np.abs(autocorr_vis_mfreq_sf_normalized - autocorr_vis_normalized)) <= 10.-3):
 				print ('>>>>>>>>Single Freq Visibility Simulation Not perfectly match Multi Freq Visibility Simulation')
 			else:
 				print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
@@ -4750,6 +4832,42 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 	
 
 sys.stdout.flush()
+
+####################################################################################################################################################
+############################################## Exclude Bad Baselines by Comparing to Simulation ###################################################
+##################################################################################################################################################
+# vis_data_dred, vis_data_dred_mfreq, redundancy_pro, dflags_dred, dflags_dred_mfreq, bsl_coord_dred, Ubl_list
+# vis_data_dred_mfreq: [pol][freq, time, ubl_index]
+# fullsim_data_dred_mfreq: [ubl_index, pol, time, freq]
+
+# Exclude_BadBaselines_Comparing2Simulation = True
+# BadBaseline_Threshold = 2.
+
+if Exclude_BadBaselines_Comparing2Simulation:
+	GoodBaseline_Bool, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=vis_data_dred_mfreq, used_common_ubls=used_common_ubls,
+	                                                                   index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold)
+		
+	if fullsim_vis is not None:
+		fullsim_vis = fullsim_vis[GoodBaseline_Bool]
+	if fullsim_vis_mfreq is not None:
+		fullsim_vis_mfreq = fullsim_vis_mfreq[GoodBaseline_Bool]
+	if vis_data_dred is not None:
+		for i in range(2):
+			vis_data_dred[i] = vis_data_dred[i][:, GoodBaseline_Bool]
+	if vis_data_dred_mfreq is not None:
+		for i in range(2):
+			vis_data_dred_mfreq[i] = vis_data_dred_mfreq[i][:, :, GoodBaseline_Bool]
+	
+	used_common_ubls = used_common_ubls[GoodBaseline_Bool]
+	nUBL_used = len(used_common_ubls)
+	for i in range(2):
+		# redundancy[i] = redundancy[i][GoodBaseline_Bool]
+		used_redundancy[i] = used_redundancy[i][GoodBaseline_Bool]
+		ubl_index[['x', 'y'][i]] = np.arange(1, nUBL_used+1)
+		
+		
+	print('>>>>>>>>>>>>>>>>> Number of good Baselines: %s' % (len(used_common_ubls)))
+
 
 ##################################################################################################################################################
 ############################################################ Model Calibration  #################################################################
@@ -4775,7 +4893,7 @@ if Absolute_Calibration_dred_mfreq_byEachBsl:
 	                                                                         Mocal_time_bin_temp, nt, lsts_full, Mocal_freq_bin_temp, flist, fullsim_vis_mfreq[id_bin * AbsByUbl_bin: np.min([(id_bin + 1) * AbsByUbl_bin, nUBL_used])],
 	                                                                         [vis_data_dred_mfreq[0][:, :, id_bin * AbsByUbl_bin: np.min([(id_bin + 1) * AbsByUbl_bin, nUBL_used])], vis_data_dred_mfreq[1][:, :, id_bin * AbsByUbl_bin: np.min([(id_bin + 1) * AbsByUbl_bin, nUBL_used])]],
 	                                                                         [dflags_dred_mfreq_ublbin[0][id_bin], dflags_dred_mfreq_ublbin[1][id_bin]], add_Autobsl, autocorr_vis_mfreq, autocorr_data_mfreq, 0,
-	                                                                         INSTRUMENT, used_common_ubls[None, id_bin * AbsByUbl_bin], freq, nUBL_used, bnside, nside_standard, AmpCal_Pro, id_bin, MocalAmp)) for id_bin in range(AbsByUbl_bin_number)]
+	                                                                         INSTRUMENT, used_common_ubls[None, id_bin * AbsByUbl_bin], freq, nUBL_used, bnside, nside_standard, AmpCal_Pro, index_freq, id_bin, MocalAmp)) for id_bin in range(AbsByUbl_bin_number)]
 	AbsByUbl_list = np.array([p.get() for p in AbsByUbl_list_process])
 	
 	vis_data_dred_mfreq_abscal = np.array([np.concatenate(np.array([AbsByUbl_list[id_bin, 0][0][:, :, :].transpose((2, 0, 1)) for id_bin in range(AbsByUbl_bin_number)]), axis=0).transpose((1, 2, 0)),
@@ -4839,7 +4957,7 @@ else:
 	if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred:
 		vis_data_dred_mfreq_abscal, autocorr_data_dred_mfreq_abscal, vis_data_dred_abscal, autocorr_data_dred_abscal, mocal_time_bin, mocal_freq_bin = \
 			Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, Absolute_Calibration_dred=Absolute_Calibration_dred, Fake_wgts_dred_mfreq=Fake_wgts_dred_mfreq, Bandpass_Constrain=Bandpass_Constrain, re_cal_times=re_cal_times,
-			                        antpos=antpos, Mocal_time_bin_temp=Mocal_time_bin_temp, nt_used=nt, lsts=lsts_full, Mocal_freq_bin_temp=Mocal_freq_bin_temp, flist=flist,
+			                        antpos=antpos, Mocal_time_bin_temp=Mocal_time_bin_temp, nt_used=nt, lsts=lsts_full, Mocal_freq_bin_temp=Mocal_freq_bin_temp, flist=flist, index_freq=index_freq, freq=freq, INSTRUMENT=INSTRUMENT, used_common_ubls=used_common_ubls, nUBL_used=None, bnside=None, nside_standard=None,
 			                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_mfreq, bl_dred_mfreq_select=bl_dred_mfreq_select, AmpCal_Pro=AmpCal_Pro, MocalAmp=MocalAmp)
 		
 
@@ -5015,7 +5133,7 @@ sys.stdout.flush()
 if Absolute_Calibration_dred_mfreq_pscal:
 	vis_data_dred_mfreq_pscal_abscal, autocorr_data_dred_mfreq_pscal_abscal, vis_data_dred_pscal_abscal, autocorr_data_dred_pscal_abscal, _, _ = \
 		Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, Absolute_Calibration_dred=Absolute_Calibration_dred, Fake_wgts_dred_mfreq=Fake_wgts_dred_mfreq, Bandpass_Constrain=Bandpass_Constrain, re_cal_times=re_cal_times,
-		                        antpos=antpos, Mocal_time_bin_temp=Mocal_time_bin_temp, nt_used=nt_used, lsts=lsts, Mocal_freq_bin_temp=Mocal_freq_bin_temp, flist=flist,
+		                        antpos=antpos, Mocal_time_bin_temp=Mocal_time_bin_temp, nt_used=nt_used, lsts=lsts, Mocal_freq_bin_temp=Mocal_freq_bin_temp, flist=flist, index_freq=index_freq, freq=freq, INSTRUMENT=INSTRUMENT, used_common_ubls=used_common_ubls, nUBL_used=None, bnside=None, nside_standard=None,
 		                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq_pscal, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_dred_mfreq_pscal, bl_dred_mfreq_select=8, AmpCal_Pro=AmpCal_Pro, MocalAmp=MocalAmp)
 
 sys.stdout.flush()
@@ -5353,25 +5471,25 @@ for p in ['x', 'y']:
 		elif 'hera47' in INSTRUMENT:
 			if From_File_Data:
 				if Use_PsAbsCal:
-					Ni[pol] = 1. / (np.fromfile(data_var_filename_pscal, dtype='float64').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+					Ni[pol] = 1. / (np.fromfile(data_var_filename_pscal, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 				elif Use_Fullsim_Noise:
 					Ni[pol] = 1. / (np.fromfile(sim_var_filename, dtype='float64').reshape((nt_used, nUBL_used)).transpose().flatten())
 				else:
-					Ni[pol] = 1. / (np.fromfile(data_var_filename, dtype='float64').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+					Ni[pol] = 1. / (np.fromfile(data_var_filename, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 			else:
 				if Use_PsAbsCal:
-					Ni[pol] = 1. / N_data_pscal[p].reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+					Ni[pol] = 1. / N_data_pscal[p].reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 				elif Use_Fullsim_Noise:
 					Ni[pol] = 1. / (np.fromfile(sim_var_filename, dtype='float64').reshape((nt_used, nUBL_used)).transpose().flatten())
 				else:
-					Ni[pol] = 1. / N_data[p].reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+					Ni[pol] = 1. / N_data[p].reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 			if From_File_Data:
 				if Use_PsAbsCal:
-					data[pol] = np.fromfile(globals()['pscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1]
+					data[pol] = np.fromfile(globals()['pscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]
 				elif Use_AbsCal:
-					data[pol] = np.fromfile(globals()['abscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1]
+					data[pol] = np.fromfile(globals()['abscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]
 				else:
-					data[pol] = jansky2kelvin * np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
+					data[pol] = jansky2kelvin * np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
 			else:
 				if Use_PsAbsCal:
 					data[pol] = vis_data_dred_pscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
