@@ -3379,7 +3379,7 @@ elif 'hera47' in INSTRUMENT:
 	Absolute_Calibration_dred_mfreq = True  # The only working Model Calibration Method.
 	Absolute_Calibration_dred_mfreq_byEachBsl = False  # Absolute_Calibration_dred_mfreq once for AbsByUbl_bin ubls (multiprocessing).
 	AbsByUbl_bin = 2  # Number of ubls for each abs_calibartion.
-	AmpCal_Pro = True  # ReCalibrate Amplitude over each time_bin for each frequency.
+	AmpCal_Pro = False  # ReCalibrate Amplitude over each time_bin for each frequency.
 	MocalAmp = True  # Whether to Calibrate Amplitude by Mocal or not.
 	Mocal_time_bin_temp = 3  # 30; 600; (362)
 	Mocal_freq_bin_temp = 1  # 600; 22; 32; (64)
@@ -3443,7 +3443,7 @@ elif 'hera47' in INSTRUMENT:
 	baseline_safety_zz_max = 2.1  # Meters
 	
 	Exclude_BadBaselines_Comparing2Simulation = True  # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
-	BadBaseline_Threshold = 1.2  # Ratio threshold between angles of visibilities of data and simulation.
+	BadBaseline_Threshold = 1.4  # Ratio threshold between angles of visibilities of data and simulation.
 	STD_time_temp = 60  # Time_bin for comparing std.
 	
 	Real_Visibility = False  # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
@@ -3483,6 +3483,8 @@ elif 'hera47' in INSTRUMENT:
 	use_select_time = True
 	use_select_freq = True
 	
+	Narrow_Freq = True # Use the minimum frequencies: Mocal_freq_bin, Synthesis_MultiFreq_Nfreq, flist.
+	
 	Tmask_temp = False
 	Tmask_temp_start = 21
 	Tmask_temp_end = 31
@@ -3494,8 +3496,8 @@ elif 'hera47' in INSTRUMENT:
 	RFI_Free_Thresh = 0.085  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.085  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** -1  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [100, 100]
-	Freq_High = [200, 200]
+	Freq_Low = [110, 110]
+	Freq_High = [190, 190]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]
@@ -3503,8 +3505,8 @@ elif 'hera47' in INSTRUMENT:
 	Check_Dred_AFreq_ATime = False
 	Tolerance = 5.e-3  # meter, Criterion for De-Redundancy
 	
-	Synthesize_MultiFreq = False
-	Synthesize_MultiFreq_Nfreq = 11 if Synthesize_MultiFreq else 1  # tempr
+	Synthesize_MultiFreq = True
+	Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # tempr
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 	
 	sys.stdout.flush()
@@ -3516,7 +3518,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Bin = 101562.5  # 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'no_use'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-4., 20., 1.)
+	rcond_list = 10. ** np.arange(-5., 20., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4010,6 +4012,7 @@ elif 'hera47' in INSTRUMENT:
 		Synthesize_MultiFreq_Nfreq = len(Flist_select[0])
 	except:
 		print('No Flist_select or Flist_select_index calculated.')
+		
 	
 	print ('\n' + '>>>>>>>>>>>>>>>>%s minutes used for loading data' % ((time.time() - timer_loading) / 60.) + '\n')
 	# tempt = data[0][37, 65, 'xx'].reshape(6, 20, 64)
@@ -6464,42 +6467,45 @@ for coord in ['C', 'CG']:
 # I = sol4map(np.real(w_GSM))
 # hpv.mollview(np.log10(I), coord='CG', nest=True)
 # plt.show()
-
-if not Only_AbsData:
-	if not Real_Visibility:
-		error = data.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
-		chi = error * (Ni.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1]))) ** .5
+try:
+	if not Only_AbsData:
+		if not Real_Visibility:
+			error = data.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
+			chi = error * (Ni.reshape((2, data_shape['xx'][0], 2, data_shape['xx'][1]))) ** .5
+		else:
+			error = data.reshape((1, data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
+			chi = error * (Ni.reshape((1, data_shape['xx'][0], 2, data_shape['xx'][1]))) ** .5
 	else:
-		error = data.reshape((1, data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
-		chi = error * (Ni.reshape((1, data_shape['xx'][0], 2, data_shape['xx'][1]))) ** .5
-else:
-	error = data.reshape((data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
-	chi = error * (Ni.reshape((data_shape['xx'][0], 2, data_shape['xx'][1]))) ** .5
-print "chi^2 = %.3e, data points %i, pixels %i" % (la.norm(chi) ** 2, len(data), valid_npix)
-if not Real_Visibility:
-	print "re/im chi2 %.3e, %.3e" % (la.norm(chi[0]) ** 2, la.norm(chi[1]) ** 2)
-print "xx/yy chi2 %.3e, %.3e" % (la.norm(chi[:, :, 0]) ** 2, la.norm(chi[:, :, 1]) ** 2)
-# plt.clf()
-plt.figure(120)
-plt.subplot(2, 2, 1)
-plt.plot([la.norm(error[:, u]) for u in ubl_sort['x']])
-plt.title('Error Norm-bsl')
-plt.yscale('symlog')
-plt.subplot(2, 2, 2)
-plt.plot([la.norm(chi[:, u]) for u in ubl_sort['x']])
-plt.title('Chi Norm-bsl')
-plt.yscale('symlog')
-plt.subplot(2, 2, 3)
-plt.plot(lsts, [la.norm(error[..., t]) for t in range(error.shape[-1])])
-plt.title('Error Norm-t')
-plt.yscale('symlog')
-plt.subplot(2, 2, 4)
-plt.plot(lsts, [la.norm(chi[..., t]) for t in range(error.shape[-1])])
-plt.title('Chi Norm-bsl')
-plt.yscale('symlog')
-plt.savefig(script_dir + '/../Output/chi-%s-%s-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-%s-recond-%s.png' % (tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
-plt.show(block=False)
-# plt.gcf().clear()
+		error = data.reshape((data_shape['xx'][0], 2, data_shape['xx'][1])) - best_fit
+		chi = error * (Ni.reshape((data_shape['xx'][0], 2, data_shape['xx'][1]))) ** .5
+	print "chi^2 = %.3e, data points %i, pixels %i" % (la.norm(chi) ** 2, len(data), valid_npix)
+	if not Real_Visibility:
+		print "re/im chi2 %.3e, %.3e" % (la.norm(chi[0]) ** 2, la.norm(chi[1]) ** 2)
+	print "xx/yy chi2 %.3e, %.3e" % (la.norm(chi[:, :, 0]) ** 2, la.norm(chi[:, :, 1]) ** 2)
+	# plt.clf()
+	plt.figure(120)
+	plt.subplot(2, 2, 1)
+	plt.plot([la.norm(error[:, u]) for u in ubl_sort['x']])
+	plt.title('Error Norm-bsl')
+	plt.yscale('symlog')
+	plt.subplot(2, 2, 2)
+	plt.plot([la.norm(chi[:, u]) for u in ubl_sort['x']])
+	plt.title('Chi Norm-bsl')
+	plt.yscale('symlog')
+	plt.subplot(2, 2, 3)
+	plt.plot(lsts, [la.norm(error[..., t]) for t in range(error.shape[-1])])
+	plt.title('Error Norm-t')
+	plt.yscale('symlog')
+	plt.subplot(2, 2, 4)
+	plt.plot(lsts, [la.norm(chi[..., t]) for t in range(error.shape[-1])])
+	plt.title('Chi Norm-bsl')
+	plt.yscale('symlog')
+	plt.savefig(script_dir + '/../Output/chi-%s-%s-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-%s-recond-%s.png' % (tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
+	plt.show(block=False)
+	# plt.gcf().clear()
+except:
+	pass
+
 
 try:
 	print('Additive_sol: %s' % additive_sol[:2])

@@ -62,3 +62,8 @@ with open(op.join('src', 'GIT_INFO'), 'w') as outfile:
         json.dump(data, outfile)
 with open(op.join('src', 'VERSION'), 'w') as outfile:
         json.dump(__version__, outfile)
+try:
+    with open('VERSION', 'w') as outfile:
+        json.dump(__version__, outfile)
+except:
+    print('VERSION not saved to outside.')

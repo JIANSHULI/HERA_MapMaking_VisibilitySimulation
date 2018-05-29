@@ -374,7 +374,14 @@ class Visibility_Simulator:
             ###result[i] = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - phi) * np.exp(ik*rotatez_matrix(phi).dot(d_equ).dot(ps_vec))
         ###return result
         try:
-            result = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.einsum('ijt,uj->uti', rotatez_matrix(angle_list), d_equ).dot(ps_vec))
+            try:
+                result = hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec))
+                # print('Use Dot.')
+                # print (rotatez_matrix(angle_list).shape, d_equ.shape)
+            except:
+                result = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.einsum('ijt,uj->uti', rotatez_matrix(angle_list), d_equ).dot(ps_vec))
+                print('Use Einsum.')
+                # print (rotatez_matrix(angle_list).shape, d_equ.shape)
         except:
             print hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)).shape
             print rotatez_matrix(angle_list).shape, d_equ.shape
