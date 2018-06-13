@@ -1162,6 +1162,8 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 					bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
 			else:
 				bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			
+			bls[i][x][0] = - bls[i][x][0] #  [S, E, U]
 	# bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
 	# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
 	bls = np.array(bls)
@@ -3499,8 +3501,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRS' # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 73
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [25, 25]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [33, 33]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [28, 28]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [29, 29]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Parallel_Files = True  # Parallel Computing for Loading Files
 	Parallel_DataPolsLoad = True if not (Small_ModelData or Model_Calibration or Parallel_Files) else False  # Parallel Computing for Loading Two Pols Data
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
@@ -4280,6 +4282,8 @@ elif 'hera47' in INSTRUMENT:
 						bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
 				else:
 					bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+					
+				bls[i][x][0] = - bls[i][x][0] # [S, E, U]
 	# bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
 	# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
 	bls = np.array(bls)
