@@ -64,6 +64,16 @@ from multiprocessing import Pool
 PI = np.pi
 TPI = PI * 2
 
+southern_points = {'hyd': {'ra': '09:18:05.7', 'dec': '-12:05:44'},
+				   'cen': {'ra': '13:25:27.6', 'dec': '-43:01:09'},
+				   'cyg': {'ra': '19:59:28.3', 'dec': '40:44:02'},
+				   'pic': {'ra': '05:19:49.7', 'dec': '-45:46:44'},
+				   'vir': {'ra': '12:30:49.4', 'dec': '12:23:28'},
+				   'for': {'ra': '03:22:41.7', 'dec': '-37:12:30'},
+				   'sag': {'ra': '17:45:40.045', 'dec': '-29:0:27.9'},
+				   'cas': {'ra': '23:23:26', 'dec': '58:48:00'},
+				   'crab': {'ra': '5:34:31.97', 'dec': '22:00:52.1'}}
+
 try:
 	str2pol = {
 		'I': 1,  # Stokes Paremeters
@@ -2950,7 +2960,7 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 						data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(crdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p])))])  # 5 * np.max(np.abs(fun(cNi[u, p])))
 					plt.yscale('log')
 					plt.title("%s Baseline-%.2f_%.2f_%.2f results on srtime" % (['xx', 'yy'][p], used_common_ubls[u, 0], used_common_ubls[u, 1], used_common_ubls[u, 2]))
-					plt.ylim([-1.05 * data_range, 1.05 * data_range])
+					# plt.ylim([-1.05 * data_range, 1.05 * data_range])
 					if pre_calibrate:
 						plt.legend(handles=[figure[1], figure[2], figure[3], figure[4], figure[5]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise', 'additive'], loc=0)
 					else:
@@ -3110,7 +3120,7 @@ def source2file(ra, lon=21.428305555, lat=-30.72152, duration=2.0, offset=0.0, s
 
 
 
-def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, fullsim_vis_mfreq=None, vis_data_dred=None, vis_data_dred_mfreq=None, used_common_ubls=None, index_freq=None, Flist_select_index=None, Synthesize_MultiFreq=False, BadBaseline_Threshold=2, STD_time_temp=60):
+def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, fullsim_vis_mfreq=None, vis_data_dred=None, vis_data_dred_mfreq=None, used_common_ubls=None, index_freq=None, Flist_select_index=None, Synthesize_MultiFreq=False, Do_Phase=False, Do_Amplitude=False, BadBaseline_Threshold=2., BadBaseline_Amp_Threshold=2., STD_time_temp=60, tmask=None):
 	GoodBaseline_Bool = np.array([np.ones(len(used_common_ubls)).astype('bool'), np.ones(len(used_common_ubls)).astype('bool')])
 	Bad_Baseline_List = [[], []]
 	Good_Baseline_List = [[], []]
@@ -3142,12 +3152,23 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 		if fullsim_vis is None:
 			fullsim_vis = np.concatenate((fullsim_vis_mfreq[:, 0, :, index_freq[0]], fullsim_vis_mfreq[:, 1, :, index_freq[1]]), axis=1)
 		
+		for i in range(2):
+			if vis_data_dred[i].shape[0] != fullsim_vis.shape[2]:
+				vis_data_dred[i] = vis_data_dred[i][tmask, :]
+		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis[:, i, :]) / np.abs(vis_data_dred[i][ :, :].transpose())) for i in range(2)])
+		
 		for id_p in range(2):
 			for id_key, key in enumerate(dflags_dred[id_p].keys()):
-				if (np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
-									 np.min([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold) \
-						or (np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
-											 np.min([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold):
+				if (((np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
+									   np.min([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold) \
+					 or (np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
+										  np.min([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold))
+					and Do_Phase) or \
+						(((np.max(np.array([np.max([np.mean(np.abs(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[0]]) / \
+											np.min([np.mean(np.abs(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[0]]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Amp_Threshold) \
+						  or (np.max(np.array([np.max([np.mean(np.abs(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[1]]) / \
+											   np.min([np.mean(np.abs(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[1]]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Amp_Threshold))
+						 and Do_Amplitude):
 					
 					try:
 						cdflags_dred[id_p].pop(key)
@@ -3164,14 +3185,26 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 			Good_Baseline_List[id_p] = np.array(Good_Baseline_List[id_p])
 	
 	else:
+		for i in range(2):
+			if vis_data_dred_mfreq[i].shape[1] != fullsim_vis_mfreq.shape[2]:
+				vis_data_dred_mfreq[i] = vis_data_dred_mfreq[i][ :, tmask, :]
+		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis_mfreq[:, i, :, Flist_select_index[i]]) / np.abs(vis_data_dred_mfreq[i][Flist_select_index[i], :, :].transpose())) for i in range(2)])
 		for id_p in range(2):
 			for id_key, key in enumerate(dflags_dred_mfreq[id_p].keys()):
-				if (np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
+				if (((np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
 									  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
 									  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold) \
 						or (np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
 											  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
-											  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold):
+											  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold))
+						and Do_Phase) or \
+						(((np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) / \
+											 np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) \
+											 for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold) \
+						  or (np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) / \
+												np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) \
+												for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold))
+						and Do_Amplitude):
 					
 					try:
 						cdflags_dred_mfreq[id_p].pop(key)
@@ -3194,7 +3227,11 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 		Bad_Baseline_List = np.array(Bad_Baseline_List)
 		Good_Baseline_List = np.array(Good_Baseline_List)
 	
-	print('>>>>>>>>>>>>>>> Number of Good Baseline after comparing to Simulation with STD Ratio %s: %s' % (BadBaseline_Threshold, np.sum(GoodBaseline_Bool)))
+	if Do_Phase:
+		print('>>>>>>>>>>>>>>> Number of Good Baseline after comparing to Simulation with Phase STD Ratio %s: %s' % (BadBaseline_Threshold, np.sum(GoodBaseline_Bool)))
+		
+	if Do_Amplitude:
+		print('>>>>>>>>>>>>>>> Number of Good Baseline after comparing to Simulation with Mean Amplitude Ratio %s: %s' % (BadBaseline_Amp_Threshold, np.sum(GoodBaseline_Bool)))
 	
 	if dflags_dred is not None and dflags_dred_mfreq is not None:
 		return GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, cdflags_dred_mfreq, cdflags_dred
@@ -3481,7 +3518,7 @@ elif 'hera47' in INSTRUMENT:
 	Conjugate_CertainBSL2 = False  # Whether we conjugate baselines with different x and y coordinates. sign(Y - X)
 	Conjugate_CertainBSL3 = False  # Whether we conjugate baselines with different x and y coordinates. sign(Y-X) for same sign, while - for different sign.
 	baseline_safety_low = 0.  # Meters
-	baseline_safety_factor = 0.2  # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor
+	baseline_safety_factor = 0.1  # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor
 	baseline_safety_xx = 0.  # Meters
 	baseline_safety_yy = 0.  # Meters
 	baseline_safety_zz = 0.
@@ -3490,8 +3527,11 @@ elif 'hera47' in INSTRUMENT:
 	baseline_safety_zz_max = 2.1  # Meters
 	
 	Exclude_BadBaselines_Comparing2Simulation = False  # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
+	STD_time_temp = 600  # Time_bin for comparing std and amp average.
+	Do_Phase = False # Exclude based on Phase STD.
 	BadBaseline_Threshold = 1.25  # Ratio threshold between angles of visibilities of data and simulation.
-	STD_time_temp = 60  # Time_bin for comparing std.
+	Do_Amplitude = True # Exclude Baselines based on Amplitude Average.
+	BadBaseline_Amp_Threshold = 3. # Ratio threshold between amplitudes of average of all baselines and the specific baseline.
 	
 	Real_Visibility = False  # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
 	Only_AbsData = False  # Whether to use Only Absolute value of the visibility.
@@ -3503,6 +3543,23 @@ elif 'hera47' in INSTRUMENT:
 	Specific_Files = True  # Choose a list of Specific Data Sets.
 	Specific_FileIndex_start = [28, 28]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 	Specific_FileIndex_end = [29, 29]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Focus_PointSource = True
+	if Focus_PointSource:
+		Point_Source_Direction = {'ra': 50.67375, 'dec': 37.20833} # Fornax A
+		
+		data_fnames_full = {}
+		IP_ps = {}
+		fname_ps = {}
+		data_fnames_full[0] = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))
+		data_fnames_full[1] = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))
+		for i in range(2):
+			IP_ps[i] = source2file(ra=Point_Source_Direction['ra'], lon=21.4283056, duration=4, start_jd=int(Observing_Session.split('/')[-2]), jd_files=data_fnames_full[i], get_filetimes=True, verbose=True)
+			fname_ps[i] = IP_ps[i][4][0]
+		Specific_FileIndex_start = [data_fnames_full[0].index(fname_ps[0]), data_fnames_full[1].index(fname_ps[1])]
+		Specific_FileIndex_end = [Specific_FileIndex_start[0] + 1, Specific_FileIndex_start[1] + 1]
+		
+		print('Specific_FileIndex_start: {}; Specific_FileInde_end: {}'.format(Specific_FileIndex_start, Specific_FileIndex_end))
+	
 	Parallel_Files = True  # Parallel Computing for Loading Files
 	Parallel_DataPolsLoad = True if not (Small_ModelData or Model_Calibration or Parallel_Files) else False  # Parallel Computing for Loading Two Pols Data
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
@@ -3519,7 +3576,7 @@ elif 'hera47' in INSTRUMENT:
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 1  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Frequency_Average_preload = 4  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -3556,7 +3613,8 @@ elif 'hera47' in INSTRUMENT:
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 39 if Synthesize_MultiFreq else 1  # tempr
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
-	
+
+	Normalize_TotalAmplitude = False # Whether to rescale the total amplitude at the end or not.
 	DeAverage_GSM = False # Whether to remove the mean of GSM model or not.
 	
 	sys.stdout.flush()
@@ -3568,7 +3626,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Bin = 101562.5  # 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-6, 10., 1.)
+	rcond_list = 10. ** np.arange(-10, 10., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4970,10 +5028,14 @@ sys.stdout.flush()
 # Exclude_BadBaselines_Comparing2Simulation = True
 # BadBaseline_Threshold = 2.
 # STD_time_temp = 30
+# Do_Phase = False
+# Do_Amplitude = True
+# BadBaseline_Amp_Threshold = 3.
 
 if Exclude_BadBaselines_Comparing2Simulation:
 	GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=vis_data_dred_mfreq, used_common_ubls=used_common_ubls,
-																											  index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold, STD_time_temp=STD_time_temp)
+																											  index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold, STD_time_temp=STD_time_temp,
+																											  Do_Phase=Do_Phase, Do_Amplitude=Do_Amplitude, BadBaseline_Amp_Threshold=BadBaseline_Amp_Threshold, tmask=tmask)
 	
 	if fullsim_vis is not None:
 		fullsim_vis = fullsim_vis[GoodBaseline_Bool]
@@ -5100,8 +5162,8 @@ else:
 if Amp_To_Simulation:
 	vis_data_dred_mfreq_abscal, autocorr_data_dred_mfreq_abscal, vis_data_dred_abscal, autocorr_data_dred_abscal, mocalamp2sim_time_bin, mocalamp2sim_freq_bin = \
 		Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, Absolute_Calibration_dred=Absolute_Calibration_dred, Fake_wgts_dred_mfreq=Fake_wgts_dred_mfreq, Bandpass_Constrain=Bandpass_Constrain, re_cal_times=0,
-		                        antpos=antpos, Mocal_time_bin_temp=MocalAmp2Sim_time_bin_temp, nt_used=nt, lsts=lsts_full, Mocal_freq_bin_temp=MocalAmp2Sim_freq_bin_temp, flist=flist, index_freq=index_freq, freq=freq, INSTRUMENT=INSTRUMENT, used_common_ubls=used_common_ubls, nUBL_used=None, bnside=None, nside_standard=None,
-		                        fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq_abscal, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_dred_mfreq_abscal, bl_dred_mfreq_select=bl_dred_mfreq_select, AmpCal_Pro=AmpCal_Pro, MocalAmp=MocalAmp, Amp_To_Simulation=Amp_To_Simulation)
+								antpos=antpos, Mocal_time_bin_temp=MocalAmp2Sim_time_bin_temp, nt_used=nt, lsts=lsts_full, Mocal_freq_bin_temp=MocalAmp2Sim_freq_bin_temp, flist=flist, index_freq=index_freq, freq=freq, INSTRUMENT=INSTRUMENT, used_common_ubls=used_common_ubls, nUBL_used=None, bnside=None, nside_standard=None,
+								fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred_mfreq=vis_data_dred_mfreq_abscal, dflags_dred_mfreq=dflags_dred_mfreq, add_Autobsl=False, autocorr_vis_mfreq=autocorr_vis_mfreq, autocorr_data_mfreq=autocorr_data_dred_mfreq_abscal, bl_dred_mfreq_select=bl_dred_mfreq_select, AmpCal_Pro=AmpCal_Pro, MocalAmp=MocalAmp, Amp_To_Simulation=Amp_To_Simulation)
 
 sys.stdout.flush()
 
@@ -5246,15 +5308,15 @@ sys.stdout.flush()
 ########################################################################################################################
 ########################################## Point Source Calibration  ##################################################
 ######################################################################################################################
-southern_points = {'hyd': {'ra': '09:18:05.7', 'dec': '-12:05:44'},
-				   'cen': {'ra': '13:25:27.6', 'dec': '-43:01:09'},
-				   'cyg': {'ra': '19:59:28.3', 'dec': '40:44:02'},
-				   'pic': {'ra': '05:19:49.7', 'dec': '-45:46:44'},
-				   'vir': {'ra': '12:30:49.4', 'dec': '12:23:28'},
-				   'for': {'ra': '03:22:41.7', 'dec': '-37:12:30'},
-				   'sag': {'ra': '17:45:40.045', 'dec': '-29:0:27.9'},
-				   'cas': {'ra': '23:23:26', 'dec': '58:48:00'},
-				   'crab': {'ra': '5:34:31.97', 'dec': '22:00:52.1'}}
+# southern_points = {'hyd': {'ra': '09:18:05.7', 'dec': '-12:05:44'},
+# 				   'cen': {'ra': '13:25:27.6', 'dec': '-43:01:09'},
+# 				   'cyg': {'ra': '19:59:28.3', 'dec': '40:44:02'},
+# 				   'pic': {'ra': '05:19:49.7', 'dec': '-45:46:44'},
+# 				   'vir': {'ra': '12:30:49.4', 'dec': '12:23:28'},
+# 				   'for': {'ra': '03:22:41.7', 'dec': '-37:12:30'},
+# 				   'sag': {'ra': '17:45:40.045', 'dec': '-29:0:27.9'},
+# 				   'cas': {'ra': '23:23:26', 'dec': '58:48:00'},
+# 				   'crab': {'ra': '5:34:31.97', 'dec': '22:00:52.1'}}
 
 data_var_xx_filename_pscal = script_dir + '/../Output/%s_%s_p2_scale%s_u%i_t%i_nside%i_bnside%i_var_data_xx_pscal.simvis' % (INSTRUMENT, freq, scale_noise_ratio if scale_noise else '-none', nUBL, nt, nside_standard, bnside)
 data_var_yy_filename_pscal = script_dir + '/../Output/%s_%s_p2_scale%s_u%i_t%i_nside%i_bnside%i_var_data_yy_pscal.simvis' % (INSTRUMENT, freq, scale_noise_ratio if scale_noise else '-none', nUBL, nt, nside_standard, bnside)
@@ -6057,8 +6119,13 @@ try:
 except:
 	print ('Error when Plotting Comparison of Full and Dyna Simulation Results.')
 
-vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis), data_shape=data_shape) if not Only_AbsData else get_vis_normalization(stitch_complex_data(data), stitch_complex_data(fullsim_vis), data_shape=data_shape)
-print "Normalization from visibilities", vis_normalization
+# Normalize_TotalAmplitude = True
+if Normalize_TotalAmplitude:
+	vis_normalization = get_vis_normalization(data, stitch_complex_data(fullsim_vis), data_shape=data_shape) if not Only_AbsData else get_vis_normalization(stitch_complex_data(data), stitch_complex_data(fullsim_vis), data_shape=data_shape)
+	print ("Normalization from visibilities", vis_normalization)
+else:
+	vis_normalization = 1.
+	print ("No Normalization from visibilities", vis_normalization)
 
 Del = True
 if Del:
