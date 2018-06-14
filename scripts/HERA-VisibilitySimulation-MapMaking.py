@@ -3544,8 +3544,8 @@ elif 'hera47' in INSTRUMENT:
 	RFI_Free_Thresh = 0.27  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.35  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [135, 135]
-	Freq_High = [165, 165]
+	Freq_Low = [145, 145]
+	Freq_High = [155, 155]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3556,6 +3556,8 @@ elif 'hera47' in INSTRUMENT:
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 39 if Synthesize_MultiFreq else 1  # tempr
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
+	
+	DeAverage_GSM = False # Whether to remove the mean of GSM model or not.
 	
 	sys.stdout.flush()
 	
@@ -4641,6 +4643,12 @@ w3 = si.interp1d(components[:, 0], components[:, 4])
 gsm_standard = np.exp(scale_loglog(np.log(freq))) * (w1(freq) * pca1 + w2(freq) * pca2 + w3(freq) * pca3)
 if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
 	gsm_standard_mfreq = np.array([np.exp(scale_loglog(np.log(flist[0][i]))) * (w1(flist[0][i]) * pca1 + w2(flist[0][i]) * pca2 + w3(flist[0][i]) * pca3) for i in range(nf_used)])
+
+# DeAverage_GSM = True
+if DeAverage_GSM:
+	gsm_standard = gsm_standard - np.mean(gsm_standard)
+	if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
+		gsm_standard_mfreq = gsm_standard_mfreq - np.mean(gsm_standard_mfreq)
 
 # rotate sky map and converts to nest
 equatorial_GSM_standard = np.zeros(12 * nside_standard ** 2, 'float')
