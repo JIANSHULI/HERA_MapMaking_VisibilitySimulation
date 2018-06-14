@@ -4487,7 +4487,7 @@ elif 'hera47' in INSTRUMENT:
 	######################### Beam Pattern #############################
 	Old_BeamPattern = False
 	if Old_BeamPattern:
-		filename = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
+		filename_pre = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
 		beam_E = fits.getdata(filename_pre, extname='BEAM_E').T  # E is east corresponding to X polarization
 		beam_nside = hp.npix2nside(beam_E.shape[1])
 		beam_freqs = fits.getdata(filename_pre, extname='FREQS')
@@ -4648,7 +4648,7 @@ if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq
 if DeAverage_GSM:
 	gsm_standard = gsm_standard - np.mean(gsm_standard)
 	if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
-		gsm_standard_mfreq = gsm_standard_mfreq - np.mean(gsm_standard_mfreq)
+		gsm_standard_mfreq = gsm_standard_mfreq - np.mean(gsm_standard_mfreq, axis=1)
 
 # rotate sky map and converts to nest
 equatorial_GSM_standard = np.zeros(12 * nside_standard ** 2, 'float')
