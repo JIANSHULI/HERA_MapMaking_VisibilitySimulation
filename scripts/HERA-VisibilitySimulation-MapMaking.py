@@ -3528,7 +3528,7 @@ elif 'hera47' in INSTRUMENT:
 	baseline_safety_yy_max = 200.  # Meters
 	baseline_safety_zz_max = 2.1  # Meters
 	
-	Exclude_BadBaselines_Comparing2Simulation = False  # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
+	Exclude_BadBaselines_Comparing2Simulation = True  # If Exclude some baselines by comparing STD of angle of visibilities with simulation.
 	STD_time_temp = 600  # Time_bin for comparing std and amp average.
 	Do_Phase = False # Exclude based on Phase STD.
 	BadBaseline_Threshold = 1.25  # Ratio threshold between angles of visibilities of data and simulation.
@@ -3628,7 +3628,7 @@ elif 'hera47' in INSTRUMENT:
 	Frequency_Bin = 101562.5  # 1.625 * 1.e6  # Hz
 	
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-10, 10., 1.)
+	rcond_list = 10. ** np.arange(-6, 10., 1.)
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4914,7 +4914,7 @@ if Absolute_Calibration_red or Check_Dred_AFreq_ATime:
 
 # Parallel_Mulfreq_Visibility = True
 
-if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_MultiFreq or Exclude_BadBaselines_Comparing2Simulation:  # Used 9.4 min. 64*9*60*12280
+if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_MultiFreq or (Exclude_BadBaselines_Comparing2Simulation and Synthesize_MultiFreq):  # Used 9.4 min. 64*9*60*12280
 	try:
 		if Parallel_Mulfreq_Visibility and not Parallel_Mulfreq_Visibility_deep:
 			# pass
@@ -5037,9 +5037,14 @@ sys.stdout.flush()
 # BadBaseline_Amp_Threshold = 3.
 
 if Exclude_BadBaselines_Comparing2Simulation:
-	GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=vis_data_dred_mfreq, used_common_ubls=used_common_ubls,
-																											  index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold, STD_time_temp=STD_time_temp,
-																											  Do_Phase=Do_Phase, Do_Amplitude=Do_Amplitude, BadBaseline_Amp_Threshold=BadBaseline_Amp_Threshold, tmask=tmask)
+	if Synthesize_MultiFreq:
+		GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=fullsim_vis_mfreq, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=vis_data_dred_mfreq, used_common_ubls=used_common_ubls,
+																												  index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold, STD_time_temp=STD_time_temp,
+																												  Do_Phase=Do_Phase, Do_Amplitude=Do_Amplitude, BadBaseline_Amp_Threshold=BadBaseline_Amp_Threshold, tmask=tmask)
+	else:
+		GoodBaseline_Bool, Good_Baseline_List, Bad_Baseline_List, dflags_dred_mfreq, dflags_dred = DeBadBaselines(dflags_dred_mfreq=dflags_dred_mfreq, dflags_dred=dflags_dred, fullsim_vis=fullsim_vis, fullsim_vis_mfreq=None, vis_data_dred=vis_data_dred, vis_data_dred_mfreq=None, used_common_ubls=used_common_ubls,
+		                                                                                                          index_freq=index_freq, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq, BadBaseline_Threshold=BadBaseline_Threshold, STD_time_temp=STD_time_temp,
+		                                                                                                          Do_Phase=Do_Phase, Do_Amplitude=Do_Amplitude, BadBaseline_Amp_Threshold=BadBaseline_Amp_Threshold, tmask=tmask)
 	
 	if fullsim_vis is not None:
 		fullsim_vis = fullsim_vis[GoodBaseline_Bool]
