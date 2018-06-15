@@ -3152,22 +3152,23 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 		if fullsim_vis is None:
 			fullsim_vis = np.concatenate((fullsim_vis_mfreq[:, 0, :, index_freq[0]], fullsim_vis_mfreq[:, 1, :, index_freq[1]]), axis=1)
 		
+		cvis_data_dred = {}
 		for i in range(2):
 			if vis_data_dred[i].shape[0] != fullsim_vis.shape[2]:
-				vis_data_dred[i] = vis_data_dred[i][tmask, :]
-		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis[:, i, :]) / np.abs(vis_data_dred[i][ :, :].transpose())) for i in range(2)])
+				cvis_data_dred[i] = copy.deepcopy(vis_data_dred[i][tmask, :])
+		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis[:, i, :]) / np.abs(cvis_data_dred[i][ :, :].transpose())) for i in range(2)])
 		
 		for id_p in range(2):
 			for id_key, key in enumerate(dflags_dred[id_p].keys()):
-				if (((np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
-									   np.min([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold) \
-					 or (np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
-										  np.min([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold))
+				if (((np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(cvis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
+									   np.min([np.std(np.angle(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(cvis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold) \
+					 or (np.max(np.array([np.max([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(cvis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) / \
+										  np.min([np.std(np.angle(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])])), np.std(np.angle(cvis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]))]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Threshold))
 					and Do_Phase) or \
-						(((np.max(np.array([np.max([np.mean(np.abs(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[0]]) / \
-											np.min([np.mean(np.abs(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[0]]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Amp_Threshold) \
-						  or (np.max(np.array([np.max([np.mean(np.abs(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[1]]) / \
-											   np.min([np.mean(np.abs(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]), axis=-1) / np.mean(np.abs(vis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=0), BadBaseline_Amp_Ratio[1]]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Amp_Threshold))
+						(((np.max(np.array([np.max([np.mean(np.abs(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]) / np.abs(cvis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) / \
+											np.min([np.mean(np.abs(fullsim_vis[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]) / np.abs(cvis_data_dred[0][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Amp_Threshold) \
+						  or (np.max(np.array([np.max([np.mean(np.abs(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]) / np.abs(cvis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) / \
+											   np.min([np.mean(np.abs(fullsim_vis[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]])]) / np.abs(cvis_data_dred[1][id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) for id_tbin in range(N_std_time_bin)])) > BadBaseline_Amp_Threshold))
 						 and Do_Amplitude):
 					
 					try:
@@ -3185,24 +3186,25 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 			Good_Baseline_List[id_p] = np.array(Good_Baseline_List[id_p])
 	
 	else:
+		cvis_data_dred_mfreq = {}
 		for i in range(2):
 			if vis_data_dred_mfreq[i].shape[1] != fullsim_vis_mfreq.shape[2]:
-				vis_data_dred_mfreq[i] = vis_data_dred_mfreq[i][ :, tmask, :]
-		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis_mfreq[:, i, :, Flist_select_index[i]]) / np.abs(vis_data_dred_mfreq[i][Flist_select_index[i], :, :].transpose())) for i in range(2)])
+				cvis_data_dred_mfreq[i] = copy.deepcopy(vis_data_dred_mfreq[i][ :, tmask, :])
+		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis_mfreq[:, i, :, Flist_select_index[i]]) / np.abs(cvis_data_dred_mfreq[i][Flist_select_index[i], :, :].transpose(2, 1, 0))) for i in range(2)])
 		for id_p in range(2):
 			for id_key, key in enumerate(dflags_dred_mfreq[id_p].keys()):
-				if (((np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
-									  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
+				if (((np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
+									  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
 									  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold) \
-						or (np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
-											  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
+						or (np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
+											  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
 											  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold))
 						and Do_Phase) or \
-						(((np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) / \
-											 np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) \
+						(((np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]) / np.abs(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) / \
+											 np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]) / np.abs(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) \
 											 for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold) \
-						  or (np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) / \
-												np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]), axis=-1) / np.mean(np.abs(vis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) \
+						  or (np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]) / np.abs(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) / \
+												np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]) / np.abs(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) \
 												for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold))
 						and Do_Amplitude):
 					
@@ -4291,8 +4293,8 @@ elif 'hera47' in INSTRUMENT:
 	
 	################################################### Visibility ########################################################
 	vis_freq_selected = freq = flist[0][index_freq[0]]  # MHz For Omni:  0:100, 16:125, 32:150, 48:175;;; For Model:  512:150MHz   Choose xx as reference
-	jansky2kelvin = 1.e-23 * ((C / freq) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2)) # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
-	jansky2kelvin_multifreq = 1.e-23 * ((C / flist[0]) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2))
+	jansky2kelvin = 1.e-26 * ((C / freq) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2)) # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
+	jansky2kelvin_multifreq = 1.e-26 * ((C / flist[0]) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2))
 	
 	for i in range(2):
 		autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
@@ -4565,6 +4567,7 @@ elif 'hera47' in INSTRUMENT:
 		beam_EN = np.array([beam_E, beam_N])
 		beam_EN.resize(2, Nfreqs, 49152)
 		
+		beam_EN = beam_EN / 64 ** 2 * 12.
 		local_beam_unpol_old = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 		del (beam_N)
 		del (beam_E)
@@ -4579,6 +4582,7 @@ elif 'hera47' in INSTRUMENT:
 	if Add_GroundPlane2BeamPattern:
 		beam_EN[:, :, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
 	
+	beam_EN = beam_EN / 64 ** 2 * 12.
 	local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 	
 	#	# normalize each frequency to max of 1
