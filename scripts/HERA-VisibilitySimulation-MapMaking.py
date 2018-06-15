@@ -2984,7 +2984,7 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 						data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(crdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p])))])  # 5 * np.max(np.abs(fun(cNi[u, p])))
 					# plt.yscale('log')
 					plt.title("%s Baseline-%.2f_%.2f_%.2f results on srtime" % (['xx', 'yy'][p], used_common_ubls[u, 0], used_common_ubls[u, 1], used_common_ubls[u, 2]))
-					plt.ylim([-1.05 * data_range, 1.05 * data_range])
+					# plt.ylim([-1.05 * data_range, 1.05 * data_range])
 					if pre_calibrate:
 						plt.legend(handles=[figure[1], figure[2], figure[3], figure[4], figure[5]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise', 'additive'], loc=0)
 					else:
@@ -3129,7 +3129,8 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 		N_std_time_bin = (fullsim_vis.shape[2] / STD_time) if np.mod(fullsim_vis.shape[2], STD_time) == 0 else ((fullsim_vis.shape[2] / STD_time) + 1)
 	else:
 		STD_time = np.min([STD_time_temp, fullsim_vis_mfreq.shape[2]])
-		N_std_time_bin = (fullsim_vis_mfreq.shape[2] / STD_time) if np.mod(fullsim_vis_mfreq.shape[2], STD_time) == 0 else ((fullsim_vis_mfreq.shape[2] / STD_time) + 1)
+		# N_std_time_bin = (fullsim_vis_mfreq.shape[2] / STD_time) if np.mod(fullsim_vis_mfreq.shape[2], STD_time) == 0 else ((fullsim_vis_mfreq.shape[2] / STD_time) + 1)
+		N_std_time_bin = (np.sum(tmask) / STD_time) if np.mod(np.sum(tmask), STD_time) == 0 else ((np.sum(tmask) / STD_time) + 1)
 	
 	print('STD_time_temp: %s; \n STD_time: %s' % (STD_time_temp, STD_time))
 	
@@ -3186,25 +3187,29 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 			Good_Baseline_List[id_p] = np.array(Good_Baseline_List[id_p])
 	
 	else:
-		cvis_data_dred_mfreq = {}
+		# cvis_data_dred_mfreq = {}
+		cvis_data_dred_mfreq = copy.deepcopy(vis_data_dred_mfreq)
+		cfullsim_vis_mfreq = copy.deepcopy(fullsim_vis_mfreq)
 		for i in range(2):
-			if vis_data_dred_mfreq[i].shape[1] != fullsim_vis_mfreq.shape[2]:
-				cvis_data_dred_mfreq[i] = copy.deepcopy(vis_data_dred_mfreq[i][ :, tmask, :])
-		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(fullsim_vis_mfreq[:, i, :, Flist_select_index[i]]) / np.abs(cvis_data_dred_mfreq[i][Flist_select_index[i], :, :].transpose(2, 1, 0))) for i in range(2)])
+			if vis_data_dred_mfreq[i].shape[1] == len(tmask):
+				cvis_data_dred_mfreq[i] = cvis_data_dred_mfreq[i][ :, tmask, :]
+		if fullsim_vis_mfreq.shape[2] == len(tmask):
+			cfullsim_vis_mfreq = cfullsim_vis_mfreq[ :, :, tmask, :]
+		BadBaseline_Amp_Ratio = np.array([np.mean(np.abs(cfullsim_vis_mfreq[:, i, :, Flist_select_index[i]]) / np.abs(cvis_data_dred_mfreq[i][Flist_select_index[i], :, :].transpose(0, 2, 1))) for i in range(2)])
 		for id_p in range(2):
 			for id_key, key in enumerate(dflags_dred_mfreq[id_p].keys()):
-				if (((np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
-									  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
+				if (((np.max(np.array([[np.max([np.std(np.angle(cfullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]))]) / \
+									  np.min([np.std(np.angle(cfullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]))]) \
 									  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold) \
-						or (np.max(np.array([[np.max([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) / \
-											  np.min([np.std(np.angle(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]))]) \
+						or (np.max(np.array([[np.max([np.std(np.angle(cfullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]))]) / \
+											  np.min([np.std(np.angle(cfullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]])), np.std(np.angle(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]))]) \
 											  for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold))
 						and Do_Phase) or \
-						(((np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]) / np.abs(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) / \
-											 np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]) / np.abs(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) \
+						(((np.max(np.array([[np.max([np.mean(np.abs(cfullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]) / np.abs(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) / \
+											 np.min([np.mean(np.abs(cfullsim_vis_mfreq[id_key, 0, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[0][id_f]]) / np.abs(cvis_data_dred_mfreq[0][Flist_select_index[0][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[0]]) \
 											 for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[0]))])) > BadBaseline_Threshold) \
-						  or (np.max(np.array([[np.max([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]) / np.abs(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) / \
-												np.min([np.mean(np.abs(fullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]) / np.abs(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, fullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) \
+						  or (np.max(np.array([[np.max([np.mean(np.abs(cfullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]) / np.abs(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) / \
+												np.min([np.mean(np.abs(cfullsim_vis_mfreq[id_key, 1, id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), Flist_select_index[1][id_f]]) / np.abs(cvis_data_dred_mfreq[1][Flist_select_index[1][id_f], id_tbin * STD_time: np.min([(id_tbin + 1) * STD_time, cfullsim_vis_mfreq.shape[2]]), id_key]), axis=-1), BadBaseline_Amp_Ratio[1]]) \
 												for id_tbin in range(N_std_time_bin)] for id_f in range(len(Flist_select_index[1]))])) > BadBaseline_Threshold))
 						and Do_Amplitude):
 					
@@ -3537,7 +3542,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	Real_Visibility = False  # Only Use Real parts of Visibility to Calculate sky vector and only keep real part of matrixes.
 	Only_AbsData = False  # Whether to use Only Absolute value of the visibility.
-	INSTRUMENT = INSTRUMENT + ('-ExB%s' % (BadBaseline_Threshold) if Exclude_BadBaselines_Comparing2Simulation else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
+	INSTRUMENT = INSTRUMENT + ('-ExBPh%s' % (BadBaseline_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Phase) else '') + ('-ExBAm%s' % (BadBaseline_Amp_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Amplitude) else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
 	Observing_Session = '/IDR2_1/2458105/' # '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Filename_Suffix = '.uvOCRS' # '.uvOCRS' '.uvOCRSD'
@@ -3545,7 +3550,7 @@ elif 'hera47' in INSTRUMENT:
 	Specific_Files = True  # Choose a list of Specific Data Sets.
 	Specific_FileIndex_start = [28, 28]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 	Specific_FileIndex_end = [29, 29]  # Ending point of selected data sets. [51, 51], [26, 27]
-	Focus_PointSource = True
+	Focus_PointSource = False
 	if Focus_PointSource:
 		Point_Source_Direction = {'ra': 50.67375, 'dec': 37.20833} # Fornax A
 		
@@ -3578,7 +3583,7 @@ elif 'hera47' in INSTRUMENT:
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 4  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Frequency_Average_preload = 1  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -3603,8 +3608,8 @@ elif 'hera47' in INSTRUMENT:
 	RFI_Free_Thresh = 0.27  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.35  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [145, 145]
-	Freq_High = [155, 155]
+	Freq_Low = [147.5, 147.5]
+	Freq_High = [152.5, 152.5]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3613,7 +3618,7 @@ elif 'hera47' in INSTRUMENT:
 	Tolerance = 1.e-9  # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
-	Synthesize_MultiFreq_Nfreq = 39 if Synthesize_MultiFreq else 1  # tempr
+	Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # tempr
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 
 	Normalize_TotalAmplitude = False # Whether to rescale the total amplitude at the end or not.
@@ -3643,8 +3648,11 @@ elif 'hera47' in INSTRUMENT:
 	nside_start = 32  # starting point to calculate dynamic A
 	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
 	nside_beamweight = 32  # undynamic A matrix shape
+	
+	Old_BeamPattern = False  # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
 	bnside = 64  # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
+	INSTRUMENT = INSTRUMENT + ('-OBP' if Old_BeamPattern else '-NBP') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP')
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
 	if 'ampcal' in tag:
@@ -3783,6 +3791,7 @@ elif 'hera47' in INSTRUMENT:
 	badants = np.unique(badants)
 	print('Badants: %s' % str(badants))
 	
+	##############################################
 	lst = {}
 	jd = {}
 	utc_range = {}
@@ -3860,7 +3869,9 @@ elif 'hera47' in INSTRUMENT:
 			print ('Nfiles: %s' % Nfiles)
 		except:
 			print('Absolute-Calibrated .uvORX files not ready.')
-			
+	
+	##############################################
+	
 	if not Parallel_DataPolsLoad:
 		for i in range(2):
 			if Small_ModelData:
@@ -4293,8 +4304,8 @@ elif 'hera47' in INSTRUMENT:
 	
 	################################################### Visibility ########################################################
 	vis_freq_selected = freq = flist[0][index_freq[0]]  # MHz For Omni:  0:100, 16:125, 32:150, 48:175;;; For Model:  512:150MHz   Choose xx as reference
-	jansky2kelvin = 1.e-26 * ((C / freq) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2)) # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
-	jansky2kelvin_multifreq = 1.e-26 * ((C / flist[0]) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2))
+	jansky2kelvin = 1.e-23 * ((C / freq) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2)) # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
+	jansky2kelvin_multifreq = 1.e-23 * ((C / flist[0]) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2))
 	
 	for i in range(2):
 		autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
@@ -4545,7 +4556,7 @@ elif 'hera47' in INSTRUMENT:
 	sys.stdout.flush()
 	
 	######################### Beam Pattern #############################
-	Old_BeamPattern = False
+	# Old_BeamPattern = True # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
 	if Old_BeamPattern:
 		filename_pre = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
 		beam_E = fits.getdata(filename_pre, extname='BEAM_E').T  # E is east corresponding to X polarization
@@ -4561,29 +4572,30 @@ elif 'hera47' in INSTRUMENT:
 		if Add_GroundPlane2BeamPattern:
 			beam_E[:, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
 		# R = hp.Rotator(rot=[0,0,-np.pi/2], deg=False)
-		R = hp.Rotator(rot=[-np.pi / 2, 0, 0], deg=False)
+		R = hp.Rotator(rot=[np.pi / 2, 0, 0], deg=False)
 		beam_theta2, beam_phi2 = R(beam_theta, beam_phi)
 		beam_N = np.array(map(lambda x: hp.get_interp_val(x, beam_theta2, beam_phi2), beam_E))
 		beam_EN = np.array([beam_E, beam_N])
 		beam_EN.resize(2, Nfreqs, 49152)
 		
-		beam_EN = beam_EN / 64 ** 2 * 12.
-		local_beam_unpol_old = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
+		beam_EN = beam_EN / (4 * np.pi)
+		local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 		del (beam_N)
 		del (beam_E)
 	
-	filename = script_dir + '/../data/HERA-47/Beam-Dipole/NF_HERA_power_beam_healpix.fits'
-	beam_EN = fits.getdata(filename).squeeze()  # E is east corresponding to X polarization # [pol, freqs, pixels]
-	beam_nside = hp.npix2nside(beam_EN.shape[2])
-	beam_freqs = np.arange(100, 201, 1) # MHz
-	
-	Nfreqs = len(beam_freqs)
-	beam_theta, beam_phi = hp.pix2ang(64, np.arange(64 ** 2 * 12))
-	if Add_GroundPlane2BeamPattern:
-		beam_EN[:, :, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
-	
-	beam_EN = beam_EN / 64 ** 2 * 12.
-	local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
+	else:
+		filename = script_dir + '/../data/HERA-47/Beam-Dipole/NF_HERA_power_beam_healpix.fits'
+		beam_EN = fits.getdata(filename).squeeze()  # E is east corresponding to X polarization # [pol, freqs, pixels]
+		beam_nside = hp.npix2nside(beam_EN.shape[2])
+		beam_freqs = np.arange(100, 201, 1) # MHz
+		
+		Nfreqs = len(beam_freqs)
+		beam_theta, beam_phi = hp.pix2ang(64, np.arange(64 ** 2 * 12))
+		if Add_GroundPlane2BeamPattern:
+			beam_EN[:, :, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
+		
+		beam_EN = beam_EN / (4 * np.pi)
+		local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 	
 	#	# normalize each frequency to max of 1
 	#	for i in range(beam_EN.shape[-2]):
@@ -5019,6 +5031,8 @@ if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_Mu
 				print ('>>>>>>>>Single-Freq Visibility Simulation Perfectly match Multi-Freq Visibility Simulation')
 		except:
 			print('SinFreq-MultiFreq Visibility Simulation NOT Comparared.')
+else:
+	fullsim_vis_mfreq = None
 
 sys.stdout.flush()
 
@@ -6526,6 +6540,14 @@ def plot_IQU_unlimit(solution, title, col, shape=(2, 3), coord='C'):
 	plotcoordtmp = coord
 	hpv.mollview(np.log10(I), coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
 
+def plot_IQU_unlimit_up(solution, title, col, shape=(2, 3), coord='C'):
+	# Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
+	# I = Es[0] + Es[3]
+	# Q = Es[0] - Es[3]
+	# U = Es[1] + Es[2]
+	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+	plotcoordtmp = coord
+	hpv.mollview(np.log10(I), coord=plotcoordtmp, min=2, title=title, nest=True, sub=(shape[0], shape[1], col))
 
 # if col == shape[0] * shape[1]:
 # plt.show(block=False)
@@ -6593,6 +6615,21 @@ for coord in ['C', 'CG']:
 	plot_IQU_unlimit((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord)
 	plot_IQU_unlimit((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord)
 	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+	plt.show(block=False)
+# plt.gcf().clear()
+
+crd = 0
+for coord in ['C', 'CG']:
+	# plt.clf()
+	plt.figure(950 + crd)
+	crd += 10
+	plot_IQU_unlimit_up((w_GSM + np.abs(w_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
+	plot_IQU_unlimit_up((w_sim_sol + np.abs(w_sim_sol)) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord)  # (~noise+data)
+	plot_IQU_unlimit_up((w_solution + np.abs(w_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
+	plot_IQU_unlimit_up((fake_solution + np.abs(fake_solution)) * 0.5, 'True GSM masked', 4, coord=coord)
+	plot_IQU_unlimit_up((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord)
+	plot_IQU_unlimit_up((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord)
+	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
