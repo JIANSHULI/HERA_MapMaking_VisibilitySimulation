@@ -4304,8 +4304,8 @@ elif 'hera47' in INSTRUMENT:
 	
 	################################################### Visibility ########################################################
 	vis_freq_selected = freq = flist[0][index_freq[0]]  # MHz For Omni:  0:100, 16:125, 32:150, 48:175;;; For Model:  512:150MHz   Choose xx as reference
-	jansky2kelvin = 1.e-23 * ((C / freq) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2)) # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
-	jansky2kelvin_multifreq = 1.e-23 * ((C / flist[0]) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2))
+	jansky2kelvin = 1.e-26 * ((C / freq) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2)) # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
+	jansky2kelvin_multifreq = 1.e-26 * ((C / flist[0]) ** 2 / (2.* kB)) / (4 * np.pi / (12 * nside_standard ** 2))
 	
 	for i in range(2):
 		autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
