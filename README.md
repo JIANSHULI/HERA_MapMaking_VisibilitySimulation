@@ -20,6 +20,6 @@
 2. open HERA-VisibilitySimulation-MapMaking.py
   
 ## If you want to use or look at the results:
-1. go to /Map Blender
-2. go to /Map_Blender/SelectedPlots_IDR2.1_x for better results
+1. go to /Maps_Blender
+2. go to /Maps_Blender/SelectedPlots_IDR2.1_x for better results
 3. there will be '.fits' file for results sky map (Data and GSM) with non-zero values on valid pixels
