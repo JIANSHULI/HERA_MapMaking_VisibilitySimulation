@@ -3679,7 +3679,8 @@ elif 'hera47' in INSTRUMENT:
 	Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # tempr
 	Synthesize_MultiFreq_Step = 1 if Synthesize_MultiFreq else 1
 	
-	Normalize_TotalAmplitude = True  # Whether to rescale the total amplitude at the end or not.
+	Normalize_TotalAmplitude = False  # Whether to rescale the total amplitude at the end or not.
+	rescale_factor_inuse = False # whether to rescale or not, only when plotting.
 	DeAverage_GSM = False  # Whether to remove the mean of GSM model or not.
 	
 	sys.stdout.flush()
@@ -3708,9 +3709,10 @@ elif 'hera47' in INSTRUMENT:
 	nside_beamweight = 32  # undynamic A matrix shape
 	
 	Old_BeamPattern = False  # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
+	Beam_Normalization = True #
 	bnside = 64  # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
-	INSTRUMENT = INSTRUMENT + ('-OBP' if Old_BeamPattern else '-NBP') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP')
+	INSTRUMENT = INSTRUMENT + ('-OB' if Old_BeamPattern else '-NB') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-NB' if Beam_Normalization else '')
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
 	if 'ampcal' in tag:
@@ -4407,8 +4409,8 @@ elif 'hera47' in INSTRUMENT:
 	
 	################################################### Visibility ########################################################
 	vis_freq_selected = freq = flist[0][index_freq[0]]  # MHz For Omni:  0:100, 16:125, 32:150, 48:175;;; For Model:  512:150MHz   Choose xx as reference
-	jansky2kelvin = 1.e-23 * ((C / freq) ** 2 / (2. * kB)) / (4 * np.pi / (12 * nside_standard ** 2))  # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
-	jansky2kelvin_multifreq = 1.e-23 * ((C / flist[0]) ** 2 / (2. * kB)) / (4 * np.pi / (12 * nside_standard ** 2))
+	jansky2kelvin = 1.e-26 * ((C / freq) ** 2 / (2. * kB)) / (4 * np.pi / (12 * nside_standard ** 2))  # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
+	jansky2kelvin_multifreq = 1.e-26 * ((C / flist[0]) ** 2 / (2. * kB)) / (4 * np.pi / (12 * nside_standard ** 2))
 	
 	for i in range(2):
 		autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
@@ -4660,9 +4662,13 @@ elif 'hera47' in INSTRUMENT:
 	
 	######################### Beam Pattern #############################
 	# Old_BeamPattern = True # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
+	# Beam_Normalization = True
 	if Old_BeamPattern:
 		filename_pre = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
 		beam_E = fits.getdata(filename_pre, extname='BEAM_E').T  # E is east corresponding to X polarization
+		if Beam_Normalization:
+			for id_f in range(beam_E.shape[0]):
+				beam_E[id_f] = beam_E[id_f] / beam_E[id_f].max()
 		beam_nside = hp.npix2nside(beam_E.shape[1])
 		beam_freqs = fits.getdata(filename_pre, extname='FREQS')
 		
@@ -4681,7 +4687,6 @@ elif 'hera47' in INSTRUMENT:
 		beam_EN = np.array([beam_E, beam_N])
 		beam_EN.resize(2, Nfreqs, 49152)
 		
-		beam_EN = beam_EN
 		local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 		del (beam_N)
 		del (beam_E)
@@ -4697,7 +4702,10 @@ elif 'hera47' in INSTRUMENT:
 		if Add_GroundPlane2BeamPattern:
 			beam_EN[:, :, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
 		
-		beam_EN = beam_EN
+		if Beam_Normalization:
+			for i in range(2):
+				for id_f in range(beam_EN.shape[1]):
+					beam_EN[i, id_f] = beam_EN[i, id_f] / beam_EN[i, id_f].max()
 		local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 	
 	#	# normalize each frequency to max of 1
@@ -4982,7 +4990,7 @@ autocorr_vis_normalized = None
 # 																			   C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
 # 																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
 
-fullsim_vis_auto, autocorr_vis_A, autocorr_vis_normalized_A = Simulate_Visibility_mfreq(vs=vs, full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=[[0, 0, 0]],
+fullsim_vis_auto, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mfreq(vs=vs, full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=[[0, 0, 0]],
                                                                                flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
                                                                                C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
                                                                                beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
@@ -5000,10 +5008,11 @@ try:
 	fullsim_vis[:, 1, :].astype('complex128').tofile(sim_vis_yy_filename)
 except:
 	print('>>>>>>>>>>>>> Not Saved.')
-	
-fullsim_vis = fullsim_vis[:, :, tmask]
-autocorr_vis = autocorr_vis[:, tmask]
-autocorr_vis_normalized = autocorr_vis_normalized[:, tmask]
+
+if fullsim_vis.shape[2] == len(tmask):	
+	fullsim_vis = fullsim_vis[:, :, tmask]
+	autocorr_vis = autocorr_vis[:, tmask]
+	autocorr_vis_normalized = autocorr_vis_normalized[:, tmask]
 
 print ">>>>>>>>> Calculate Visibilities in %f minutes." % ((time.time() - timer) / 60.)
 
@@ -6694,7 +6703,11 @@ def plot_IQU_unlimit_up(solution, title, col, shape=(2, 3), coord='C'):
 
 sys.stdout.flush()
 
-rescale_factor = np.max(np.abs(fake_solution)) / np.max(np.abs(w_solution))
+# rescale_factor_inuse = False
+if rescale_factor_inuse:
+	rescale_factor = np.max(np.abs(fake_solution)) / np.max(np.abs(w_solution))
+else:
+	rescale_factor = 1.
 
 crd = 0
 for coord in ['C', 'CG']:
@@ -6710,7 +6723,7 @@ for coord in ['C', 'CG']:
 	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
-
+# outfilename = script_dir + '/../Output/result_wiener-150MHz-nside_standard32-1.fit'
 
 crd = 0
 for coord in ['C', 'CG']:
@@ -6803,6 +6816,26 @@ for coord in ['C', 'CG']:
 	plt.savefig(script_dir + '/../Output/results_wiener_renormalized-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
+
+new_map = fits.HDUList()
+w_solution_full = sol2map(w_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+new_map.append(fits.ImageHDU(data=np.real(w_solution_full)))
+# new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
+outfile_data_name = script_dir + '/../Output/results_Data-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+new_map.writeto(outfile_data_name, overwrite=True)
+
+ww_solution_all = fits.getdata(outfile_data_name).squeeze()
+ww_solution = ww_solution_all[valid_pix_mask]
+
+new_GSM = fits.HDUList()
+w_GSM_full = sol2map(w_GSM, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+new_GSM.append(fits.ImageHDU(data=np.real(w_GSM_full)))
+# new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
+outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+new_GSM.writeto(outfile_GSM_name, overwrite=True)
+
+ww_GSM_all = fits.getdata(outfile_GSM_name).squeeze()
+ww_GSM = ww_GSM_all[valid_pix_mask]
 
 # def sol4map(sol):
 #	solx = sol[:valid_npix]
