@@ -3547,7 +3547,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Observing_Session = ['/IDR2_1/LSTBIN/three_group/grp1/', '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458104/', '/IDR2_1/2458110/', '/IDR2_1/2458116/']
+	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/']#, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458104/', '/IDR2_1/2458110/', '/IDR2_1/2458116/']
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
