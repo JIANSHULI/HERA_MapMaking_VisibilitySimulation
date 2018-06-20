@@ -1434,12 +1434,12 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
 				beam_heal_equ = {0: beam_heal_equ_x, 1: beam_heal_equ_y}
 				
-				A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (PI / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(12 * nside_beamweight ** 2)] for f in Flist_select[id_p]] for id_p in range(2)])
+				A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(12 * nside_beamweight ** 2)] for f in Flist_select[id_p]] for id_p in range(2)])
 				A_list = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(12 * nside_beamweight ** 2)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((0, 1, 3, 4, 2))
 			else:
 				beam_heal_equ = {0: beam_heal_equ_x_mfreq, 1: beam_heal_equ_y_mfreq}
 				
-				A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (PI / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
+				A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
 				A_list = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], n] / equatorial_GSM_standard[n]) for n in range(12 * nside_beamweight ** 2)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((0, 1, 3, 4, 2))
 			print('Shape of A_list: %s' % (str(A_list.shape)))
 			
@@ -1499,14 +1499,14 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					timer = time.time()
 					for i in np.arange(12 * nside_beamweight ** 2):
 						dec, ra = hpf.pix2ang(nside_beamweight, i)  # gives theta phi
-						dec = PI / 2 - dec
+						dec = np.pi / 2 - dec
 						print "\r%.1f%% completed" % (100. * float(i) / (12. * nside_beamweight ** 2)),
 						sys.stdout.flush()
-						if abs(dec - lat_degree * PI / 180) <= PI / 2:
+						if abs(dec - lat_degree * PI / 180) <= np.pi / 2:
 							if Synthesize_MultiFreq:
-								A[p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], i] / equatorial_GSM_standard[i])
+								A[p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], i] / equatorial_GSM_standard[i]) / 2.
 							else:
-								A[p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts))
+								A[p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) / 2.
 					
 					print "%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), pol, f)
 					sys.stdout.flush()
@@ -1705,12 +1705,12 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
 					beam_heal_equ = {0: beam_heal_equ_x, 1: beam_heal_equ_y}
 					
-					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (PI / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(2)])
+					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(2)])
 					A[:, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((1, 3, 0, 4, 2))
 				else:
 					beam_heal_equ = {0: beam_heal_equ_x_mfreq, 1: beam_heal_equ_y_mfreq}
 					
-					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (PI / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
+					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
 					A[:, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((1, 3, 0, 4, 2))
 				print('A shape: %s' % str(A.shape))
 				print('%s minutes used for parallel_computing A' % ((float(time.time() - timer) / 60.)))
@@ -1755,14 +1755,14 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						
 						for n in range(valid_npix):
 							ra = phis[n]
-							dec = PI / 2. - thetas[n]
+							dec = np.pi / 2. - thetas[n]
 							print "\r%f%% completed, %f minutes left for %s-%s" % (
 								100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.), id_f, f),
 							sys.stdout.flush()
 							if Synthesize_MultiFreq:
-								A[id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
+								A[id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
 							else:
-								A[id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2)  # xx and yy are each half of I
+								A[id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.)  # xx and yy are each half of I
 						# A[:, -1, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_y, tlist=lsts) / 2
 						
 						print ("%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), p, f))
@@ -2071,7 +2071,7 @@ def Simulate_Visibility_mfreq(vs, script_dir='', INSTRUMENT='', full_sim_filenam
 						for i, (ra, dec) in enumerate(zip(full_ras[full_sim_mask], full_decs[full_sim_mask])):
 							# if Parallel_Mulfreq_Visibility:
 							# 	res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
-							res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2
+							res = vs.calculate_pointsource_visibility(ra, dec, full_sim_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.
 							fullsim_vis_mfreq[p, :, :, id_f] += masked_equ_GSM_mfreq[p, id_f, i] * res
 			# fullsim_vis_DBG[p, ..., i] = res[:-1]
 			# autocorr = ~16*la.norm, ~80*np.std, ~1.e-5*np.corrrelate
@@ -3555,7 +3555,7 @@ elif 'hera47' in INSTRUMENT:
 	Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
-	Focus_PointSource = True if Specific_Files else False
+	Focus_PointSource = False if Specific_Files else False
 	Assigned_File = False # Use Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]] no matter what calculated.
 	if Focus_PointSource:
 		Point_Source_Direction = {'ra': 50.67375, 'dec': -37.20833}  # Fornax A {'ra': 50.67375, 'dec': -37.20833}; Crab: [dec:22.0014167, ra:83.63321]; Sag [dec:-29.00775, ra:266.41685]
@@ -4803,11 +4803,6 @@ except:
 	except:
 		raise ValueError('No A or beam_weight calculated.')
 
-try:
-	del (A)
-	print('A has been successfully deleted.')
-except:
-	print('A not to be deleted.')
 
 ########################################################
 ###################### GSM ############################
@@ -4866,6 +4861,7 @@ if Del:
 		del (gsm_standard_mfreq)
 	except:
 		pass
+
 sys.stdout.flush()
 
 ####################### Test get_A_multifreq() and Simulate_Visibility_mfreq() and De_Redundancy() ########################
@@ -4971,6 +4967,8 @@ if Check_Dred_AFreq_ATime:
 ###############################################################################################################################################################
 ############################################################### Fullsky Sinfreq Visibility Simulaiton ########################################################
 #############################################################################################################################################################
+timer = time.time()
+
 full_sim_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 sim_vis_xx_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_xx.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
 sim_vis_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_nside%i_bnside%i_texp%s_vis_sim_yy.simvis' % (INSTRUMENT, freq, nUBL_used + 1, nt_used, Time_Average, Frequency_Average, nside_standard, bnside, Time_Expansion_Factor)
@@ -4979,14 +4977,35 @@ sim_vis_yy_filename = script_dir + '/../Output/%s_%s_p2_u%i_t%i_tave%s_fave%s_ns
 fullsim_vis = None
 autocorr_vis = None
 autocorr_vis_normalized = None
-fullsim_vis, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mfreq(vs=vs, full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
-																			   flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
-																			   C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
-																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=True)
+# fullsim_vis, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mfreq(vs=vs, full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=used_common_ubls,
+# 																			   flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
+# 																			   C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
+# 																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
 
+fullsim_vis_auto, autocorr_vis_A, autocorr_vis_normalized_A = Simulate_Visibility_mfreq(vs=vs, full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=[[0, 0, 0]],
+                                                                               flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
+                                                                               C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
+                                                                               beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
+
+if nside_standard != nside_beamweight:
+	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
+	A = np.array([[hpf.get_interp_val(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
+	fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
+else:
+	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
+
+try:
+	fullsim_vis.transpose(1, 0, 2).astype('complex128').tofile(full_sim_filename)
+	fullsim_vis[:, 0, :].astype('complex128').tofile(sim_vis_xx_filename)
+	fullsim_vis[:, 1, :].astype('complex128').tofile(sim_vis_yy_filename)
+except:
+	print('>>>>>>>>>>>>> Not Saved.')
+	
 fullsim_vis = fullsim_vis[:, :, tmask]
 autocorr_vis = autocorr_vis[:, tmask]
 autocorr_vis_normalized = autocorr_vis_normalized[:, tmask]
+
+print ">>>>>>>>> Calculate Visibilities in %f minutes." % ((time.time() - timer) / 60.)
 
 if plot_data_error:
 	# plt.clf()
@@ -4999,6 +5018,13 @@ if plot_data_error:
 # plt.gcf().clear()
 # plt.clf()
 # plt.close()
+sys.stdout.flush()
+
+try:
+	del (A)
+	print('A has been successfully deleted.')
+except:
+	print('A not to be deleted.')
 sys.stdout.flush()
 
 ########################################################### Sinfreq Redundant Visibility Simulation #######################################################
@@ -6254,10 +6280,10 @@ except:
 # Normalize_TotalAmplitude = True
 if Normalize_TotalAmplitude:
 	vis_normalization = get_vis_normalization(stitch_complex_data(fullsim_vis), data, data_shape=data_shape) if not Only_AbsData else get_vis_normalization(stitch_complex_data(fullsim_vis), stitch_complex_data(data), data_shape=data_shape)
-	print ("Normalization from visibilities", vis_normalization)
+	print ("Normalization from visibilities: {}".format(vis_normalization))
 else:
 	vis_normalization = 1.
-	print ("No Normalization from visibilities", vis_normalization)
+	print ("No Normalization from visibilities.", vis_normalization)
 
 Del = True
 if Del:
