@@ -6280,6 +6280,7 @@ try:
 		plt.legend(loc=0)
 		plt.xlabel('Baseline Length (wavelength)')
 		plt.ylabel('Relative RMS Error')
+		plt.yscale('log')
 		plt.savefig(script_dir + '/../Output/noise_and_dynamic_pixel_error-%s-dipole-beam_weight-bnside-%s-nside_standard-%s-%.2fMHz-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s.png' % (tag, bnside, nside_standard, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'))
 		plt.show(block=False)
 # plt.gcf().clear()
