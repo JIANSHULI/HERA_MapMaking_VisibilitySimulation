@@ -6303,7 +6303,7 @@ if Normalize_TotalAmplitude:
 	print (">>>>>>>>>>>>> Normalization from visibilities: {}".format(vis_normalization))
 else:
 	vis_normalization = 1.
-	print (">>>>>>>>>>>>> No Normalization from visibilities.", vis_normalization)
+	print (">>>>>>>>>>>>> No Normalization from visibilities.", get_vis_normalization(stitch_complex_data(fullsim_vis), data, data_shape=data_shape) if not Only_AbsData else get_vis_normalization(stitch_complex_data(fullsim_vis), stitch_complex_data(data), data_shape=data_shape))
 
 Del = True
 if Del:
@@ -6852,20 +6852,22 @@ try:
 	os.environ['QT_QPA_PLATFORM'] = 'onscreen'
 	for coord in ['C', 'CG']:
 		# plt.clf()
-		plt.figure(9500000 + crd)
+		plt.figure(9800000 + crd)
 		crd += 10
-		plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
-		plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
+		plot_IQU_unlimit_up(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord)
+		# plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord)  # (clean dynamic_data)
+		plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord)
 		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 		plt.show(block=False)
 except:
 	try:
 		for coord in ['C', 'CG']:
 			# plt.clf()
-			plt.figure(9500000 + crd)
+			plt.figure(9800000 + crd)
 			crd += 10
-			plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
-			plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
+			plot_IQU_unlimit_up(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord)
+			# plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord)  # (clean dynamic_data)
+			plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord)
 			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 			plt.show(block=False)
 	except:
