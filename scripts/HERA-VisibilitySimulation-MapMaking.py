@@ -2943,6 +2943,7 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 			# us = ubl_sort['x'][::len(ubl_sort['x']) / pncol] if len(ubl_sort['x']) / pncol >= 1 else ubl_sort['x']
 			us = ubl_sort['x'][::len(ubl_sort['x']) / 24]
 			figure = {}
+			figure_ang = {}
 			for p in range(2):
 				for nu, u in enumerate(us):
 					plt.figure(5000 + 100 * p + nu)
@@ -2970,14 +2971,14 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 			fun = np.angle
 			for p in range(2):
 				for nu, u in enumerate(us):
-					plt.figure(50000 + 100 * p + nu)
+					plt.figure(500000 + 100 * p + nu)
 					# plt.subplot(5, (len(us) + 4) / 5, nu + 1)
-					figure[1] = plt.plot(srt, fun(cdata[u, p][asrt]), label='calibrated_data')
-					figure[2] = plt.plot(srt, fun(fullsim_vis[u, p][asrt]), label='fullsim_vis')
-					figure[3] = plt.plot(srt, fun(crdata[u, p][asrt]), '+', label='raw_data')
-					figure[4] = plt.plot(srt, fun(cNi[u, p][asrt]), label='Ni')
+					figure_ang[1] = plt.plot(srt, fun(cdata[u, p][asrt]), label='calibrated_data')
+					figure_ang[2] = plt.plot(srt, fun(fullsim_vis[u, p][asrt]), label='fullsim_vis')
+					figure_ang[3] = plt.plot(srt, fun(crdata[u, p][asrt]), '+', label='raw_data')
+					figure_ang[4] = plt.plot(srt, fun(cNi[u, p][asrt]), label='Ni')
 					if pre_calibrate:
-						figure[5] = plt.plot(srt, fun(cadd[u, p][asrt]), label='additive')
+						figure_ang[5] = plt.plot(srt, fun(cadd[u, p][asrt]), label='additive')
 						data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(crdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p]))), np.max(fun(cadd[u, p]))])  # 5 * np.max(np.abs(fun(cNi[u, p]))),
 					else:
 						data_range = np.max([np.max(np.abs(fun(cdata[u, p]))), np.max(np.abs(fun(crdata[u, p]))), np.max(np.abs(fun(fullsim_vis[u, p])))])  # 5 * np.max(np.abs(fun(cNi[u, p])))
@@ -2985,9 +2986,9 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 					plt.title("%s Baseline-%.2f_%.2f_%.2f results on srtime" % (['xx', 'yy'][p], used_common_ubls[u, 0], used_common_ubls[u, 1], used_common_ubls[u, 2]))
 					# plt.ylim([-1.05 * data_range, 1.05 * data_range])
 					if pre_calibrate:
-						plt.legend(handles=[figure[1], figure[2], figure[3], figure[4], figure[5]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise', 'additive'], loc=0)
+						plt.legend(handles=[figure_ang[1], figure_ang[2], figure_ang[3], figure_ang[4], figure_ang[5]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise', 'additive'], loc=0)
 					else:
-						plt.legend(handles=[figure[1], figure[2], figure[3], figure[4]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise'], loc=0)
+						plt.legend(handles=[figure_ang[1], figure_ang[2], figure_ang[3], figure_ang[4]], labels=['calibrated_data', 'fullsim_vis', 'raw_data', 'noise'], loc=0)
 					plt.savefig(
 						script_dir + '/../Output/%s-Baseline%s-%.2f_%.2f_%.2f-dipole-precal_data_error-Angle_Full_vis-%s-%.2fMHz-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s.pdf' % (
 						INSTRUMENT, u, used_common_ubls[u, 0], used_common_ubls[u, 1], used_common_ubls[u, 2], ['xx', 'yy'][p], freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard))
