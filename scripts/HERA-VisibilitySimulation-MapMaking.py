@@ -6720,7 +6720,7 @@ if rescale_factor_inuse:
 else:
 	rescale_factor = 1.
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(900 + crd)
@@ -6736,7 +6736,7 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 # outfilename = script_dir + '/../Output/result_wiener-150MHz-nside_standard32-1.fit'
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9000000 + crd)
@@ -6751,7 +6751,7 @@ for coord in ['C', 'CG']:
 	plt.show(block=False)
 # plt.gcf().clear()
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9500000 + crd)
@@ -6767,7 +6767,7 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(950 + crd)
@@ -6782,7 +6782,7 @@ for coord in ['C', 'CG']:
 	plt.show(block=False)
 # plt.gcf().clear()
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9500 + crd)
@@ -6797,7 +6797,7 @@ for coord in ['C', 'CG']:
 	plt.show(block=False)
 # plt.gcf().clear()
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(90000 + crd)
@@ -6813,7 +6813,7 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 
 
-# crd = 0
+crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9000 + crd)
@@ -6850,6 +6850,7 @@ ww_GSM = ww_GSM_all[valid_pix_mask]
 
 try:
 	os.environ['QT_QPA_PLATFORM'] = 'onscreen'
+	crd = 0
 	for coord in ['C', 'CG']:
 		# plt.clf()
 		plt.figure(9800000 + crd)
