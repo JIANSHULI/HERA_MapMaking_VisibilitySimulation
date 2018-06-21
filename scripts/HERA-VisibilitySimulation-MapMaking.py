@@ -5861,16 +5861,25 @@ for p in ['x', 'y']:
 					data[pol] = np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
 			else:
 				if Use_PsAbsCal:
-					data[pol] = vis_data_dred_pscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+					if vis_data_dred_pscal[pol_index].shape[0] == len(tmask):
+						data[pol] = vis_data_dred_pscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+					else:
+						data[pol] = vis_data_dred_pscal[pol_index].transpose()[abs(ubl_index[p]) - 1]
 					# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
 					data[pol] = data[pol].flatten()  # .conjugate()  # there's a conjugate convention difference
 				elif Use_AbsCal:
-					data[pol] = vis_data_dred_abscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+					if vis_data_dred_abscal[pol_index].shape[0] == len(tmask):
+						data[pol] = vis_data_dred_abscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+					else:
+						data[pol] = vis_data_dred_abscal[pol_index].transpose()[abs(ubl_index[p]) - 1]
 					# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
 					data[pol] = data[pol].flatten()  # .conjugate()  # there's a conjugate convention difference
 				else:
-					# data[pol] = jansky2kelvin * vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
-					data[pol] = vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+					if vis_data_dred[pol_index].shape == len(tmask):
+						# data[pol] = jansky2kelvin * vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+						data[pol] = vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+					else:
+						data[pol] = vis_data_dred[pol_index].transpose()[abs(ubl_index[p]) - 1]
 	# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
 	# data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
 	# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
@@ -6290,10 +6299,10 @@ except:
 # Normalize_TotalAmplitude = True
 if Normalize_TotalAmplitude:
 	vis_normalization = get_vis_normalization(stitch_complex_data(fullsim_vis), data, data_shape=data_shape) if not Only_AbsData else get_vis_normalization(stitch_complex_data(fullsim_vis), stitch_complex_data(data), data_shape=data_shape)
-	print ("Normalization from visibilities: {}".format(vis_normalization))
+	print (">>>>>>>>>>>>> Normalization from visibilities: {}".format(vis_normalization))
 else:
 	vis_normalization = 1.
-	print ("No Normalization from visibilities.", vis_normalization)
+	print (">>>>>>>>>>>>> No Normalization from visibilities.", vis_normalization)
 
 Del = True
 if Del:
