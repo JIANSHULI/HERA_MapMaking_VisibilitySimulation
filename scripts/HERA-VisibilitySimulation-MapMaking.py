@@ -3551,8 +3551,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [6, 6]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [10, 10]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -4991,9 +4991,9 @@ autocorr_vis_normalized = None
 # 																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
 
 fullsim_vis_auto, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mfreq(vs=vs, full_sim_filename_mfreq=full_sim_filename, sim_vis_xx_filename_mfreq=sim_vis_xx_filename, sim_vis_yy_filename_mfreq=sim_vis_yy_filename, Multi_freq=False, Multi_Sin_freq=False, used_common_ubls=[[0, 0, 0]],
-                                                                               flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
-                                                                               C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
-                                                                               beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
+																			   flist=None, freq_index=None, freq=[freq, freq], equatorial_GSM_standard_xx=equatorial_GSM_standard, equatorial_GSM_standard_yy=equatorial_GSM_standard, equatorial_GSM_standard_mfreq_xx=None, equatorial_GSM_standard_mfreq_yy=None, beam_weight=beam_weight,
+																			   C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
+																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
 
 if nside_standard != nside_beamweight:
 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
@@ -6710,7 +6710,7 @@ if rescale_factor_inuse:
 else:
 	rescale_factor = 1.
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(900 + crd)
@@ -6726,7 +6726,7 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 # outfilename = script_dir + '/../Output/result_wiener-150MHz-nside_standard32-1.fit'
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9000000 + crd)
@@ -6741,7 +6741,7 @@ for coord in ['C', 'CG']:
 	plt.show(block=False)
 # plt.gcf().clear()
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9500000 + crd)
@@ -6757,7 +6757,7 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(950 + crd)
@@ -6772,7 +6772,7 @@ for coord in ['C', 'CG']:
 	plt.show(block=False)
 # plt.gcf().clear()
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9500 + crd)
@@ -6787,7 +6787,7 @@ for coord in ['C', 'CG']:
 	plt.show(block=False)
 # plt.gcf().clear()
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(90000 + crd)
@@ -6803,7 +6803,7 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 
 
-crd = 0
+# crd = 0
 for coord in ['C', 'CG']:
 	# plt.clf()
 	plt.figure(9000 + crd)
@@ -6837,6 +6837,30 @@ new_GSM.writeto(outfile_GSM_name, overwrite=True)
 
 ww_GSM_all = fits.getdata(outfile_GSM_name).squeeze()
 ww_GSM = ww_GSM_all[valid_pix_mask]
+
+try:
+	os.environ['QT_QPA_PLATFORM'] = 'onscreen'
+	for coord in ['C', 'CG']:
+		# plt.clf()
+		plt.figure(9500000 + crd)
+		crd += 10
+		plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
+		plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
+		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+		plt.show(block=False)
+except:
+	try:
+		for coord in ['C', 'CG']:
+			# plt.clf()
+			plt.figure(9500000 + crd)
+			crd += 10
+			plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
+			plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
+			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+			plt.show(block=False)
+	except:
+		print('Reloaded Data not Plotted.')
+		
 
 # def sol4map(sol):
 #	solx = sol[:valid_npix]
