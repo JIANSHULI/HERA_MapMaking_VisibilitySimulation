@@ -5003,12 +5003,13 @@ if nside_standard != nside_beamweight:
 	if Parallel_A_Convert:
 		pool = Pool()
 		A_list = np.array([[pool.apply_async(hpf.get_interp_val, args=(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, False)) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
-		A = np.array([[np.array(A_list[id_p][id_ubl].get()) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
+		fullsim_vis = np.array([[np.dot(np.array(A_list[id_p][id_ubl].get()), equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)]).reshape((2, nUBL_used, nt_used)).transpose(1, 0, 2)
+		del (A_list)
+		del (pool)
 	else:
 		A = np.array([[hpf.get_interp_val(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
-	fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
-	del(A_list)
-	del(pool)
+		fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
+
 else:
 	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
 
