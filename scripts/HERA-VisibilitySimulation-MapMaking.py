@@ -3632,6 +3632,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
+	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Parallel_A = True  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A to disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
@@ -4996,10 +4997,18 @@ fullsim_vis_auto, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mf
 																			   C=299.792458, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=nside_standard, nside_start=None,
 																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
 
+# Parallel_A_Convert = False # If to parallel Convert A from nside_beam to nside_standard.
 if nside_standard != nside_beamweight:
 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
-	A = np.array([[hpf.get_interp_val(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
+	if Parallel_A_Convert:
+		pool = Pool()
+		A_list = np.array([[pool.apply_async(hpf.get_interp_val, args=(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, False)) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
+		A = np.array([[np.array(A_list[id_p][id_ubl].get()) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
+	else:
+		A = np.array([[hpf.get_interp_val(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
 	fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
+	del(A_list)
+	del(pool)
 else:
 	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
 
@@ -6849,7 +6858,7 @@ ww_GSM_all = fits.getdata(outfile_GSM_name).squeeze()
 ww_GSM = ww_GSM_all[valid_pix_mask]
 
 try:
-	os.environ['QT_QPA_PLATFORM'] = 'onscreen'
+	# os.environ['QT_QPA_PLATFORM'] = 'onscreen'
 	crd = 0
 	for coord in ['C', 'CG']:
 		# plt.clf()
