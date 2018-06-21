@@ -24,4 +24,4 @@
 ## If you want to use or look at the results:
 1. go to /Maps_Blender
 2. go to /Maps_Blender/SelectedPlots_IDR2.1_x for better results
-3. there will be '.fits' file for results sky map (Data and GSM) with non-zero values on valid pixels ( The Data .fits files have negtive pixels set to be zero plus a ignorable small positive number for log-plotting.)
+3. there will be '.fits' file for results sky map (Data and GSM) with non-zero values on valid pixels ( The Data '.fits' files have negtive pixels set to be zero plus a ignorable small positive number for log-plotting.)
