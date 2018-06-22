@@ -5013,7 +5013,7 @@ if nside_standard != nside_beamweight:
 		# fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
 
 else:
-	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard_ring).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
+	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
 
 try:
 	fullsim_vis.transpose(1, 0, 2).astype('complex128').tofile(full_sim_filename)
