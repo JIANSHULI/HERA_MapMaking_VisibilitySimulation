@@ -3552,8 +3552,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [6, 6]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [10, 10]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3632,7 +3632,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
-	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
+	Parallel_A_Convert = True  # If to parallel Convert A from nside_beam to nside_standard.
 	Parallel_A = True  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A to disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
