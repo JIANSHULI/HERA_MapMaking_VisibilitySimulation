@@ -3682,7 +3682,7 @@ elif 'hera47' in INSTRUMENT:
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 1.e-2  # meter, Criterion for De-Redundancy
+	Tolerance = 1.e-9  # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # tempr
@@ -4256,7 +4256,8 @@ elif 'hera47' in INSTRUMENT:
 			Flist_select_index[i] = np.arange(Synthesize_MultiFreq_start[i], Synthesize_MultiFreq_end[i] + 1, Synthesize_MultiFreq_Step)
 		# noinspection PyUnboundLocalVariable
 		Synthesize_MultiFreq_Nfreq = len(Flist_select[0])
-		INSTRUMENT = INSTRUMENT + '-SF{0}-{1:.3f}-{2:.3f}'.format(Synthesize_MultiFreq_Nfreq, Flist_select[0][0], Flist_select[0][-1])
+		if Synthesize_MultiFreq_Nfreq > 1:
+			INSTRUMENT = INSTRUMENT + '-SF{0}-{1:.3f}-{2:.3f}'.format(Synthesize_MultiFreq_Nfreq, Flist_select[0][0], Flist_select[0][-1])
 	except:
 		print('No Flist_select or Flist_select_index calculated.')
 	
@@ -4548,9 +4549,9 @@ elif 'hera47' in INSTRUMENT:
 	#	tlist[i] = '%.2f' %si_t
 	
 	if tag == '-ampcal-':
-		tag = '%s-%.2f' % (INSTRUMENT, freq) + '-%s-%s' % ('bW' if Use_BeamWeight else 'gW', valid_pix_thresh) + tag
+		tag = '%s-%.2f' % (INSTRUMENT, freq) + '-%s-%.6f' % ('bW' if Use_BeamWeight else 'gW', valid_pix_thresh) + tag
 	else:
-		tag = '%s-%.2f' % (INSTRUMENT, freq) + '-%s-%s' % ('bW' if Use_BeamWeight else 'gW', valid_pix_thresh)
+		tag = '%s-%.2f' % (INSTRUMENT, freq) + '-%s-%.6f' % ('bW' if Use_BeamWeight else 'gW', valid_pix_thresh)
 	tmasks = {}
 	for id_p, p in enumerate(['x', 'y']):
 		# tmasks[p] = np.ones_like(tlist).astype(bool)
@@ -6703,7 +6704,7 @@ def plot_IQU(solution, title, col, shape=(2, 3), coord='C'):
 	# U = Es[1] + Es[2]
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
-	hpv.mollview(np.log10(I), min=0, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.mollview(np.log10(I), min=2, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
 
 
 # if col == shape[0] * shape[1]:
@@ -6726,7 +6727,7 @@ def plot_IQU_unlimit_up(solution, title, col, shape=(2, 3), coord='C'):
 	# U = Es[1] + Es[2]
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
-	hpv.mollview(np.log10(I), coord=plotcoordtmp, min=2, title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.mollview(np.log10(I), coord=plotcoordtmp, min=np.mean(I), title=title, nest=True, sub=(shape[0], shape[1], col))
 
 
 # if col == shape[0] * shape[1]:
@@ -6767,7 +6768,7 @@ for coord in ['C', 'CG']:
 	plot_IQU_unlimit(np.abs(fake_solution), 'True GSM masked', 4, coord=coord)
 	plot_IQU_unlimit(np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution), 'combined sim solution', 5, coord=coord)
 	plot_IQU_unlimit(np.abs((w_solution - w_GSM) * rescale_factor + fake_solution), 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
@@ -6782,7 +6783,7 @@ for coord in ['C', 'CG']:
 	plot_IQU(np.abs(fake_solution), 'True GSM masked', 4, coord=coord)
 	plot_IQU(np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution), 'combined sim solution', 5, coord=coord)
 	plot_IQU(np.abs((w_solution - w_GSM) * rescale_factor + fake_solution), 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
@@ -6798,7 +6799,7 @@ for coord in ['C', 'CG']:
 	plot_IQU_unlimit((fake_solution + np.abs(fake_solution)) * 0.5, 'True GSM masked', 4, coord=coord)
 	plot_IQU_unlimit((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord)
 	plot_IQU_unlimit((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
@@ -6813,7 +6814,7 @@ for coord in ['C', 'CG']:
 	plot_IQU_unlimit_up((fake_solution + np.abs(fake_solution)) * 0.5, 'True GSM masked', 4, coord=coord)
 	plot_IQU_unlimit_up((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord)
 	plot_IQU_unlimit_up((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
@@ -6828,7 +6829,7 @@ for coord in ['C', 'CG']:
 	plot_IQU(np.abs(fake_solution), 'True GSM masked', 4, coord=coord)
 	plot_IQU(np.abs(w_sim_sol - w_GSM + fake_solution), 'combined sim solution', 5, coord=coord)
 	plot_IQU(np.abs(w_solution - w_GSM + fake_solution), 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
+	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
@@ -6844,7 +6845,7 @@ for coord in ['C', 'CG']:
 	plot_IQU(np.abs(fake_solution / vis_normalization), 'True GSM masked', 4, coord=coord)
 	plot_IQU(np.abs((w_sim_sol - w_GSM + fake_solution) / vis_normalization), 'combined sim solution', 5, coord=coord)
 	plot_IQU(np.abs((w_solution - w_GSM + fake_solution) / vis_normalization), 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener_renormalized-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
+	plt.savefig(script_dir + '/../Output/results_wiener_renormalized-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-limit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
 	plt.show(block=False)
 # plt.gcf().clear()
 
@@ -6852,21 +6853,36 @@ new_map = fits.HDUList()
 w_solution_full = sol2map(w_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_map.append(fits.ImageHDU(data=np.real(w_solution_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_data_name = script_dir + '/../Output/results_Data-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+outfile_data_name = script_dir + '/../Output/results_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
 new_map.writeto(outfile_data_name, overwrite=True)
 
 ww_solution_all = fits.getdata(outfile_data_name).squeeze()
 ww_solution = ww_solution_all[valid_pix_mask]
 
 new_GSM = fits.HDUList()
-w_GSM_full = sol2map(w_GSM, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
-new_GSM.append(fits.ImageHDU(data=np.real(w_GSM_full)))
+ww_GSM_full = sol2map(w_GSM, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+new_GSM.append(fits.ImageHDU(data=np.real(ww_GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
-new_GSM.writeto(outfile_GSM_name, overwrite=True)
+outfile_w_GSM_name = script_dir + '/../Output/results_w-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+new_GSM.writeto(outfile_w_GSM_name, overwrite=True)
 
-ww_GSM_all = fits.getdata(outfile_GSM_name).squeeze()
+ww_GSM_all = fits.getdata(outfile_w_GSM_name).squeeze()
 ww_GSM = ww_GSM_all[valid_pix_mask]
+
+map_GSM = fits.HDUList()
+GSM_full = sol2map(fake_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+map_GSM.append(fits.ImageHDU(data=np.real(GSM_full)))
+# new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
+outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+map_GSM.writeto(outfile_GSM_name, overwrite=True)
+
+GSM_all = fits.getdata(outfile_GSM_name).squeeze()
+GSM = GSM_all[valid_pix_mask]
+
+
+thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
+bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi])
+bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi])
 
 try:
 	# os.environ['QT_QPA_PLATFORM'] = 'onscreen'
@@ -6878,7 +6894,7 @@ try:
 		plot_IQU_unlimit_up(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord)
 		# plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord)  # (clean dynamic_data)
 		plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord)
-		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 		plt.show(block=False)
 except:
 	try:
@@ -6889,7 +6905,7 @@ except:
 			plot_IQU_unlimit_up(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord)
 			# plot_IQU_unlimit_up((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord)  # (clean dynamic_data)
 			plot_IQU_unlimit_up((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord)
-			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
 			plt.show(block=False)
 	except:
 		print('Reloaded Data not Plotted.')
