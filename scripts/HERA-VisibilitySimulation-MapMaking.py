@@ -3632,7 +3632,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
-	Parallel_A_Convert = True  # If to parallel Convert A from nside_beam to nside_standard.
+	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Parallel_A = True  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A to disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
