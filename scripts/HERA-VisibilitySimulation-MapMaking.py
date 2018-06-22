@@ -3548,7 +3548,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/']#, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458104/', '/IDR2_1/2458110/', '/IDR2_1/2458116/']
+	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458104/', '/IDR2_1/2458110/', '/IDR2_1/2458116/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
@@ -3559,7 +3559,14 @@ elif 'hera47' in INSTRUMENT:
 	Focus_PointSource = False if Specific_Files else False
 	Assigned_File = False # Use Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]] no matter what calculated.
 	if Focus_PointSource:
-		Point_Source_Direction = {'ra': 50.67375, 'dec': -37.20833}  # Fornax A {'ra': 50.67375, 'dec': -37.20833}; Crab: [dec:22.0014167, ra:83.63321]; Sag [dec:-29.00775, ra:266.41685]
+		Point_Source_Direction = {'ra': 30.05044, 'dec': -30.89106}
+		# Fornax A {'ra': 50.67375, 'dec': -37.20833}, LST-Binned:[8, 8];
+		# TGSSADR J071717.6-250454 ['ra': 109.32351, 'dec': -25.0817], LST-Binned:[19,19]; TGSSADR J020012.1-305327 ['ra': 30.05044, 'dec': -30.89106], LST-Binned: [4,4];
+		
+		# TGSSADR J002549.1-260210 ['ra': 6.45484, 'dec': -26.0363], LST-Binned: [0, 0], Single-Day: [[14, 15, 85, 86, 156, 227], [14, 15, 85, 86, 156, 227]];
+		# Crab: ['dec':22.0014167, 'ra':83.63321]; Sag['dec':-29.00775, 'ra':266.41685];
+		# TGSSADR J171257.3-280936 [ra: 258.2388, dec: -28.16007]; TGSSADR J203547.5-345404 [ra: 308.948, dec: -34.90121]; TGSSADR J142529.1-295956 [ra: 216.37163, dec: -29.999];
+		# TGSSADR J101809.2-314415 [ra: 154.53835, dec: -31.73773]; TGSSADR J071717.6-250454 [ra: 109.32351, dec: -25.0817]; TGSSADR J020012.1-305327 [ra: 30.05044, dec: -30.89106]; 
 		
 		data_fnames_full = [[], []]
 		data_fnames_full_sd = [[], []]
@@ -3675,7 +3682,7 @@ elif 'hera47' in INSTRUMENT:
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
 	
 	Check_Dred_AFreq_ATime = False
-	Tolerance = 1.e-9  # meter, Criterion for De-Redundancy
+	Tolerance = 1.e-2  # meter, Criterion for De-Redundancy
 	
 	Synthesize_MultiFreq = False
 	Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # tempr
@@ -4249,6 +4256,7 @@ elif 'hera47' in INSTRUMENT:
 			Flist_select_index[i] = np.arange(Synthesize_MultiFreq_start[i], Synthesize_MultiFreq_end[i] + 1, Synthesize_MultiFreq_Step)
 		# noinspection PyUnboundLocalVariable
 		Synthesize_MultiFreq_Nfreq = len(Flist_select[0])
+		INSTRUMENT = INSTRUMENT + '-SF{0}-{1:.3f}-{2:.3f}'.format(Synthesize_MultiFreq_Nfreq, Flist_select[0][0], Flist_select[0][-1])
 	except:
 		print('No Flist_select or Flist_select_index calculated.')
 	
