@@ -5000,18 +5000,20 @@ fullsim_vis_auto, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mf
 # Parallel_A_Convert = False # If to parallel Convert A from nside_beam to nside_standard.
 if nside_standard != nside_beamweight:
 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
+	equatorial_GSM_standard_ring = equatorial_GSM_standard[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]
 	if Parallel_A_Convert:
 		pool = Pool()
 		A_list = np.array([[pool.apply_async(hpf.get_interp_val, args=(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, False)) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
-		fullsim_vis = np.array([[np.dot(np.array(A_list[id_p][id_ubl].get()), equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)]).reshape((2, nUBL_used, nt_used)).transpose(1, 0, 2)
+		fullsim_vis = np.array([[np.dot(np.array(A_list[id_p][id_ubl].get()), equatorial_GSM_standard_ring) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)]).reshape((2, nUBL_used, nt_used)).transpose(1, 0, 2)
 		del (A_list)
 		del (pool)
 	else:
-		A = np.array([[hpf.get_interp_val(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
-		fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
+		fullsim_vis = np.array([[np.dot(hpf.get_interp_val(A[['x','y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False), equatorial_GSM_standard_ring) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)]).reshape((2, nUBL_used, nt_used)).transpose(1, 0, 2)
+		# A = np.array([[hpf.get_interp_val(A[['x', 'y'][id_p]][id_ubl], thetas_standard, phis_standard, nest=False) for id_ubl in range(nUBL_used * nt_used)] for id_p in range(2)])
+		# fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
 
 else:
-	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
+	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard_ring).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
 
 try:
 	fullsim_vis.transpose(1, 0, 2).astype('complex128').tofile(full_sim_filename)
