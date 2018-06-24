@@ -3567,7 +3567,7 @@ elif 'hera47' in INSTRUMENT:
 		# Crab: ['dec':22.0014167, 'ra':83.63321]; Sag['dec':-29.00775, 'ra':266.41685];
 		# TGSSADR J171257.3-280936 [ra: 258.2388, dec: -28.16007]; TGSSADR J203547.5-345404 [ra: 308.948, dec: -34.90121]; TGSSADR J142529.1-295956 [ra: 216.37163, dec: -29.999];
 		# TGSSADR J101809.2-314415 [ra: 154.53835, dec: -31.73773]; TGSSADR J071717.6-250454 [ra: 109.32351, dec: -25.0817]; TGSSADR J020012.1-305327 [ra: 30.05044, dec: -30.89106];
-		# UPS: [ra: 127.96375, dec: -38.68219]
+		# UPS: [ra: 127.96375, dec: -38.68219] [ra:50.625, dec:-27.9532]
 		
 		data_fnames_full = [[], []]
 		data_fnames_full_sd = [[], []]
@@ -3714,9 +3714,10 @@ elif 'hera47' in INSTRUMENT:
 	valid_pix_thresh = 10 ** (-1.5)
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
-	nside_start = 32  # starting point to calculate dynamic A
-	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
-	nside_beamweight = 32  # undynamic A matrix shape
+	nside_start = 64  # starting point to calculate dynamic A
+	nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
+	nside_beamweight = 16  # undynamic A matrix shape
+	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	
 	Old_BeamPattern = False  # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
 	Beam_Normalization = True #
@@ -5008,7 +5009,7 @@ fullsim_vis_auto, autocorr_vis, autocorr_vis_normalized = Simulate_Visibility_mf
 																			   beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts_full, Parallel_Mulfreq_Visibility=Parallel_Mulfreq_Visibility, Parallel_Mulfreq_Visibility_deep=Parallel_Mulfreq_Visibility_deep)
 
 # Parallel_A_Convert = False # If to parallel Convert A from nside_beam to nside_standard.
-if nside_standard != nside_beamweight:
+if (nside_standard != nside_beamweight) and not Use_nside_bw_forFullsim:
 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
 	equatorial_GSM_standard_ring = equatorial_GSM_standard[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]
 	if Parallel_A_Convert:
@@ -5023,7 +5024,10 @@ if nside_standard != nside_beamweight:
 		# fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
 
 else:
-	fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
+	if Use_nside_bw_forFullsim:
+		fullsim_vis = np.array([np.dot(A[['x', 'y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
+	else:
+		fullsim_vis = np.array([np.dot(A[['x','y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0 ,2)
 
 try:
 	fullsim_vis.transpose(1, 0, 2).astype('complex128').tofile(full_sim_filename)
