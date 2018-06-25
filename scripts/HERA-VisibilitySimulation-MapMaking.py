@@ -1307,11 +1307,14 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 def Calculate_pointsource_visibility(vs, ra, dec, d, freq, beam_healpix_hor=None, beam_heal_equ=None, nt=None, tlist=None, verbose=False):
 	return vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose)
 
+def Calculate_pointsource_visibility_R_I(vs, ra, dec, d, freq, beam_healpix_hor=None, beam_heal_equ=None, nt=None, tlist=None, verbose=False):
+	return np.array([np.real(vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose)), np.imag(vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose))]).astype('float64')
+
 
 def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=True, Compute_beamweight=False, A_path='', A_RE_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=True, Flist_select_index=None, Flist_select=None, flist=None, Reference_Freq_Index=None, Reference_Freq=None,
 					equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=None, thresh=2., valid_pix_thresh=1.e-4, Use_BeamWeight=False, Only_AbsData=False, Del_A=False, valid_npix=None,
 					beam_weight=None, ubls=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, Parallel_A=False, Precision_full='complex64',
-                    NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='complex128', nchunk_AtNiA_maxcut=6, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True):
+                    NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='complex64', nchunk_AtNiA_maxcut=6, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True):
 	print('flist: %s' % str(flist))
 	
 	if Synthesize_MultiFreq:
@@ -1534,9 +1537,9 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			print "Reading A matrix from %s" % A_path
 			sys.stdout.flush()
 			if fit_for_additive:
-				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2 * nUBL_used * len(Flist_select[0]), 2, valid_npix + nt_used, 4 * nUBL_used * len(Flist_select[0])))
+				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2 * nUBL_used * len(Flist_select[0]) * 2 * (valid_npix + nt_used), 4 * nUBL_used * len(Flist_select[0])))
 			else:
-				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2 * nUBL_used * len(Flist_select[0]), 2, nt_used, valid_npix))
+				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2 * nUBL_used * len(Flist_select[0]) * 2 * nt_used, valid_npix))
 			
 			Case = 0
 			# if not NoA_Out
@@ -1546,11 +1549,11 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			print "Reading A matrix from %s" % A_path
 			sys.stdout.flush()
 			if fit_for_additive:
-				A = np.fromfile(A_path, dtype=Precision_masked).reshape((nUBL_used * len(Flist_select[0]), 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])))
-				A.shape = (len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
+				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2, nUBL_used * len(Flist_select[0]), 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])))
+				A.shape = (2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
 			else:
-				A = np.fromfile(A_path, dtype=Precision_masked).reshape((nUBL_used * len(Flist_select[0]), 2, nt_used, valid_npix))
-				A.shape = (len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
+				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2, nUBL_used * len(Flist_select[0]), 2, nt_used, valid_npix))
+				A.shape = (2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
 			if not fit_for_additive:
 				A = A[:, :valid_npix]
 			else:
@@ -1695,9 +1698,11 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				print ("Computing A matrix...")
 			sys.stdout.flush()
 			if fit_for_additive:
-				A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
+				# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
+				A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
 			else:
-				A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+				# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+				A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
 			timer = time.time()
 			if Parallel_A:
 				pool = Pool()
@@ -1715,22 +1720,22 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
 					beam_heal_equ = {0: beam_heal_equ_x, 1: beam_heal_equ_y}
 					
-					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(2)])
-					A[:, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((1, 3, 0, 4, 2))
+					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(2)])
+					A[:, :, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
 				else:
 					beam_heal_equ = {0: beam_heal_equ_x_mfreq, 1: beam_heal_equ_y_mfreq}
 					
-					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
-					A[:, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((1, 3, 0, 4, 2))
+					A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
+					A[:, :, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
 				print('A shape: %s' % str(A.shape))
 				print('%s minutes used for parallel_computing A' % ((float(time.time() - timer) / 60.)))
 				
 				del (A_multiprocess_list)
 				
 				if fit_for_additive:
-					A = A.reshape(len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
+					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
 				else:
-					A = A.reshape(len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix)
+					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix)
 				print('>>>>>>>>>>>>>>>>> Shape of A: %s' % (str(A.shape)))
 			# if Del_A:
 			# 	try:
@@ -1770,9 +1775,9 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 								100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.), id_f, f),
 							sys.stdout.flush()
 							if Synthesize_MultiFreq:
-								A[id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
+								A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
 							else:
-								A[id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.)  # xx and yy are each half of I
+								A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.)  # xx and yy are each half of I
 						# A[:, -1, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_y, tlist=lsts) / 2
 						
 						print ("%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), p, f))
@@ -1780,12 +1785,12 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					sys.stdout.flush()
 				
 				if fit_for_additive:
-					A = A.reshape(len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
+					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
 				else:
-					A = A.reshape(len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix)
+					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix)
 				print('>>>>>>>>>>>>>>>>> Shape of A: %s' % (str(A.shape)))
 			
-			if Del_A:
+			if Del_A and not NoA_Out:
 				try:
 					A.tofile(A_path)
 				except:
@@ -1830,7 +1835,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			#         A[i, p, :, valid_npix + 4 * i + 2 * p] = 1. * autocorr_vis_normalized[p]
 			#         A[i, p, :, valid_npix + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
 			
-			A.shape = (len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
+			A.shape = (2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
 			if not fit_for_additive:
 				A = A[:, :valid_npix]
 			else:
@@ -1844,11 +1849,11 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			Case = 2
 			
 		if NoA_Out:
-			A = np.concatenate((np.real(A), np.imag(A))).astype('float64')
+			# A = np.concatenate((np.real(A), np.imag(A))).astype('float64')
 			
 			Ashape0, Ashape1 = A.shape
 			
-			print "Memory usage before A Derivant calculated: %fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
+			print "Memory usage before A Derivants calculated: %fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 			sys.stdout.flush()
 			
 			##############
@@ -1896,70 +1901,23 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					print('No A deleted in the function.')
 				AtNiA.tofile(AtNiA_path)
 			if Case == 0 or Case == 1:
-				return clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1
+				return clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, None, None, None, None, None, None, None, None, None, None, None, None, None
 			else:
 				return clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
 		
-		if Case == 0:
-			return A
-		elif Case == 1:
+		if Case == 0 or Case ==1:
 			# Merge A
 			try:
-				if not Only_AbsData:
-					return np.concatenate((np.real(A), np.imag(A))).astype('float64')
-				else:
-					return A
-			
+				return A
 			except MemoryError:
-				print "Not enough memory, concatenating A on disk ", A_path + 'tmpre', A_path + 'tmpim',
-				sys.stdout.flush()
-				Ashape = list(A.shape)
-				Ashape[0] = Ashape[0] * 2
-				np.real(A).tofile(A_path + 'tmpre')
-				np.imag(A).tofile(A_path + 'tmpim')
-				del (A)
-				os.system("cat %s >> %s" % (A_path + 'tmpim', A_path + 'tmpre'))
-				
-				os.system("rm %s" % (A_path + 'tmpim'))
-				A = np.fromfile(A_path + 'tmpre', dtype='float64').reshape(Ashape)
-				os.system("rm %s" % (A_path + 'tmpre'))
-				print "done."
-				sys.stdout.flush()
-				
-				if not NoA_Out:
-					return A.astype('float64')
+				raise ValueError('A cannot be sent out.')
 		elif Case == 2:
 			# Merge A
 			try:
-				if Synthesize_MultiFreq:
-					if not Only_AbsData:
-						return np.concatenate((np.real(A), np.imag(A))).astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution  # , fake_solution_map_mfreq
-					else:
-						return A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution  # , fake_solution_map_mfreq
-				else:
-					if not Only_AbsData:
-						return np.concatenate((np.real(A), np.imag(A))).astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
-					else:
-						return A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
-			except MemoryError:
-				print "Not enough memory, concatenating A on disk ", A_path + 'tmpre', A_path + 'tmpim',
-				sys.stdout.flush()
-				Ashape = list(A.shape)
-				Ashape[0] = Ashape[0] * 2
-				np.real(A).tofile(A_path + 'tmpre')
-				np.imag(A).tofile(A_path + 'tmpim')
-				del (A)
-				os.system("cat %s >> %s" % (A_path + 'tmpim', A_path + 'tmpre'))
-				
-				os.system("rm %s" % (A_path + 'tmpim'))
-				A = np.fromfile(A_path + 'tmpre', dtype='float64').reshape(Ashape)
-				os.system("rm %s" % (A_path + 'tmpre'))
-				print "done."
-				sys.stdout.flush()
-				if Synthesize_MultiFreq:
-					return A.astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution  # , fake_solution_map_mfreq
-				else:
-					return A.astype('float64'), beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
+				return A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
+			except:
+				raise ValueError('A cannot be sent out.')
+
 
 
 # return A, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map
@@ -3749,7 +3707,7 @@ elif 'hera47' in INSTRUMENT:
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
-	Precision_masked = 'complex128' # Precision to calculate A for masked sky.
+	Precision_masked = 'complex64' # Precision to calculate A for masked sky.
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
@@ -6169,6 +6127,11 @@ try:
 			additive_A = np.ones(0)
 			additive_term = np.ones(0)
 			print('additive_A and additive_term have been deleted.')
+	
+	try:
+		additive_A = np.concatenate((np.real(additive_A), np.imag(additive_A)), axis=0)
+	except:
+		print('additive_A not adapted to new get_A_multifreq()')
 
 except:
 	additive_A = np.ones(0)
