@@ -1874,10 +1874,9 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				sys.stdout.flush()
 				AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 			else:
-				print "Allocating AtNiA..."
 				sys.stdout.flush()
 				timer = time.time()
-				AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
+				# AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
 				print "Computing AtNiA...", datetime.datetime.now()
 				sys.stdout.flush()
 				if Parallel_AtNiA:
@@ -1887,10 +1886,17 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							break
 						except:
 							if (i + nchunk_AtNiA_step) >= nchunk_AtNiA_maxcut:
+								print "Allocating AtNiA..."
+								AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
 								ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
 							continue
 				else:
-					ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+					if nchunk != 1:
+						print "Allocating AtNiA..."
+						AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
+						ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+					else:
+						AtNiA = np.dot(A.transpose() * CNi, A)
 				
 				print ">>>>>>>>> %f minutes used <<<<<<<<<<" % (float(time.time() - timer) / 60.)
 				sys.stdout.flush()
@@ -3624,6 +3630,18 @@ elif 'hera47' in INSTRUMENT:
 		# TGSSADR J171257.3-280936 [ra: 258.2388, dec: -28.16007]; TGSSADR J203547.5-345404 [ra: 308.948, dec: -34.90121]; TGSSADR J142529.1-295956 [ra: 216.37163, dec: -29.999];
 		# TGSSADR J101809.2-314415 [ra: 154.53835, dec: -31.73773]; TGSSADR J071717.6-250454 [ra: 109.32351, dec: -25.0817]; TGSSADR J020012.1-305327 [ra: 30.05044, dec: -30.89106];
 		# UPS: [ra: 127.96375, dec: -38.68219] [ra:50.625, dec:-27.9532]
+		Bright_Source_file = [DATA_PATH + '/hera_strip_1.csv', DATA_PATH + '/hera_strip_2.csv']
+		JY_StartRow = [80, 80]
+		bright_sources = {}
+		Bright_PointSource_Flux = {}
+		import csv
+		for id_p in range(2):
+			with open(Bright_Source_file[id_p], 'rb') as csvfile:
+				bright_sources[id_p] = csv.reader(csvfile, delimiter=',', quotechar='|')
+				Bright_PointSource_Flux[id_p] = np.array([row for id_row, row in enumerate(bright_sources[id_p])])
+				# for id_row, row in enumerate(bright_sources):
+				# 	if id_row >= JY_StartRow[id_p]:
+				# 		print ', '.join(row)
 		
 		data_fnames_full = [[], []]
 		data_fnames_full_sd = [[], []]
@@ -6265,6 +6283,7 @@ if NoA_Out:
 			                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot)
 	except:
 		try:
+			sys.stdout.flush()
 			if Parallel_A:
 				Parallel_A = False
 				print('Use Unparallel Computing for A instead.')
@@ -6275,6 +6294,7 @@ if NoA_Out:
 					                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot)
 		
 		except:
+			sys.stdout.flush()
 			if not Del_A:
 				Del_A = True
 				clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
@@ -6292,6 +6312,7 @@ else:
 							used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A)
 	except:
 		try:
+			sys.stdout.flush()
 			if Parallel_A:
 				Parallel_A = False
 				print('Use Unparallel Computing for A instead.')
@@ -6301,6 +6322,7 @@ else:
 									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A)
 		
 		except:
+			sys.stdout.flush()
 			if not Del_A:
 				Del_A = True
 				A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
