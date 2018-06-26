@@ -1929,16 +1929,22 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						except MemoryError:
 							AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
 							# ATNIA(A, CNi, AtNiA, nchunk=nchunk * nchunk_AtNiA_maxcut, dot=UseDot)
-							ATNIA_doublechunk(A, CNi, AtNiA, nchunk=nchunk * nchunk_AtNiA_maxcut, dot=UseDot)
+							ATNIA_doublechunk(A, CNi, AtNiA, nchunk=int(nchunk * nchunk_AtNiA_maxcut), dot=UseDot)
 					else:
 						try:
 							AtNiA = np.dot(A.transpose() * CNi, A)
 						except MemoryError:
-							nchunk = 20
+							nchunk = 5
 							print "Allocating AtNiA..."
 							AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
-							# ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
-							ATNIA_doublechunk(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+							try:
+								AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
+								# ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+								ATNIA_doublechunk(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+							except MemoryError:
+								AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
+								# ATNIA(A, CNi, AtNiA, nchunk=nchunk * nchunk_AtNiA_maxcut, dot=UseDot)
+								ATNIA_doublechunk(A, CNi, AtNiA, nchunk=int(nchunk * nchunk_AtNiA_maxcut), dot=UseDot)
 						print('AtNiA shape: {}'.format(AtNiA.shape))
 				
 				print ">>>>>>>>> %f minutes used <<<<<<<<<<" % (float(time.time() - timer) / 60.)
@@ -3840,7 +3846,7 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-1.35)
+	valid_pix_thresh = 10 ** (-1.34)
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
 	nside_start = 32  # starting point to calculate dynamic A
