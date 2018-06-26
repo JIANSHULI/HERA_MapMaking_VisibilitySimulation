@@ -169,7 +169,7 @@ def ATNIA(A, Ni, C, nchunk=20, dot=True):  # C=AtNiA
 	for i in range(nchunk):
 		ltm = time.time()
 		if dot:
-			C[i * chunk:(i + 1) * chunk] = np.dot((A[:, i * chunk:(i + 1) * chunk] * Ni[:, None]).transpose(), A)
+			C[i * chunk:(i + 1) * chunk] = np.dot((A[:, i * chunk:(i + 1) * chunk].transpose() * Ni), A)
 		else:
 			C[i * chunk:(i + 1) * chunk] = np.einsum('ji,jk->ik', A[:, i * chunk:(i + 1) * chunk] * Ni[:, None], A)
 		if expected_time >= 1.:
@@ -177,9 +177,38 @@ def ATNIA(A, Ni, C, nchunk=20, dot=True):  # C=AtNiA
 			sys.stdout.flush()
 	if chunk * nchunk < len(C):
 		if dot:
-			C[chunk * nchunk:] = np.dot((A[:, chunk * nchunk:] * Ni[:, None]).transpose(), A)
+			C[chunk * nchunk:] = np.dot((A[:, chunk * nchunk:].transpose() * Ni), A)
 		else:
 			C[chunk * nchunk:] = np.einsum('ji,jk->ik', A[:, chunk * nchunk:] * Ni[:, None], A)
+
+
+def ATNIA_doublechunk(A, Ni, C, nchunk=20, dot=True):  # C=AtNiA
+	if A.ndim != 2 or C.ndim != 2 or Ni.ndim != 1:
+		raise ValueError("A, AtNiA and Ni not all have correct dims: %i %i %i" % (A.ndim, C.ndim, Ni.ndim))
+	
+	expected_time = 1.3e-11 * (A.shape[0]) * (A.shape[1]) ** 2
+	print('Process Starts at: %s' % str(datetime.datetime.now()))
+	print " >>>>>>>>>>> Estimated time for A %i by %i <<<<<<<<<<<<" % (A.shape[0], A.shape[1]), expected_time, "minutes",
+	sys.stdout.flush()
+	
+	chunk = len(C) / nchunk
+	for i in range(nchunk):
+		for j in range(nchunk):
+			ltm = time.time()
+			if dot:
+				C[i * chunk:(i + 1) * chunk, j * chunk:(j + 1) * chunk] = np.dot((A[:, i * chunk:(i + 1) * chunk].transpose() * Ni), A[:, j * chunk:(j + 1) * chunk])
+			else:
+				C[i * chunk:(i + 1) * chunk, j * chunk:(j + 1) * chunk] = np.einsum('ji,jk->ik', A[:, i * chunk:(i + 1) * chunk].transpose() * Ni, A[:, j * chunk:(j + 1) * chunk])
+			if expected_time >= 1.:
+				print "%i/%i, %i/%i: %.5fmins" % (i, nchunk, j, nchunk, (time.time() - ltm) / 60.)
+				sys.stdout.flush()
+		if chunk * nchunk < len(C):
+			if dot:
+				C[chunk * nchunk:] = np.dot((A[:, chunk * nchunk:].transpose() * Ni), A)
+				C[:, chunk * nchunk:] = np.dot((A[:, :].transpose() * Ni), A[:, chunk * nchunk:])
+			else:
+				C[chunk * nchunk:] = np.einsum('ji,jk->ik', A[:, chunk * nchunk:] * Ni[:, None], A)
+				C[:, chunk * nchunk:] = np.einsum('ji,jk->ik', A[:, :] * Ni[:, None], A[:, chunk * nchunk:])
 
 
 def Chunk_Multiply_p(A, Ni, chunk, nchunk, expected_time, i, dot=True):
@@ -1314,7 +1343,7 @@ def Calculate_pointsource_visibility_R_I(vs, ra, dec, d, freq, beam_healpix_hor=
 def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=True, Compute_beamweight=False, A_path='', A_RE_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=True, Flist_select_index=None, Flist_select=None, flist=None, Reference_Freq_Index=None, Reference_Freq=None,
 					equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=None, thresh=2., valid_pix_thresh=1.e-4, Use_BeamWeight=False, Only_AbsData=False, Del_A=False, valid_npix=None,
 					beam_weight=None, ubls=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, Parallel_A=False, Precision_full='complex64',
-					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='complex64', nchunk_AtNiA_maxcut=6, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False):
+					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False):
 	print('flist: %s' % str(flist))
 	
 	if Synthesize_MultiFreq:
@@ -1893,8 +1922,14 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				else:
 					if nchunk != 1:
 						print "Allocating AtNiA..."
-						AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
-						ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+						try:
+							AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
+							# ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+							ATNIA_doublechunk(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+						except MemoryError:
+							AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
+							# ATNIA(A, CNi, AtNiA, nchunk=nchunk * nchunk_AtNiA_maxcut, dot=UseDot)
+							ATNIA_doublechunk(A, CNi, AtNiA, nchunk=nchunk * nchunk_AtNiA_maxcut, dot=UseDot)
 					else:
 						try:
 							AtNiA = np.dot(A.transpose() * CNi, A)
@@ -1902,7 +1937,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							nchunk = 20
 							print "Allocating AtNiA..."
 							AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
-							ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+							# ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
+							ATNIA_doublechunk(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
 						print('AtNiA shape: {}'.format(AtNiA.shape))
 				
 				print ">>>>>>>>> %f minutes used <<<<<<<<<<" % (float(time.time() - timer) / 60.)
@@ -3581,9 +3617,6 @@ elif 'hera47' in INSTRUMENT:
 	
 	Erase = True
 	
-	Add_S_diag = False
-	Add_Rcond = True
-	
 	Small_ModelData = False
 	Model_Calibration = False
 	
@@ -3617,12 +3650,12 @@ elif 'hera47' in INSTRUMENT:
 	
 	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458104/', '/IDR2_1/2458110/', '/IDR2_1/2458116/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
+	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [14, 14]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [17, 17]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3648,9 +3681,10 @@ elif 'hera47' in INSTRUMENT:
 				Bright_PointSource_Flux[id_p] = np.array([[np.float(Bright_PointSource[id_p][id_s][id_f + 7]) for id_f in range(1, len(Bright_PointSource[id_p][0][7:]) - 2, 2)] for id_s in range(len(Bright_PointSource[id_p]))])
 	
 	if Focus_PointSource:
-		Point_Source_Direction = {'ra': 30.05044, 'dec': -30.89106}
+		Point_Source_Direction = {'ra': 80.741081, 'dec': -36.457577}
 		# Fornax A {'ra': 50.67375, 'dec': -37.20833}, LST-Binned:[8, 8];
 		# TGSSADR J071717.6-250454 ['ra': 109.32351, 'dec': -25.0817], LST-Binned:[19,19]; TGSSADR J020012.1-305327 ['ra': 30.05044, 'dec': -30.89106], LST-Binned: [4,4];
+		# J052257-362727 ['ra': 80.741081, 'dec': -36.457577] [14, 14]
 		
 		# TGSSADR J002549.1-260210 ['ra': 6.45484, 'dec': -26.0363], LST-Binned: [0, 0], Single-Day: [[14, 15, 85, 86, 156, 227], [14, 15, 85, 86, 156, 227]];
 		# Crab: ['dec':22.0014167, 'ra':83.63321]; Sag['dec':-29.00775, 'ra':266.41685];
@@ -3733,14 +3767,15 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_A = False  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A to disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 20  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 3  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number
-	nchunk_AtNiA_maxcut = 6  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
+	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
-	Precision_masked = 'complex64' # Precision to calculate A for masked sky.
+	Precision_masked = 'float64' # Precision to calculate A for masked sky.
+	Precision_AtNiAi = 'complex128' # Precision to calculate AtNiAi for masked sky.
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
@@ -3793,6 +3828,8 @@ elif 'hera47' in INSTRUMENT:
 	Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
 	Frequency_Bin = 101562.5  # 1.625 * 1.e6  # Hz
 	
+	Add_S_diag = False # Add S_matrix onto AtNiA to calculate inverse or not.
+	Add_Rcond = False # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
 	rcond_list = 10. ** np.arange(-6, 10., 1.)
 	if Data_Deteriorate:
@@ -5128,7 +5165,7 @@ try:
 except:
 	print('>>>>>>>>>>>>> Not Saved.')
 
-if fullsim_vis.shape[2] == len(tmask):	
+if fullsim_vis.shape[2] == len(tmask):
 	fullsim_vis = fullsim_vis[:, :, tmask]
 	autocorr_vis = autocorr_vis[:, tmask]
 	autocorr_vis_normalized = autocorr_vis_normalized[:, tmask]
@@ -6611,8 +6648,9 @@ else:
 	print "%f minutes used" % (float(time.time() - timer) / 60.)
 	sys.stdout.flush()
 
-# compute (AtNiA+Si)i
-precision = Precision_masked
+##################################### compute (AtNiA+Si)i #########################################
+# precision = Precision_masked
+# Precision_AtNiAi = 'complex128'
 AtNiAi_tag = 'AtNiASii' + ('RV' if Real_Visibility else '') + "_u%i_t%i_mtbin%s-mfbin%s-tbin%s_p%i_n%i_%i_b%i" % (nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', valid_npix, nside_start, nside_standard, bnside)
 if not fit_for_additive:
 	AtNiAi_version = 0.3
@@ -6637,18 +6675,18 @@ if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_
 	
 	print "Reading Regularized AtNiAi...",
 	sys.stdout.flush()
-	AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
+	AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
 else:
 	if not NoA_Out:
 		if os.path.isfile(AtNiA_path) and not force_recompute:
 			print "Reading AtNiA...",
 			sys.stdout.flush()
-			AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
+			AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 		else:
 			print "Allocating AtNiA..."
 			sys.stdout.flush()
 			timer = time.time()
-			AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=precision)
+			AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
 			print "Computing AtNiA...", datetime.datetime.now()
 			sys.stdout.flush()
 			if Parallel_AtNiA:
@@ -6694,7 +6732,10 @@ else:
 		print 'trying', rcond,
 		sys.stdout.flush()
 		try:
-			AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f' % (S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
+			if rcond == 0:
+				AtNiAi_filename = AtNiAi_tag + '_S%s_RE-N_N%s_v%.1f' % (S_type, vartag, AtNiAi_version) + A_filename
+			else:
+				AtNiAi_filename = AtNiAi_tag + '_S%s_RE%.1f_N%s_v%.1f' % (S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
 			AtNiAi_path = datadir + tag + AtNiAi_filename
 			if Add_Rcond:
 				if not Only_AbsData:
@@ -6703,7 +6744,7 @@ else:
 					AtNiA[::len(S_diag) + 1] += (maxAtNiA * rcond + 1.j * maxAtNiA * rcond)
 			
 			AtNiA.shape = (Ashape1, Ashape1)
-			AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(precision)
+			AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(Precision_AtNiAi)
 			# del (AtNiA)
 			try:
 				AtNiAi.tofile(AtNiAi_path, overwrite=True)
@@ -7150,7 +7191,7 @@ try:
 	if True:  # and S_type == 'none':
 		print "Reading Regularized AtNiAi...",
 		sys.stdout.flush()
-		AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), precision)
+		AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
 		
 		AtNiA_tag = 'AtNiA_N%s' % vartag
 		if not fit_for_additive:
@@ -7163,7 +7204,7 @@ try:
 		AtNiA_path = datadir + tag + AtNiA_filename
 		print "Reading AtNiA...",
 		sys.stdout.flush()
-		AtNiA = np.fromfile(AtNiA_path, dtype=precision).reshape((Ashape1, Ashape1))
+		AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 		
 		iplot = 0
 		valid_thetas_phis = np.array(zip(thetas, phis))
@@ -7178,7 +7219,7 @@ try:
 				
 				if iplot in choose_plots:
 					np.argmin(la.norm(valid_thetas_phis - [theta, phi], axis=-1))
-					point_vec = np.zeros_like(fake_solution).astype('complex128')
+					point_vec = np.zeros_like(fake_solution).astype(Precision_masked)
 					
 					point_vec[np.argmin(la.norm(valid_thetas_phis - [theta, phi], axis=-1))] = 1
 					if not Only_AbsData:
