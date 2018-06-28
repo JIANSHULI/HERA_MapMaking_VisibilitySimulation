@@ -3615,7 +3615,8 @@ elif 'hera47' in INSTRUMENT:
 	scale_noise_ratio = 10. ** 0 if scale_noise else 1.  # comparing to data amplitude.
 	ReCalculate_Auto = False  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
 	Noise_from_Diff_Freq = True  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
-	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if Noise_from_Diff_Freq else '') + '-nsc%s' % int(scale_noise_ratio)
+	Gaussianized_Noise = False # Whether to use the noise amplitude as reference so as to calculate noise or not.
+	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if (Noise_from_Diff_Freq and Gaussianized_Noise) else '-DFNng' if (Noise_from_Diff_Freq and not Gaussianized_Noise) else '') + '-nsc%s' % int(scale_noise_ratio)
 	
 	Replace_Data = True
 	
@@ -6113,8 +6114,13 @@ else:
 	Ni = np.concatenate((Ni * 2, Ni * 2))
 
 if Noise_from_Diff_Freq:
-	noise_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten()))
-	Ni = 1./noise_DiffFreq
+	if Gaussianized_Noise:
+		noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
+		                                  np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+	else:
+		noise2_DiffFreq = np.concatenate(((Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(), (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), (Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
+		                                  (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+	Ni = 1./noise2_DiffFreq
 	
 
 sys.stdout.flush()
