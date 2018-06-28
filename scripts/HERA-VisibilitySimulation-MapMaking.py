@@ -3613,8 +3613,9 @@ elif 'hera47' in INSTRUMENT:
 	Use_Fullsim_Noise = False  # Use fullsim autocorr calculated noise.
 	scale_noise = True  # rescale amplitude of noise to data amplitude.
 	scale_noise_ratio = 10. ** 0 if scale_noise else 1.  # comparing to data amplitude.
-	ReCalculate_Auto = True  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
-	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + '-nsc%s' % int(scale_noise_ratio)
+	ReCalculate_Auto = False  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
+	Noise_from_Diff_Freq = True  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
+	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if Noise_from_Diff_Freq else '') + '-nsc%s' % int(scale_noise_ratio)
 	
 	Replace_Data = True
 	
@@ -3866,7 +3867,7 @@ elif 'hera47' in INSTRUMENT:
 	bnside = 64  # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
 	INSTRUMENT = INSTRUMENT + ('-OB' if Old_BeamPattern else '-NB') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-BN' if Beam_Normalization else '') \
-	             + ('-LST' if LST_binned_Data else '')
+	             + ('-LST' if LST_binned_Data else '') + ('-li' if Use_LinalgInv else '')
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
 	if 'ampcal' in tag:
@@ -4301,7 +4302,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	if ReCalculate_Auto:
 		for i in range(2):
-			autocorr_data_mfreq[i] = np.abs(np.mean(np.array(data[i].values()), axis=0))
+			autocorr_data_mfreq[i] = np.abs(np.mean(np.abs(np.array(data[i].values())), axis=0))
 			Integration_Time = 1.
 			Frequency_Bin = 1.
 	
@@ -4669,6 +4670,29 @@ elif 'hera47' in INSTRUMENT:
 		else:
 			print('Redundancy_preload: %s' % len(redundancy[i]))
 			redundancy[i] = redundancy_pro[i]
+	
+	# Noise_from_Diff_Freq = True # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
+	
+	if Noise_from_Diff_Freq:
+		Noise_DiffFreq_mfreq = {}
+		Noise_DiffFreq = {}
+		for i in range(2):
+			if vis_data_dred_mfreq[i].shape[0] > 1:
+				Noise_DiffFreq_mfreq[i] = np.ones_like(np.abs(vis_data_dred_mfreq[i]))
+				for id_f in range(vis_data_dred_mfreq[i].shape[0]):
+					if id_f > 0 and id_f < (vis_data_dred_mfreq[i].shape[0] - 1):
+						Noise_DiffFreq_mfreq[i][id_f] = np.mean(np.array([np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]), np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])]), axis=0)
+					elif id_f == 0:
+						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])
+					elif id_f == (vis_data_dred_mfreq[i].shape[0] - 1):
+						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])])
+				Noise_DiffFreq[i] = Noise_DiffFreq_mfreq[i][index_freq[i]]
+			else:
+				print('Noise_from_Different_Frequency_Chanels cannot be done due to only single frequency provided.')
+			
+			# autocorr_data_mfreq[i] = np.abs(np.mean(np.abs(np.array(vis_data_dred_mfreq[i].values())), axis=0))
+		# Integration_Time = 1.
+		# Frequency_Bin = 1.
 	
 	Del = True
 	if Del and not Small_ModelData:
@@ -5706,6 +5730,11 @@ if Synthesize_MultiFreq:
 		except:
 			print('No vis_data_dred[%s] Synthesize_Multifreq.' % i)
 		try:
+			Noise_DiffFreq[i] = Noise_DiffFreq_mfreq[i][Flist_select_index[i], :, :].transpose(0, 2, 1).reshape(len(Flist_select_index[i]) * Noise_DiffFreq_mfreq[i].shape[2], Noise_DiffFreq_mfreq[i].shape[1]).transpose()
+		except:
+			print('No Noise_DiffFreq[%s] Synthesize_Multifreq.' % i)
+			
+		try:
 			# if i == 0:
 			# 	vis_data_dred_abscal = {}
 			vis_data_dred_abscal[i] = vis_data_dred_mfreq_abscal[i][Flist_select_index[i], :, :].transpose(0, 2, 1).reshape(len(Flist_select_index[i]) * vis_data_dred_mfreq_abscal[i].shape[2], vis_data_dred_mfreq_abscal[i].shape[1]).transpose()
@@ -6082,6 +6111,11 @@ if Only_AbsData:
 else:
 	data = np.concatenate((np.real(data), np.imag(data))).astype('float64')
 	Ni = np.concatenate((Ni * 2, Ni * 2))
+
+if Noise_from_Diff_Freq:
+	noise_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten()))
+	Ni = 1./noise_DiffFreq
+	
 
 sys.stdout.flush()
 
