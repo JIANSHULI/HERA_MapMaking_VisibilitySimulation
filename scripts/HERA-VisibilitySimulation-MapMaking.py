@@ -3613,7 +3613,8 @@ elif 'hera47' in INSTRUMENT:
 	Use_Fullsim_Noise = False  # Use fullsim autocorr calculated noise.
 	scale_noise = True  # rescale amplitude of noise to data amplitude.
 	scale_noise_ratio = 10. ** 0 if scale_noise else 1.  # comparing to data amplitude.
-	INSTRUMENT = INSTRUMENT + '-nsc%s' % int(scale_noise_ratio)
+	ReCalculate_Auto = True  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
+	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + '-nsc%s' % int(scale_noise_ratio)
 	
 	Replace_Data = True
 	
@@ -3664,8 +3665,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [4, 4]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [14, 14]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3782,11 +3783,12 @@ elif 'hera47' in INSTRUMENT:
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
+	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
 	Conjugate_A_append = True # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
 	Precision_masked = 'float64' # Precision to calculate A for masked sky.
-	Precision_AtNiAi = 'complex128' # Precision to calculate AtNiAi for masked sky.
+	Precision_AtNiAi = 'float64' # Precision to calculate AtNiAi for masked sky.
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
@@ -4295,6 +4297,13 @@ elif 'hera47' in INSTRUMENT:
 		
 		del (PolsData)
 		del (PolsData_process)
+	
+	
+	if ReCalculate_Auto:
+		for i in range(2):
+			autocorr_data_mfreq[i] = np.abs(np.mean(np.array(data[i].values()), axis=0))
+			Integration_Time = 1.
+			Frequency_Bin = 1.
 	
 	# RFI_Free_Thresh = 0.8
 	# RFI_AlmostFree_Thresh = 0.6
@@ -5521,17 +5530,18 @@ elif 'miteor' in INSTRUMENT:
 
 # Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
 # Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-try:
-	if len(Time_seperation_real) > 1:
-		Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
-except:
-	Integration_Time = Time_seperation_real * ((Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1))
-
-try:
-	if len(Frequency_gap_real) > 1:
-		Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-except:
-	Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
+if not ReCalculate_Auto:
+	try:
+		if len(Time_seperation_real) > 1:
+			Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+	except:
+		Integration_Time = Time_seperation_real * ((Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1))
+	
+	try:
+		if len(Frequency_gap_real) > 1:
+			Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+	except:
+		Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
 
 try:
 	print('>>>>>>>>>>>>>>>Integration_Time: %s\n>>>>>>>>>>>>>>>Frequency_Bin: %s' % (Integration_Time, Frequency_Bin))
@@ -5778,17 +5788,18 @@ if Synthesize_MultiFreq:
 	
 	# Integration_Time = np.mean(Time_seperation_real) / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
 	# Frequency_Bin = np.mean(Frequency_gap_real) / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-	try:
-		if len(Time_seperation_real) > 1:
-			Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
-	except:
-		Integration_Time = Time_seperation_real * ((Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1))
-	
-	try:
-		if len(Frequency_gap_real) > 1:
-			Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
-	except:
-		Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
+	if not ReCalculate_Auto:
+		try:
+			if len(Time_seperation_real) > 1:
+				Integration_Time = Counter(Time_seperation_real).most_common(1)[0][0] / ((Time_Average_preload if Select_time else 1) * (Time_Average_afterload if use_select_time else 1))
+		except:
+			Integration_Time = Time_seperation_real * ((Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1))
+		
+		try:
+			if len(Frequency_gap_real) > 1:
+				Frequency_Bin = Counter(Frequency_gap_real).most_common(1)[0][0] / ((Frequency_Average_preload if Select_freq else 1) * (Frequency_Average_afterload if use_select_freq else 1))
+		except:
+			Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
 	
 	try:
 		print('>>>>>>>>>>>>>>>Integration_Time: %s\n>>>>>>>>>>>>>>>Frequency_Bin: %s' % (Integration_Time, Frequency_Bin))
@@ -6693,7 +6704,10 @@ if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_
 	
 	print "Reading Regularized AtNiAi...",
 	sys.stdout.flush()
-	AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
+	if Use_LinalgInv:
+		AtNiAi = np.fromfile(AtNiAi_path, dtype=Precision_AtNiAi).reshape((Ashape1, Ashape1))
+	else:
+		AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
 else:
 	if not NoA_Out:
 		if os.path.isfile(AtNiA_path) and not force_recompute:
@@ -6762,7 +6776,10 @@ else:
 					AtNiA[::len(S_diag) + 1] += (maxAtNiA * rcond + 1.j * maxAtNiA * rcond)
 			
 			AtNiA.shape = (Ashape1, Ashape1)
-			AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(Precision_AtNiAi)
+			if Use_LinalgInv:
+				AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
+			else:
+				AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(Precision_AtNiAi)
 			# del (AtNiA)
 			try:
 				AtNiAi.tofile(AtNiAi_path, overwrite=True)
@@ -6783,13 +6800,23 @@ print ("Applying Regularized AtNiAi...")
 
 sys.stdout.flush()
 if not Only_AbsData:
-	w_solution = AtNiAi.dotv(AtNi_data)
-	w_GSM = AtNiAi.dotv(AtNi_clean_sim_data)
-	w_sim_sol = AtNiAi.dotv(AtNi_sim_data)
+	if Use_LinalgInv:
+		w_solution = np.dot(AtNiAi, AtNi_data)
+		w_GSM = np.dot(AtNiAi, AtNi_clean_sim_data)
+		w_sim_sol = np.dot(AtNiAi, AtNi_sim_data)
+	else:
+		w_solution = AtNiAi.dotv(AtNi_data)
+		w_GSM = AtNiAi.dotv(AtNi_clean_sim_data)
+		w_sim_sol = AtNiAi.dotv(AtNi_sim_data)
 else:
-	w_solution = np.diagonal(np.outer(AtNiAi.dotv(AtNi_data), (AtNiAi.dotv(AtNi_data)).conjugate())) ** 0.5
-	w_GSM = np.diagonal(np.outer(AtNiAi.dotv(AtNi_clean_sim_data), (AtNiAi.dotv(AtNi_clean_sim_data)).conjugate())) ** 0.5
-	w_sim_sol = np.diagonal(np.outer(AtNiAi.dotv(AtNi_sim_data), (AtNiAi.dotv(AtNi_sim_data)).conjugate())) ** 0.5
+	if Use_LinalgInv:
+		w_solution = np.dot(AtNiAi, AtNi_data)
+		w_GSM = np.dot(AtNiAi, AtNi_clean_sim_data)
+		w_sim_sol = np.dot(AtNiAi, AtNi_sim_data)
+	else:
+		w_solution = np.diagonal(np.outer(AtNiAi.dotv(AtNi_data), (AtNiAi.dotv(AtNi_data)).conjugate())) ** 0.5
+		w_GSM = np.diagonal(np.outer(AtNiAi.dotv(AtNi_clean_sim_data), (AtNiAi.dotv(AtNi_clean_sim_data)).conjugate())) ** 0.5
+		w_sim_sol = np.diagonal(np.outer(AtNiAi.dotv(AtNi_sim_data), (AtNiAi.dotv(AtNi_sim_data)).conjugate())) ** 0.5
 
 print "Memory usage: %.3fMB" % (resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1000)
 sys.stdout.flush()
@@ -7209,7 +7236,10 @@ try:
 	if True:  # and S_type == 'none':
 		print "Reading Regularized AtNiAi...",
 		sys.stdout.flush()
-		AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
+		if Use_LinalgInv:
+			AtNiAi = np.fromfile(AtNiAi_path, dtype=Precision_AtNiAi).reshape((Ashape1, Ashape1))
+		else:
+			AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
 		
 		AtNiA_tag = 'AtNiA_N%s' % vartag
 		if not fit_for_additive:
