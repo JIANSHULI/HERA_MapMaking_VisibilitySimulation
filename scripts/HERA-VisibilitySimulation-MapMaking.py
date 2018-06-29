@@ -1451,6 +1451,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
 		
 		if Parallel_A:
+			print('Parallel Computing Full-Sky A matrix.')
 			timer = time.time()
 			pool = Pool(maxtasksperchild=maxtasksperchild)
 			if not Synthesize_MultiFreq:
@@ -3772,7 +3773,7 @@ elif 'hera47' in INSTRUMENT:
 		print('Specific_FileIndex_List: {}.'.format(Specific_FileIndex_List))
 	file_JDays = np.array([2458098, 2458098]) # The starting JD, if LST-Binned then not calculated again from filenames.
 	
-	maxtasksperchild = 40 # The maximum number of tasks put into child process, to limit memory consumed by multiprocessing.
+	maxtasksperchild = 30 # The maximum number of tasks put into child process, to limit memory consumed by multiprocessing.
 	Parallel_Files = True  # Parallel Computing for Loading Files
 	Parallel_DataPolsLoad = True if not (Small_ModelData or Model_Calibration or Parallel_Files) else False  # Parallel Computing for Loading Two Pols Data
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
