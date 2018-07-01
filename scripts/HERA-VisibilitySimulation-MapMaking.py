@@ -1490,11 +1490,11 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			for id_p, p in enumerate(['x', 'y']):
 				pol = p + p
 				try:
-					print "%i UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(ubls[p]), np.max(np.linalg.norm(ubls[p], axis=1)) / (C / Reference_Freq[id_p]), pol)
-					print "%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol)
+					print ("%i UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(ubls[p]), np.max(np.linalg.norm(ubls[p], axis=1)) / (C / Reference_Freq[id_p]), pol))
+					print ("%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol))
 				except:
 					try:
-						print "%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol)
+						print ("%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol))
 					except:
 						pass
 				
@@ -1635,7 +1635,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				if A_got is None:
 					A_got = get_A_multifreq(additive_A=None, A_path=None, A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Flist_select_index=None, Reference_Freq_Index=Reference_Freq_Index, Reference_Freq=Reference_Freq, equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq,
 											used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=None, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
-				print "Computing beam weight...",
+				print ("Computing beam weight...",)
 				sys.stdout.flush()
 				beam_weight = ((la.norm(A_got['x'], axis=0) ** 2 + la.norm(A_got['y'], axis=0) ** 2) ** .5)[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
 				beam_weight = beam_weight / np.mean(beam_weight)
@@ -1646,7 +1646,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					print('A_got has been successfully deleted.')
 				except:
 					print('No A_got to be deleted.')
-				print "done."
+				print ("done.")
 				sys.stdout.flush()
 			
 			gsm_beamweighted = equatorial_GSM_standard * beam_weight
@@ -3773,7 +3773,7 @@ elif 'hera47' in INSTRUMENT:
 		print('Specific_FileIndex_List: {}.'.format(Specific_FileIndex_List))
 	file_JDays = np.array([2458098, 2458098]) # The starting JD, if LST-Binned then not calculated again from filenames.
 	
-	maxtasksperchild = 30 # The maximum number of tasks put into child process, to limit memory consumed by multiprocessing.
+	maxtasksperchild = 20 # The maximum number of tasks put into child process, to limit memory consumed by multiprocessing.
 	Parallel_Files = True  # Parallel Computing for Loading Files
 	Parallel_DataPolsLoad = True if not (Small_ModelData or Model_Calibration or Parallel_Files) else False  # Parallel Computing for Loading Two Pols Data
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
@@ -3793,7 +3793,7 @@ elif 'hera47' in INSTRUMENT:
 	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
-	Conjugate_A_append = True # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
+	Conjugate_A_append = False # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
 	Precision_masked = 'float64' # Precision to calculate A for masked sky.
 	Precision_AtNiAi = 'float64' # Precision to calculate AtNiAi for masked sky.
 	
@@ -4276,6 +4276,7 @@ elif 'hera47' in INSTRUMENT:
 		pool = Pool()
 		PolsData_process = [pool.apply_async(UVData2AbsCalDict_Auto, args=(data_fnames[p], None, True, True, 'miriad', True, True, Time_Average_preload, Frequency_Average_preload, Dred_preload, True, Tolerance, Select_freq, Select_time, badants, Parallel_Files)) for p in range(2)]
 		PolsData = [poldata.get() for poldata in PolsData_process]
+		pool.close()
 		print('Parallel_2Pols is done. %s seconds used.' % (time.time() - timer))
 		
 		for i in range(2):

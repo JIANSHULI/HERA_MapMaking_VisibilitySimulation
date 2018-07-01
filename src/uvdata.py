@@ -2213,6 +2213,7 @@ class UVData(UVBase):
                     
                     FilesData_Process = [pool.apply_async(read_miriad_fromUVData, args=(f, correct_lat_lon, run_check, check_extra, run_check_acceptability, phase_type, Parallel_Files, Time_Average, Frequency_Average, Dred, inplace, tol, Select_freq, Select_time, Badants)) for id_f, f in enumerate(filepath[1:])]
                     uv2 = [filedata.get() for filedata in FilesData_Process]
+                    pool.close()
                     for id_f, f in enumerate(filepath[1:]):
                         # uv2[id_f] = UVData()
                         # uv2[id_f] = FilesData_Process[id_f].get()
