@@ -2437,7 +2437,7 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 					plt.figure(80000000 + 1000 * i + 10 * bl_dred_mfreq_select + Index_Freq)
 					fig3[i], axes3[i] = plt.subplots(2, 1, figsize=(12, 8))
 					plt.sca(axes3[i][0])
-					uvt.plot.waterfall(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :], mode='log', mx=6, drng=4)
+					uvt.plot.waterfall(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :], mode='log', mx=np.log10(np.max(np.abs(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :]))), drng=np.log10(np.max(np.abs(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :])) - np.min(np.abs(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :]))))
 					plt.colorbar()
 					plt.title(pol + ' model AMP {}'.format(bl_dred_mfreq[i]))
 					plt.sca(axes3[i][1])
@@ -2454,7 +2454,7 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 					plt.figure(90000000 + 1000 * i + 10 * bl_dred_mfreq_select + Index_Freq)
 					fig3_data[i], axes3_data[i] = plt.subplots(2, 1, figsize=(12, 8))
 					plt.sca(axes3_data[i][0])
-					uvt.plot.waterfall(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=6, drng=4)
+					uvt.plot.waterfall(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=np.log10(np.max(np.abs(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select]))), drng=np.log10(np.max(np.abs(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select])) / np.min(np.abs(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select]))))
 					plt.colorbar()
 					plt.title(pol + ' data AMP {}'.format(bl_dred_mfreq[i]))
 					plt.sca(axes3_data[i][1])
@@ -2473,9 +2473,9 @@ def Model_Calibration_mfreq(Absolute_Calibration_dred_mfreq=False, Absolute_Cali
 					fig3_data_abscorr[i], axes3_data_abscorr[i] = plt.subplots(2, 1, figsize=(12, 8))
 					plt.sca(axes3_data_abscorr[i][0])
 					if MocalAmp:
-						uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=6, drng=4)
+						uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=np.log10(np.max(np.abs(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select]))), drng=np.log10(np.max(np.abs(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select])) / np.min(np.abs(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select]))))
 					else:
-						uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=2, drng=6)
+						uvt.plot.waterfall(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=np.log10(np.max(np.abs(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select]))), drng=np.log10(np.max(np.abs(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select])) / np.min(np.abs(vis_data_dred_mfreq_abscal[i][:, :, bl_dred_mfreq_select]))))
 					plt.colorbar()
 					plt.title(pol + ' abs_caled data AMP {}'.format(bl_dred_mfreq[i]))
 					plt.sca(axes3_data_abscorr[i][1])
@@ -3882,6 +3882,8 @@ elif 'hera47' in INSTRUMENT:
 	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
 	nside_beamweight = 16  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
+	WaterFall_Plot = True
+	WaterFall_Plot_with_MultiFreqSimulation = False
 	
 	Old_BeamPattern = False  # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
 	Beam_Normalization = True #
@@ -4991,13 +4993,6 @@ if Del:
 	except:
 		pass
 
-######################
-####initial A to compute beam weight
-#####################
-sys.stdout.flush()
-
-sys.stdout.flush()
-
 ####################################################
 ###beam weights using an equal pixel A matrix######
 ###################################################
@@ -5292,7 +5287,7 @@ if Absolute_Calibration_red or Check_Dred_AFreq_ATime:
 
 # Parallel_Mulfreq_Visibility = True
 
-if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_MultiFreq or (Exclude_BadBaselines_Comparing2Simulation and Synthesize_MultiFreq):  # Used 9.4 min. 64*9*60*12280
+if Absolute_Calibration_dred_mfreq or Absolute_Calibration_dred or Synthesize_MultiFreq or (Exclude_BadBaselines_Comparing2Simulation and Synthesize_MultiFreq) or WaterFall_Plot_with_MultiFreqSimulation:  # Used 9.4 min. 64*9*60*12280
 	try:
 		if Parallel_Mulfreq_Visibility and not Parallel_Mulfreq_Visibility_deep:
 			# pass
@@ -5451,6 +5446,64 @@ if Exclude_BadBaselines_Comparing2Simulation:
 		ubl_index[['x', 'y'][i]] = np.arange(1, nUBL_used + 1)
 	
 	print('>>>>>>>>>>>>>>>>> Number of good Baselines: %s' % (len(used_common_ubls)))
+
+########################################
+############### Plotting ###############
+########################################
+sys.stdout.flush()
+# WaterFall_Plot = False
+# WaterFall_Plot_with_MultiFreqSimulation = False
+if WaterFall_Plot:
+	try:
+		bl_dred_mfreq = [dflags_dred_mfreq[0].keys()[0], dflags_dred_mfreq[1].keys()[0]]  # [(25, 37, 'xx'), (25, 37, 'yy')]
+		fig3 = {}
+		axes3 = {}
+		fig3_data = {}
+		axes3_data = {}
+		fig3_data_abscorr = {}
+		axes3_data_abscorr = {}
+		for bl_dred_mfreq_select in np.arange(0, len(used_common_ubls), np.max([len(used_common_ubls) / 24, 1])):
+			for i in range(2):  # add another redundant 'for loop' for testing plotting.
+				pol = ['xx', 'yy'][i]
+				if WaterFall_Plot_with_MultiFreqSimulation:
+					try:
+						plt.figure(800000000 + 1000 * i + 10 * bl_dred_mfreq_select)
+						fig3[i], axes3[i] = plt.subplots(2, 1, figsize=(12, 8))
+						plt.sca(axes3[i][0])
+						uvt.plot.waterfall(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :], mode='log', mx=np.log10(np.max(np.abs(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :]))), drng=np.log10(np.max(np.abs(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :])) - np.min(np.abs(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :]))))
+						plt.colorbar()
+						plt.title(pol + ' model AMP {}'.format(bl_dred_mfreq[i]))
+						plt.sca(axes3[i][1])
+						uvt.plot.waterfall(fullsim_vis_mfreq[bl_dred_mfreq_select, i, :, :], mode='phs', mx=np.pi, drng=2 * np.pi)
+						plt.colorbar()
+						plt.title(pol + ' model PHS {}'.format(bl_dred_mfreq[i]))
+						plt.show(block=False)
+						plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_model-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
+					# plt.cla()
+					except:
+						print('Error when Plotting Multi-Frequency Waterfall Results for Model Data.')
+				
+				try:
+					plt.figure(900000000 + 1000 * i + 10 * bl_dred_mfreq_select)
+					fig3_data[i], axes3_data[i] = plt.subplots(2, 1, figsize=(12, 8))
+					plt.sca(axes3_data[i][0])
+					uvt.plot.waterfall(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select].transpose(), mode='log', mx=np.log10(np.max(np.abs(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select]))), drng=np.log10(np.max(np.abs(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select])) / np.min(np.abs(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select]))))
+					plt.colorbar()
+					plt.title(pol + ' data AMP {}'.format(bl_dred_mfreq[i]))
+					plt.sca(axes3_data[i][1])
+					uvt.plot.waterfall(vis_data_dred_mfreq[i][:, :, bl_dred_mfreq_select].transpose(), mode='phs', mx=np.pi, drng=2 * np.pi)
+					plt.colorbar()
+					plt.title(pol + ' data PHS {}'.format(bl_dred_mfreq[i]))
+					plt.show(block=False)
+					plt.savefig(script_dir + '/../Output/%s-Baseline-%.1f_%.1f-dipole-Modcal_data-%s-%.2fMHz-nubl%s-nt%s-bnside-%s-nside_standard-%s.pdf' % (INSTRUMENT, used_common_ubls[bl_dred_mfreq_select, 0], used_common_ubls[bl_dred_mfreq_select, 1], ['xx', 'yy'][i], freq, nUBL_used, nt_used, bnside, nside_standard))
+				# plt.cla()
+				except:
+					print('Error when Plotting Multi-Frequency Waterfall Results for Raw Data.')
+				
+	except:
+		print('No Plotting for Multi-Frequency Waterfall Results.')
+sys.stdout.flush()
+
 
 ##################################################################################################################################################
 ############################################################ Model Calibration  #################################################################
@@ -7061,7 +7114,7 @@ def plot_IQU_limit_up_down(solution, title, col, shape=(2, 3), coord='C', maxflu
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
 	if maxflux_index is not False:
-		hpv.mollview(np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I[maxflux_index]) / 1000.), max=np.log10(np.max(I[maxflux_index])), title=title, nest=True, sub=(shape[0], shape[1], col))
+		hpv.mollview(map=np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I[maxflux_index]) / 1000.), max=np.log10(np.max(I[maxflux_index])), title=title, nest=True, sub=(shape[0], shape[1], col))
 	else:
 		hpv.mollview(np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I) / 1000.), title=title, nest=True, sub=(shape[0], shape[1], col))
 
@@ -7215,19 +7268,29 @@ map_GSM.writeto(outfile_GSM_name, overwrite=True)
 GSM_all = fits.getdata(outfile_GSM_name).squeeze()
 GSM = GSM_all[valid_pix_mask]
 
+map_GSM_nonmask = fits.HDUList()
+# GSM_full = sol2map(equatorial_GSM_standard, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+map_GSM_nonmask.append(fits.ImageHDU(data=np.real(equatorial_GSM_standard)))
+# new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
+outfile_GSM_NoMask_name = script_dir + '/../Output/R_GSM_NoMask-Freq{0:.4f}MHz-Nside_Standard{1}-Eq.fits'.format(freq, nside_standard)
+map_GSM_nonmask.writeto(outfile_GSM_NoMask_name, overwrite=True)
+
+GSM_NoMask_all = fits.getdata(outfile_GSM_NoMask_name).squeeze()
+GSM_NoMask = GSM_NoMask_all[valid_pix_mask]
+
 
 thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
-bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-40:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-40:]] * 180. / np.pi])
-bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-40:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-40:]] * 180. / np.pi])
+bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-120:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-120:]] * 180. / np.pi])
+bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-120:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-120:]] * 180. / np.pi])
 
 print('Bright_Pixels_Data: {}'.format(bright_pixels_Data))
 print('Bright_Pixels_GSM: {}'.format(bright_pixels_GSM))
 
 # Fornax A: {'ra': 50.67375, 'dec': -37.20833}
 try:
-	FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
-	                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
-	FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
+	FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
+	                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
+	FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
 	if FornaxA_Index.shape[0] >= 1:
 		Max_FornaxA_solution_index = FornaxA_Index[np.argsort(ww_solution_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
 		Max_FornaxA_sim_index = FornaxA_Index[np.argsort(ww_GSM_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
