@@ -1343,7 +1343,7 @@ def Calculate_pointsource_visibility_R_I(vs, ra, dec, d, freq, beam_healpix_hor=
 def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=True, Compute_beamweight=False, A_path='', A_RE_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=True, Flist_select_index=None, Flist_select=None, flist=None, Reference_Freq_Index=None, Reference_Freq=None,
 					equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=None, thresh=2., valid_pix_thresh=1.e-4, Use_BeamWeight=False, Only_AbsData=False, Del_A=False, valid_npix=None,
 					beam_weight=None, ubls=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, Parallel_A=False, Precision_full='complex64',
-					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, maxtasksperchild=144):
+					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144):
 	print('flist: %s' % str(flist))
 	
 	if Synthesize_MultiFreq:
@@ -1953,6 +1953,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 								# ATNIA(A, CNi, AtNiA, nchunk=nchunk * nchunk_AtNiA_maxcut, dot=UseDot)
 								ATNIA_doublechunk(A, CNi, AtNiA, nchunk=int(nchunk * nchunk_AtNiA_maxcut), dot=UseDot)
 						print('AtNiA shape: {}'.format(AtNiA.shape))
+				AtNiA *= Scale_AtNiA
 				
 				print ">>>>>>>>> %f minutes used <<<<<<<<<<" % (float(time.time() - timer) / 60.)
 				sys.stdout.flush()
@@ -3671,8 +3672,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [35, 35]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3699,7 +3700,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	if Focus_PointSource:
 		Point_Source_Direction = {'ra': 80.741081, 'dec': -36.457577}
-		# Fornax A {'ra': 50.67375, 'dec': -37.20833}, LST-Binned:[8, 8];
+		# Fornax A {'ra': 50.67375, 'dec': -37.20833}, LST-Binned:[8, 8]; 32:8623 64:34494(E),34493(W); 32: 700Jy, 64: 430 Jy
 		# TGSSADR J071717.6-250454 ['ra': 109.32351, 'dec': -25.0817], LST-Binned:[19,19]; TGSSADR J020012.1-305327 ['ra': 30.05044, 'dec': -30.89106], LST-Binned: [4,4];
 		# J052257-362727 ['ra': 80.741081, 'dec': -36.457577] [14, 14]
 		
@@ -3708,7 +3709,16 @@ elif 'hera47' in INSTRUMENT:
 		# TGSSADR J171257.3-280936 [ra: 258.2388, dec: -28.16007]; TGSSADR J203547.5-345404 [ra: 308.948, dec: -34.90121]; TGSSADR J142529.1-295956 [ra: 216.37163, dec: -29.999];
 		# TGSSADR J101809.2-314415 [ra: 154.53835, dec: -31.73773]; TGSSADR J071717.6-250454 [ra: 109.32351, dec: -25.0817]; TGSSADR J020012.1-305327 [ra: 30.05044, dec: -30.89106];
 		# NGC 0612| 23.49058 | -36.49325 |G|  8925| 0.029771 |    |13.16|  0.000|167|10|83|17|14|20|0
-		# UPS: [ra: 127.96375, dec: -38.68219] [ra:50.625, dec:-27.9532]
+		# UPS: [ra: 127.96375, dec: -38.68219] [ra:50.625, dec:-27.9532] [ra:30.234375, dec: -22.02431284] [ra: 78.75, dec: -39.45089] [ra: 74.53125, dec: -21.38194258] [ra: 50.625, dec: -27.95318688] [ra: 52.734375, dec: -22.02431284]
+		# TGSSADR J034630.8-342238	[ra:56.62874, dec:-34.37740] Flux:14368.5 mJy, 876.6 mJy, 32:8636; Map:10.9884 Jy
+		# TGSSADR J035135.7-274435	[ra:57.89898, dec:-27.74306] Flux:28356.2 mJy, 3696.0 mJy, 32:9025; Map:23.2611 Jy
+		# TGSSADR J044437.6-280950	[ra:71.15667, dec:-28.16395] Flux:47367.9 mJy, 13948.1 mJy, 64:34680; Map: 31.0332 Jy
+		# TGSSADR J045826.4-300720	[ra:74.61041, dec:-30.12238] Flux:15692.2 mJy, 911.9 mJy, 32:8662; Map: 35.8142 Jy
+		# TGSSADR J045514.2-300650	[ra:73.80946, dec:-30.11399] Flux:20822.9 mJy, 9501.2 mJy, 32:8662; Map: 35.8142 Jy
+		# TGSSADR J042940.1-363053	[ra:67.41748, dec:-36.51481] Flux:17746.0 mJy, 14607.4 mJy; 32:8643 Map: 31.3261 Jy
+		# TGSSADR J052257.7-362735	[ra:80.74076, dec:-36.45975] Flux:62750.3 mJy, 41460.5 mJy; 64:34264 Map: 31.8555 Jy
+		# TGSSADR J062706.4-352908	[ra:96.77693, dec:-35.48578] Flux:18110.7 mJy, 4117.4 mJy; 32:9914 Map: 24.3569 Jy
+		
 		
 		data_fnames_full = [[], []]
 		data_fnames_full_sd = [[], []]
@@ -3783,7 +3793,7 @@ elif 'hera47' in INSTRUMENT:
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Parallel_A = False  # Parallel Computing for A matrix.
-	Del_A = False  # Whether to delete A and save A to disc or keep in memory, which can save time but cost memory.
+	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
 	nchunk = 3  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
@@ -3794,8 +3804,10 @@ elif 'hera47' in INSTRUMENT:
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
 	Conjugate_A_append = False # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
+	Scale_AtNiA = 1. # Rescale AtNiA
 	Precision_masked = 'float64' # Precision to calculate A for masked sky.
 	Precision_AtNiAi = 'float64' # Precision to calculate AtNiAi for masked sky.
+	INSTRUMENT = INSTRUMENT + ('-CAA' if Conjugate_A_append else '') + ('-SA{0:.1f}'.format(Scale_AtNiA) if Scale_AtNiA != 1. else '')
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
 	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
@@ -3860,7 +3872,7 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-1.32)
+	valid_pix_thresh = 10 ** (-1.31)
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
 	nside_start = 32  # starting point to calculate dynamic A
@@ -4688,11 +4700,11 @@ elif 'hera47' in INSTRUMENT:
 				Noise_DiffFreq_mfreq[i] = np.ones_like(np.abs(vis_data_dred_mfreq[i]))
 				for id_f in range(vis_data_dred_mfreq[i].shape[0]):
 					if id_f > 0 and id_f < (vis_data_dred_mfreq[i].shape[0] - 1):
-						Noise_DiffFreq_mfreq[i][id_f] = np.mean(np.array([np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]), np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])]), axis=0)
+						Noise_DiffFreq_mfreq[i][id_f] = np.mean(np.array([np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]), np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])]), axis=0) * jansky2kelvin_multifreq[id_f]
 					elif id_f == 0:
-						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])
+						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])]) * jansky2kelvin_multifreq[id_f]
 					elif id_f == (vis_data_dred_mfreq[i].shape[0] - 1):
-						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])])
+						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]) * jansky2kelvin_multifreq[id_f]
 				Noise_DiffFreq[i] = Noise_DiffFreq_mfreq[i][index_freq[i]]
 			else:
 				print('Noise_from_Different_Frequency_Chanels cannot be done due to only single frequency provided.')
@@ -6404,7 +6416,7 @@ if NoA_Out:
 							flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 							used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
 							NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
-							Conjugate_A_append=Conjugate_A_append, maxtasksperchild=maxtasksperchild)
+							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 	except:
 		try:
 			sys.stdout.flush()
@@ -6416,7 +6428,7 @@ if NoA_Out:
 									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
 									NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
-									Conjugate_A_append=Conjugate_A_append, maxtasksperchild=maxtasksperchild)
+									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 		
 		except:
 			sys.stdout.flush()
@@ -6427,7 +6439,7 @@ if NoA_Out:
 									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
 									NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
-									Conjugate_A_append=Conjugate_A_append, maxtasksperchild=maxtasksperchild)
+									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 			else:
 				raise ValueError('get_A_multifreq() misfunction.')
 else:
@@ -6436,7 +6448,7 @@ else:
 			get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
 							flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 							used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-							Conjugate_A_append=Conjugate_A_append, maxtasksperchild=maxtasksperchild)
+							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 	except:
 		try:
 			sys.stdout.flush()
@@ -6447,7 +6459,7 @@ else:
 					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
 									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-									Conjugate_A_append=Conjugate_A_append, maxtasksperchild=maxtasksperchild)
+									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 		
 		except:
 			sys.stdout.flush()
@@ -6457,7 +6469,7 @@ else:
 					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
 									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-									Conjugate_A_append=Conjugate_A_append, maxtasksperchild=maxtasksperchild)
+									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 			else:
 				raise ValueError('get_A_multifreq() misfunction.')
 
@@ -7174,7 +7186,7 @@ new_map = fits.HDUList()
 w_solution_full = sol2map(w_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_map.append(fits.ImageHDU(data=np.real(w_solution_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_data_name = script_dir + '/../Output/results_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+outfile_data_name = script_dir + '/../Output/results_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
 new_map.writeto(outfile_data_name, overwrite=True)
 
 ww_solution_all = fits.getdata(outfile_data_name).squeeze()
@@ -7184,7 +7196,7 @@ new_GSM = fits.HDUList()
 ww_GSM_full = sol2map(w_GSM, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_GSM.append(fits.ImageHDU(data=np.real(ww_GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_w_GSM_name = script_dir + '/../Output/results_w-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+outfile_w_GSM_name = script_dir + '/../Output/results_w-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
 new_GSM.writeto(outfile_w_GSM_name, overwrite=True)
 
 ww_GSM_all = fits.getdata(outfile_w_GSM_name).squeeze()
@@ -7194,7 +7206,7 @@ map_GSM = fits.HDUList()
 GSM_full = sol2map(fake_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 map_GSM.append(fits.ImageHDU(data=np.real(GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none')
+outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
 map_GSM.writeto(outfile_GSM_name, overwrite=True)
 
 GSM_all = fits.getdata(outfile_GSM_name).squeeze()
@@ -7202,27 +7214,46 @@ GSM = GSM_all[valid_pix_mask]
 
 
 thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
-bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi])
-bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi])
+bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-40:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-40:]] * 180. / np.pi])
+bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-40:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-40:]] * 180. / np.pi])
+
+print('Bright_Pixels_Data: {}'.format(bright_pixels_Data))
+print('Bright_Pixels_GSM: {}'.format(bright_pixels_GSM))
 
 # Fornax A: {'ra': 50.67375, 'dec': -37.20833}
 try:
-	FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=64/nside_standard*1.)] * 180. / np.pi,
-	                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=64/nside_standard*1.)] * 180. / np.pi])
-	FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=64/nside_standard*1.)]
+	FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
+	                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
+	FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=64/nside_standard*1.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
 	if FornaxA_Index.shape[0] >= 1:
-		Max_FornaxA_solution_index = FornaxA_Index[np.argsort(ww_solution_all[FornaxA_Index])[-np.min([int(nside_standard/32), FornaxA_Index.shape[0]]):]]
-		Max_FornaxA_sim_index = FornaxA_Index[np.argsort(ww_GSM_all[FornaxA_Index])[-np.min([int(nside_standard/32), FornaxA_Index.shape[0]]):]]
-		Max_FornaxA_GSM_index = FornaxA_Index[np.argsort(GSM_all[FornaxA_Index])[-np.min([int(nside_standard/32), FornaxA_Index.shape[0]]):]]
+		Max_FornaxA_solution_index = FornaxA_Index[np.argsort(ww_solution_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
+		Max_FornaxA_sim_index = FornaxA_Index[np.argsort(ww_GSM_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
+		Max_FornaxA_GSM_index = FornaxA_Index[np.argsort(GSM_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
 		
 		Max_FornaxA_solution = ww_solution_all[Max_FornaxA_solution_index]
 		Max_FornaxA_sim = ww_GSM_all[Max_FornaxA_sim_index]
 		Max_FornaxA_GSM = GSM_all[Max_FornaxA_GSM_index]
 		
+		Flux_FornaxA_solution = np.sum(Max_FornaxA_solution[Max_FornaxA_solution > 0.]) / jansky2kelvin
+		Flux_FornaxA_sim = np.sum(Max_FornaxA_sim[Max_FornaxA_sim > 0.]) / jansky2kelvin
+		Flux_FornaxA_GSM = np.sum(Max_FornaxA_GSM[Max_FornaxA_GSM > 0.]) / jansky2kelvin
+		
 		print('\n'
 		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
 		      '>>>>>>>>>>>>>>>>>>>>   Max_Fornax_solution: {0}; Max_Fornax_GSM: {1}   <<<<<<<<<<<<<<<<<<<<<<< \n'
 		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'.format(Max_FornaxA_solution, Max_FornaxA_GSM))
+		
+		print('\n'
+		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
+		      '>>>>>>>>>>>>>>>>>>>>   Flux_Fornax_solution: {0}; Flux_Fornax_GSM: {1}   <<<<<<<<<<<<<<<<<<<<<<< \n'
+		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'.format(Flux_FornaxA_solution, Flux_FornaxA_GSM))
+		
+		outfile_data_name = script_dir + '/../Output/Results_Fits_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s-%.2f.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution)
+		new_map.writeto(outfile_data_name, overwrite=True)
+		outfile_w_GSM_name = script_dir + '/../Output/Results_Fits_w-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s-%.2f.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_sim)
+		new_GSM.writeto(outfile_w_GSM_name, overwrite=True)
+		outfile_GSM_name = script_dir + '/../Output/Results_Fits_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s-%.2f.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_GSM)
+		map_GSM.writeto(outfile_GSM_name, overwrite=True)
 		
 		crd = 0
 		for coord in ['C', 'CG']:
@@ -7235,7 +7266,7 @@ try:
 			plot_IQU_limit_up_down(fake_solution, 'True GSM masked', 4, coord=coord, maxflux_index=FornaxA_Index)
 			plot_IQU_limit_up_down((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord, maxflux_index=FornaxA_Index)
 			plot_IQU_limit_up_down((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord, maxflux_index=FornaxA_Index)
-			plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-limit_up_down-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+			plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-limit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 			plt.show(block=False)
 		
 except:
@@ -7252,7 +7283,7 @@ try:
 		plot_IQU_limit_up_down(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 		# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 		plt.show(block=False)
 except:
 	try:
@@ -7263,7 +7294,7 @@ except:
 			plot_IQU_limit_up_down(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 			# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 			plt.show(block=False)
 	except:
 		print('Reloaded Data not Plotted.')
@@ -7410,7 +7441,7 @@ VariableMemory_Used = {}
 for var, obj in locals().items():
 	VariableMemory_Used[var] = sys.getsizeof(obj)
 # print (var, sys.getsizeof(obj))
-print (sorted(VariableMemory_Used, key=VariableMemory_Used.__getitem__, reverse=True))
+# print (sorted(VariableMemory_Used, key=VariableMemory_Used.__getitem__, reverse=True))
 
 # exit()
 
