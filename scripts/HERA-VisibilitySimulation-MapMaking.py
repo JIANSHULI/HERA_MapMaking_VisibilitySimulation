@@ -3621,6 +3621,7 @@ elif 'hera47' in INSTRUMENT:
 	ReCalculate_Auto = False  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
 	Noise_from_Diff_Freq = True  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
 	Gaussianized_Noise = False # Whether to use the noise amplitude as reference so as to calculate noise or not.
+	DivedeRedundacny_NoiseDiffFreq = False if Noise_from_Diff_Freq else False
 	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if (Noise_from_Diff_Freq and Gaussianized_Noise) else '-DFNng' if (Noise_from_Diff_Freq and not Gaussianized_Noise) else '') + '-nsc%s' % int(scale_noise_ratio)
 	
 	Replace_Data = True
@@ -3672,8 +3673,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [7, 7]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [17, 17]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3792,13 +3793,13 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
-	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
+	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Parallel_A = True  # Parallel Computing for A matrix.
+	Parallel_A = False  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 1  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 3  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -3875,7 +3876,9 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-1.31)
+	valid_pix_thresh = 10 ** (-1.3)
+	Constrain_Stripe = True # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
+	DEC_range = np.array([-24., -38.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
 	nside_start = 32  # starting point to calculate dynamic A
@@ -3890,7 +3893,7 @@ elif 'hera47' in INSTRUMENT:
 	bnside = 64  # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
 	INSTRUMENT = INSTRUMENT + ('-OB' if Old_BeamPattern else '-NB') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-BN' if Beam_Normalization else '') \
-	             + ('-LST' if LST_binned_Data else '') + ('-li' if Use_LinalgInv else '')
+				 + ('-LST' if LST_binned_Data else '') + ('-li' if Use_LinalgInv else '')
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
 	if 'ampcal' in tag:
@@ -6188,13 +6191,22 @@ else:
 	data = np.concatenate((np.real(data), np.imag(data))).astype('float64')
 	Ni = np.concatenate((Ni * 2, Ni * 2))
 
+# DivedeRedundacny_NoiseDiffFreq = False
 if Noise_from_Diff_Freq:
 	if Gaussianized_Noise:
-		noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
-		                                  np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+		if DivedeRedundacny_NoiseDiffFreq:
+			noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
+											  np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+		else:
+			noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(),
+											  np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten())) ** 2. * scale_noise_ratio ** 2.
 	else:
-		noise2_DiffFreq = np.concatenate(((Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(), (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), (Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
-		                                  (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+		if DivedeRedundacny_NoiseDiffFreq:
+			noise2_DiffFreq = np.concatenate(((Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpoe().flatten(), (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), (Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
+											  (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+		else:
+			noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(),
+											  np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten())) ** 2. * scale_noise_ratio ** 2.
 	Ni = 1./noise2_DiffFreq
 	
 
@@ -7237,9 +7249,20 @@ for coord in ['C', 'CG']:
 # 	plt.show(block=False)
 # plt.gcf().clear()
 
+# DEC_range = np.array([-22., -38.])
+if Constrain_Stripe:
+	Re_Mask = (thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1]))
+	sizes = sizes[Re_Mask]
+	# sizes = np.where((np.where(valid_pix_mask > 0)[0] == np.where((valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))) > 0)[0]
+	valid_pix_mask = valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))
+	valid_npix = np.sum(valid_pix_mask)
+	final_index = np.arange(npix)
+else:
+	Re_Mask = np.ones(valid_npix).astype('bool')
+
 
 new_map = fits.HDUList()
-w_solution_full = sol2map(w_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+w_solution_full = sol2map(w_solution[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_map.append(fits.ImageHDU(data=np.real(w_solution_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
 outfile_data_name = script_dir + '/../Output/results_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
@@ -7249,7 +7272,7 @@ ww_solution_all = fits.getdata(outfile_data_name).squeeze()
 ww_solution = ww_solution_all[valid_pix_mask]
 
 new_GSM = fits.HDUList()
-ww_GSM_full = sol2map(w_GSM, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+ww_GSM_full = sol2map(w_GSM[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_GSM.append(fits.ImageHDU(data=np.real(ww_GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
 outfile_w_GSM_name = script_dir + '/../Output/results_w-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
@@ -7259,7 +7282,7 @@ ww_GSM_all = fits.getdata(outfile_w_GSM_name).squeeze()
 ww_GSM = ww_GSM_all[valid_pix_mask]
 
 map_GSM = fits.HDUList()
-GSM_full = sol2map(fake_solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+GSM_full = sol2map(fake_solution[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 map_GSM.append(fits.ImageHDU(data=np.real(GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
 outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
@@ -7289,7 +7312,7 @@ print('Bright_Pixels_GSM: {}'.format(bright_pixels_GSM))
 # Fornax A: {'ra': 50.67375, 'dec': -37.20833}
 try:
 	FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
-	                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
+								  phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
 	FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
 	if FornaxA_Index.shape[0] >= 1:
 		Max_FornaxA_solution_index = FornaxA_Index[np.argsort(ww_solution_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
@@ -7305,14 +7328,14 @@ try:
 		Flux_FornaxA_GSM = np.sum(Max_FornaxA_GSM[Max_FornaxA_GSM > np.max([250. * nside_standard / 32, np.mean(GSM)])]) / jansky2kelvin
 		
 		print('\n'
-		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
-		      '>>>>>>>>>>>>>>>>>>>>   Max_Fornax_solution: {0}; Max_Fornax_GSM: {1}   <<<<<<<<<<<<<<<<<<<<<<< \n'
-		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'.format(Max_FornaxA_solution, Max_FornaxA_GSM))
+			  '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
+			  '>>>>>>>>>>>>>>>>>>>>   Max_Fornax_solution: {0}; Max_Fornax_GSM: {1}   <<<<<<<<<<<<<<<<<<<<<<< \n'
+			  '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'.format(Max_FornaxA_solution, Max_FornaxA_GSM))
 		
 		print('\n'
-		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
-		      '>>>>>>>>>>>>>>>>>>>>   Flux_Fornax_solution: {0}; Flux_Fornax_GSM: {1}   <<<<<<<<<<<<<<<<<<<<<<< \n'
-		      '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'.format(Flux_FornaxA_solution, Flux_FornaxA_GSM))
+			  '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
+			  '>>>>>>>>>>>>>>>>>>>>   Flux_Fornax_solution: {0}; Flux_Fornax_GSM: {1}   <<<<<<<<<<<<<<<<<<<<<<< \n'
+			  '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'.format(Flux_FornaxA_solution, Flux_FornaxA_GSM))
 		
 		outfile_data_name = script_dir + '/../Output/Results_Fits_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s-%.2f.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution)
 		new_map.writeto(outfile_data_name, overwrite=True)
@@ -7326,12 +7349,12 @@ try:
 			# plt.clf()
 			plt.figure(9300000 + crd)
 			crd += 10
-			plot_IQU_limit_up_down((w_GSM + np.abs(w_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-			plot_IQU_limit_up_down((w_sim_sol + np.abs(w_sim_sol)) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord, maxflux_index=FornaxA_Index)  # (~noise+data)
-			plot_IQU_limit_up_down((w_solution + np.abs(w_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord, maxflux_index=FornaxA_Index)
-			plot_IQU_limit_up_down(fake_solution, 'True GSM masked', 4, coord=coord, maxflux_index=FornaxA_Index)
-			plot_IQU_limit_up_down((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord, maxflux_index=FornaxA_Index)
-			plot_IQU_limit_up_down((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+			plot_IQU_limit_up_down((w_sim_sol[Re_Mask] + np.abs(w_sim_sol[Re_Mask])) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord, maxflux_index=FornaxA_Index)  # (~noise+data)
+			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down(GSM, 'True GSM masked', 4, coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down((((w_sim_sol[Re_Mask] - ww_GSM) * rescale_factor + GSM) + np.abs((w_sim_sol[Re_Mask] - ww_GSM) * rescale_factor + GSM)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down((((ww_solution - ww_GSM) * rescale_factor + GSM) + np.abs((ww_solution - ww_GSM) * rescale_factor + GSM)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord, maxflux_index=FornaxA_Index)
 			plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-limit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 			plt.show(block=False)
 		
@@ -7346,7 +7369,7 @@ try:
 		# plt.clf()
 		plt.figure(98000000 + crd)
 		crd += 10
-		plot_IQU_limit_up_down(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 		# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
@@ -7357,7 +7380,7 @@ except:
 			# plt.clf()
 			plt.figure(98000000 + crd)
 			crd += 10
-			plot_IQU_limit_up_down(fake_solution, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 			# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
