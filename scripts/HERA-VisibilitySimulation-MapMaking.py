@@ -3892,7 +3892,7 @@ elif 'hera47' in INSTRUMENT:
 	Beam_Normalization = True #
 	bnside = 64  # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
-	INSTRUMENT = INSTRUMENT + ('-OB' if Old_BeamPattern else '-NB') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-BN' if Beam_Normalization else '') \
+	INSTRUMENT = INSTRUMENT + ('-CS' if Constrain_Stripe else '') + ('-OB' if Old_BeamPattern else '-NB') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-BN' if Beam_Normalization else '') \
 				 + ('-LST' if LST_binned_Data else '') + ('-li' if Use_LinalgInv else '')
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
