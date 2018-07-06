@@ -508,7 +508,7 @@ def get_vis_normalization(data, clean_sim_data, data_shape=None):
 
 def sol2map(sol, valid_npix=None, npix=None, valid_pix_mask=None, final_index=None, sizes=None):
 	solx = sol[:valid_npix]
-	full_sol = np.zeros(npix)
+	full_sol = np.zeros(npix) + 10.**(-5)
 	full_sol[valid_pix_mask] = solx / sizes
 	return full_sol[final_index]
 
@@ -3673,8 +3673,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [7, 7]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [10, 10]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3799,7 +3799,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_A = False  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 1  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 3  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -7095,6 +7095,7 @@ def plot_IQU(solution, title, col, shape=(2, 3), coord='C'):
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
 	hpv.mollview(np.log10(I), min=2, max=4, coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.graticule(dmer=30, dpar=30, coord=coord)
 
 
 # if col == shape[0] * shape[1]:
@@ -7108,6 +7109,7 @@ def plot_IQU_unlimit(solution, title, col, shape=(2, 3), coord='C'):
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
 	hpv.mollview(np.log10(I), coord=plotcoordtmp, title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.graticule(dmer=30, dpar=30, coord=coord)
 
 
 def plot_IQU_unlimit_up(solution, title, col, shape=(2, 3), coord='C'):
@@ -7118,6 +7120,7 @@ def plot_IQU_unlimit_up(solution, title, col, shape=(2, 3), coord='C'):
 	I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 	plotcoordtmp = coord
 	hpv.mollview(np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I) / 1000.), title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.graticule(dmer=30, dpar=30, coord=coord)
 
 def plot_IQU_limit_up_down(solution, title, col, shape=(2, 3), coord='C', maxflux_index=None):
 	# Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
@@ -7130,6 +7133,7 @@ def plot_IQU_limit_up_down(solution, title, col, shape=(2, 3), coord='C', maxflu
 		hpv.mollview(map=np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I[maxflux_index]) / 1000.), max=np.log10(np.max(I[maxflux_index])), title=title, nest=True, sub=(shape[0], shape[1], col))
 	else:
 		hpv.mollview(np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I) / 1000.), title=title, nest=True, sub=(shape[0], shape[1], col))
+	hpv.graticule(dmer=30, dpar=30, coord=coord)
 
 # if col == shape[0] * shape[1]:
 # plt.show(block=False)
@@ -7142,19 +7146,19 @@ if rescale_factor_inuse:
 else:
 	rescale_factor = 1.
 
-crd = 0
-for coord in ['C', 'CG']:
-	# plt.clf()
-	plt.figure(900 + crd)
-	crd += 10
-	plot_IQU_unlimit(np.abs(w_GSM), 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
-	plot_IQU_unlimit(np.abs(w_sim_sol), 'wienered simulated solution', 2, coord=coord)  # (~noise+data)
-	plot_IQU_unlimit(np.abs(w_solution), 'wienered solution(data)', 3, coord=coord)
-	plot_IQU_unlimit(np.abs(fake_solution), 'True GSM masked', 4, coord=coord)
-	plot_IQU_unlimit(np.abs(w_sim_sol - w_GSM + fake_solution), 'combined sim solution', 5, coord=coord)
-	plot_IQU_unlimit(np.abs(w_solution - w_GSM + fake_solution), 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
-	plt.show(block=False)
+# crd = 0
+# for coord in ['C', 'CG']:
+# 	# plt.clf()
+# 	plt.figure(900 + crd)
+# 	crd += 10
+# 	plot_IQU_unlimit(np.abs(w_GSM), 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
+# 	plot_IQU_unlimit(np.abs(w_sim_sol), 'wienered simulated solution', 2, coord=coord)  # (~noise+data)
+# 	plot_IQU_unlimit(np.abs(w_solution), 'wienered solution(data)', 3, coord=coord)
+# 	plot_IQU_unlimit(np.abs(fake_solution), 'True GSM masked', 4, coord=coord)
+# 	plot_IQU_unlimit(np.abs(w_sim_sol - w_GSM + fake_solution), 'combined sim solution', 5, coord=coord)
+# 	plot_IQU_unlimit(np.abs(w_solution - w_GSM + fake_solution), 'combined solution', 6, coord=coord)
+# 	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%sMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-N-unlimit-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, S_type, rcond if Add_Rcond else 'none'))
+# 	plt.show(block=False)
 # plt.gcf().clear()
 # outfilename = script_dir + '/../Output/result_wiener-150MHz-nside_standard32-1.fit'
 
@@ -7204,19 +7208,19 @@ for coord in ['C', 'CG']:
 # 	plt.show(block=False)
 # # plt.gcf().clear()
 
-crd = 0
-for coord in ['C', 'CG']:
-	# plt.clf()
-	plt.figure(9500 + crd)
-	crd += 10
-	plot_IQU_unlimit_up((w_GSM + np.abs(w_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
-	plot_IQU_unlimit_up((w_sim_sol + np.abs(w_sim_sol)) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord)  # (~noise+data)
-	plot_IQU_unlimit_up((w_solution + np.abs(w_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
-	plot_IQU_unlimit_up(fake_solution, 'True GSM masked', 4, coord=coord)
-	plot_IQU_unlimit_up((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord)
-	plot_IQU_unlimit_up((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord)
-	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
-	plt.show(block=False)
+# crd = 0
+# for coord in ['C', 'CG']:
+# 	# plt.clf()
+# 	plt.figure(9500 + crd)
+# 	crd += 10
+# 	plot_IQU_unlimit_up((w_GSM + np.abs(w_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord)  # (clean dynamic_data)
+# 	plot_IQU_unlimit_up((w_sim_sol + np.abs(w_sim_sol)) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord)  # (~noise+data)
+# 	plot_IQU_unlimit_up((w_solution + np.abs(w_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord)
+# 	plot_IQU_unlimit_up(fake_solution, 'True GSM masked', 4, coord=coord)
+# 	plot_IQU_unlimit_up((((w_sim_sol - w_GSM) * rescale_factor + fake_solution) + np.abs((w_sim_sol - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord)
+# 	plot_IQU_unlimit_up((((w_solution - w_GSM) * rescale_factor + fake_solution) + np.abs((w_solution - w_GSM) * rescale_factor + fake_solution)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord)
+# 	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up-S-%s-recond-%s.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'none'))
+# 	plt.show(block=False)
 # plt.gcf().clear()
 
 # crd = 0
@@ -7253,15 +7257,20 @@ for coord in ['C', 'CG']:
 # DEC_range = np.array([-22., -38.])
 thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 if Constrain_Stripe:
-	Re_Mask = (thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard[valid_pix_mask] > lsts[10] * np.pi / 12.) & (phis_standard[valid_pix_mask] < lsts[-10] * np.pi / 12.)
+	Re_Mask = ((thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard[valid_pix_mask] > lsts[10] * np.pi / 12.) & (phis_standard[valid_pix_mask] < lsts[-10] * np.pi / 12.)) \
+	          + (np.isclose(90. - thetas_standard[valid_pix_mask] * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard[valid_pix_mask] * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. + 38.)))
 	sizes = sizes[Re_Mask]
 	# sizes = np.where((np.where(valid_pix_mask > 0)[0] == np.where((valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))) > 0)[0]
-	valid_pix_mask = valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard > lsts[10] * np.pi / 12.) & (phis_standard < lsts[-10] * np.pi / 12.)
+	valid_pix_mask = (valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard > lsts[10] * np.pi / 12.) & (phis_standard < lsts[-10] * np.pi / 12.)) \
+	                 + (np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard * 180. / np.pi < (90. + 38.)))
 	valid_npix = np.sum(valid_pix_mask)
 	final_index = np.arange(npix)
 else:
 	Re_Mask = np.ones(valid_npix).astype('bool')
-
+	
+FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
+                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
+FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
 
 new_map = fits.HDUList()
 w_solution_full = sol2map(w_solution[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
@@ -7303,6 +7312,31 @@ map_GSM_nonmask.writeto(outfile_GSM_NoMask_name, overwrite=True)
 GSM_NoMask_all = fits.getdata(outfile_GSM_NoMask_name).squeeze()
 GSM_NoMask = GSM_NoMask_all[valid_pix_mask]
 
+try:
+	# os.environ['QT_QPA_PLATFORM'] = 'onscreen'
+	crd = 0
+	for coord in ['C', 'CG']:
+		# plt.clf()
+		plt.figure(98000000 + crd)
+		crd += 10
+		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+		# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
+		plt.show(block=False)
+except:
+	try:
+		for coord in ['C', 'CG']:
+			# plt.clf()
+			plt.figure(98000000 + crd)
+			crd += 10
+			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+			# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
+			plt.show(block=False)
+	except:
+		print('Reloaded Data not Plotted.')
 
 # thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-120:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-120:]] * 180. / np.pi])
@@ -7313,9 +7347,9 @@ print('Bright_Pixels_GSM: {}'.format(bright_pixels_GSM))
 
 # Fornax A: {'ra': 50.67375, 'dec': -37.20833}
 try:
-	FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
-								  phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
-	FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
+	# FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
+	# 							  phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
+	# FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
 	if FornaxA_Index.shape[0] >= 1:
 		Max_FornaxA_solution_index = FornaxA_Index[np.argsort(ww_solution_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
 		Max_FornaxA_sim_index = FornaxA_Index[np.argsort(ww_GSM_all[FornaxA_Index])[-np.min([int(nside_standard/32) * 6, FornaxA_Index.shape[0]]):]]
@@ -7346,49 +7380,23 @@ try:
 		outfile_GSM_name = script_dir + '/../Output/Results_Fits_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s-%.2f.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_GSM)
 		map_GSM.writeto(outfile_GSM_name, overwrite=True)
 		
-		crd = 0
-		for coord in ['C', 'CG']:
-			# plt.clf()
-			plt.figure(9300000 + crd)
-			crd += 10
-			plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-			plot_IQU_limit_up_down((w_sim_sol[Re_Mask] + np.abs(w_sim_sol[Re_Mask])) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord, maxflux_index=FornaxA_Index)  # (~noise+data)
-			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord, maxflux_index=FornaxA_Index)
-			plot_IQU_limit_up_down(GSM, 'True GSM masked', 4, coord=coord, maxflux_index=FornaxA_Index)
-			plot_IQU_limit_up_down((((w_sim_sol[Re_Mask] - ww_GSM) * rescale_factor + GSM) + np.abs((w_sim_sol[Re_Mask] - ww_GSM) * rescale_factor + GSM)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord, maxflux_index=FornaxA_Index)
-			plot_IQU_limit_up_down((((ww_solution - ww_GSM) * rescale_factor + GSM) + np.abs((ww_solution - ww_GSM) * rescale_factor + GSM)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord, maxflux_index=FornaxA_Index)
-			plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-limit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
-			plt.show(block=False)
+		# crd = 0
+		# for coord in ['C', 'CG']:
+		# 	# plt.clf()
+		# 	plt.figure(9300000 + crd)
+		# 	crd += 10
+		# 	plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 1, coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+		# 	plot_IQU_limit_up_down((w_sim_sol[Re_Mask] + np.abs(w_sim_sol[Re_Mask])) * 0.5 * rescale_factor + 1.e-6, 'wienered simulated solution', 2, coord=coord, maxflux_index=FornaxA_Index)  # (~noise+data)
+		# 	plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, coord=coord, maxflux_index=FornaxA_Index)
+		# 	plot_IQU_limit_up_down(GSM, 'True GSM masked', 4, coord=coord, maxflux_index=FornaxA_Index)
+		# 	plot_IQU_limit_up_down((((w_sim_sol[Re_Mask] - ww_GSM) * rescale_factor + GSM) + np.abs((w_sim_sol[Re_Mask] - ww_GSM) * rescale_factor + GSM)) * 0.5 + 1.e-6, 'combined sim solution', 5, coord=coord, maxflux_index=FornaxA_Index)
+		# 	plot_IQU_limit_up_down((((ww_solution - ww_GSM) * rescale_factor + GSM) + np.abs((ww_solution - ww_GSM) * rescale_factor + GSM)) * 0.5 + 1.e-6, 'combined solution', 6, coord=coord, maxflux_index=FornaxA_Index)
+		# 	plt.savefig(script_dir + '/../Output/results_wiener-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-limit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
+		# 	plt.show(block=False)
 		
 except:
 	pass
 
-
-try:
-	# os.environ['QT_QPA_PLATFORM'] = 'onscreen'
-	crd = 0
-	for coord in ['C', 'CG']:
-		# plt.clf()
-		plt.figure(98000000 + crd)
-		crd += 10
-		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-		# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
-		plt.show(block=False)
-except:
-	try:
-		for coord in ['C', 'CG']:
-			# plt.clf()
-			plt.figure(98000000 + crd)
-			crd += 10
-			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-			# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
-			plt.show(block=False)
-	except:
-		print('Reloaded Data not Plotted.')
 		
 
 # def sol4map(sol):
