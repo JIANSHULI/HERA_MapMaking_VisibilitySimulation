@@ -3673,8 +3673,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [7, 7]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [10, 10]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3799,7 +3799,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_A = False  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 3  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 1  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -3876,7 +3876,7 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-1.3)
+	valid_pix_thresh = 10 ** (-1.31)
 	Constrain_Stripe = True # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-24., -38.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
@@ -5219,6 +5219,7 @@ if (nside_standard != nside_beamweight) and not Use_nside_bw_forFullsim:
 		# fullsim_vis = np.array([np.dot(A[id_p], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
 
 else:
+	# thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
 	if Use_nside_bw_forFullsim:
 		fullsim_vis = np.array([np.dot(A[['x', 'y'][id_p]], equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]).reshape((nUBL_used, nt_used)) for id_p in range(2)]).transpose(1, 0, 2)
 	else:
@@ -7250,11 +7251,12 @@ for coord in ['C', 'CG']:
 # plt.gcf().clear()
 
 # DEC_range = np.array([-22., -38.])
+thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 if Constrain_Stripe:
-	Re_Mask = (thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1]))
+	Re_Mask = (thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard[valid_pix_mask] > lsts[10] * np.pi / 12.) & (phis_standard[valid_pix_mask] < lsts[-10] * np.pi / 12.)
 	sizes = sizes[Re_Mask]
 	# sizes = np.where((np.where(valid_pix_mask > 0)[0] == np.where((valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))) > 0)[0]
-	valid_pix_mask = valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))
+	valid_pix_mask = valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard > lsts[10] * np.pi / 12.) & (phis_standard < lsts[-10] * np.pi / 12.)
 	valid_npix = np.sum(valid_pix_mask)
 	final_index = np.arange(npix)
 else:
@@ -7302,7 +7304,7 @@ GSM_NoMask_all = fits.getdata(outfile_GSM_NoMask_name).squeeze()
 GSM_NoMask = GSM_NoMask_all[valid_pix_mask]
 
 
-thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
+# thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-120:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-120:]] * 180. / np.pi])
 bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-120:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-120:]] * 180. / np.pi])
 
