@@ -7276,7 +7276,7 @@ new_map = fits.HDUList()
 w_solution_full = sol2map(w_solution[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_map.append(fits.ImageHDU(data=np.real(w_solution_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_data_name = script_dir + '/../Output/results_w-Data-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
+outfile_data_name = script_dir + '/../Output/results_w-Data-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
 new_map.writeto(outfile_data_name, overwrite=True)
 
 ww_solution_all = fits.getdata(outfile_data_name).squeeze()
@@ -7286,7 +7286,7 @@ new_GSM = fits.HDUList()
 ww_GSM_full = sol2map(w_GSM[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 new_GSM.append(fits.ImageHDU(data=np.real(ww_GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_w_GSM_name = script_dir + '/../Output/results_w-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
+outfile_w_GSM_name = script_dir + '/../Output/results_w-GSM-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
 new_GSM.writeto(outfile_w_GSM_name, overwrite=True)
 
 ww_GSM_all = fits.getdata(outfile_w_GSM_name).squeeze()
@@ -7296,7 +7296,7 @@ map_GSM = fits.HDUList()
 GSM_full = sol2map(fake_solution[Re_Mask], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 map_GSM.append(fits.ImageHDU(data=np.real(GSM_full)))
 # new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
-outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
+outfile_GSM_name = script_dir + '/../Output/results_GSM-%s-%.4fMHz-dipole-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit-All-S-%s-recond-%s.fits' % (tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
 map_GSM.writeto(outfile_GSM_name, overwrite=True)
 
 GSM_all = fits.getdata(outfile_GSM_name).squeeze()
@@ -7402,6 +7402,7 @@ except:
 # def sol4map(sol):
 #	solx = sol[:valid_npix]
 #	full_sol = np.zeros(npix)
+
 #	full_sol[valid_pix_mask] = solx #/ sizes
 #	return full_sol[final_index]
 #
