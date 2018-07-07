@@ -3799,7 +3799,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_A = False  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 3  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 1  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -3878,7 +3878,7 @@ elif 'hera47' in INSTRUMENT:
 	thresh = 0.2  # .2#2.#.03125#
 	valid_pix_thresh = 10 ** (-1.31)
 	Constrain_Stripe = True # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
-	DEC_range = np.array([-24., -38.])
+	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
 	nside_start = 32  # starting point to calculate dynamic A
@@ -7543,6 +7543,6 @@ for var, obj in locals().items():
 # print (var, sys.getsizeof(obj))
 # print (sorted(VariableMemory_Used, key=VariableMemory_Used.__getitem__, reverse=True))
 
-# exit()
+exit()
 
 # Mac Code
