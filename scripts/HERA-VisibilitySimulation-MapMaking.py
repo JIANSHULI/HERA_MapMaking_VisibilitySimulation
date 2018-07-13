@@ -3415,12 +3415,16 @@ except NameError:
 	# script_dir = os.path.join(DATA_PATH, '../../../HERA_MapMaking_VisibilitySimulation/scripts')
 	script_dir = os.path.join(DATA_PATH, '../scripts')
 	pixel_directory = script_dir
-	print ('Run IPython: %s' % script_dir)
+	print ('Run IPython: {0}' .format(script_dir))
 
 else:
-	script_dir = os.path.dirname(os.path.realpath(__file__))
+	script_dir = os.path.join(DATA_PATH, '../scripts') #os.path.dirname(os.path.realpath(__file__))
 	pixel_directory = script_dir
-	print ('Run Python： %s' % script_dir)
+	print ('Run Python.')
+	try:
+		print ('Run Python： {0}' .format(script_dir))
+	except:
+		print ('Run Python.')
 
 ###########################################################
 ################ data file and load beam #################
@@ -3793,10 +3797,10 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
-	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
+	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Parallel_A = False  # Parallel Computing for A matrix.
+	Parallel_A = True  # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
 	nchunk = 1  # UseDot to Parallel but not Parallel_AtNiA.
@@ -7528,6 +7532,14 @@ try:
 except:
 	print('No point spread function plotted.')
 
+try:
+	AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
+	Discrepancy_Ratio = np.abs(w_solution) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+	print('>>>>>>>>>>>>>> Discrepancy Ratio: \n{}'.format(Discrepancy_Ratio))
+	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean: {}'.format(np.mean(Discrepancy_Ratio)))
+except:
+	print('Discrepancy Ratio not Calculated')
+
 sys.stdout.flush()
 
 Timer_End = time.time()
@@ -7543,6 +7555,6 @@ for var, obj in locals().items():
 # print (var, sys.getsizeof(obj))
 # print (sorted(VariableMemory_Used, key=VariableMemory_Used.__getitem__, reverse=True))
 
-exit()
+# exit()
 
 # Mac Code
