@@ -3677,8 +3677,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [4, 4]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [15, 15]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3818,7 +3818,7 @@ elif 'hera47' in INSTRUMENT:
 	INSTRUMENT = INSTRUMENT + ('-CAA' if Conjugate_A_append else '') + ('-SA{0:.1f}'.format(Scale_AtNiA) if Scale_AtNiA != 1. else '')
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Frequency_Average_preload = 4  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -3839,12 +3839,12 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 145.  # MHz, the single frequency as reference.
+	Frequency_Select = 150.  # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [140., 140.]
-	Freq_High = [150., 150.]
+	Freq_Low = [105., 105.]
+	Freq_High = [185., 185.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3885,8 +3885,8 @@ elif 'hera47' in INSTRUMENT:
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
-	nside_start = 64  # starting point to calculate dynamic A
-	nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
+	nside_start = 32  # starting point to calculate dynamic A
+	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
 	nside_beamweight = 16  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = True
@@ -4701,6 +4701,7 @@ elif 'hera47' in INSTRUMENT:
 		else:
 			print('Redundancy_preload: %s' % len(redundancy[i]))
 			redundancy[i] = redundancy_pro[i]
+					
 	
 	# Noise_from_Diff_Freq = True # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
 	
@@ -4877,6 +4878,54 @@ elif 'hera47' in INSTRUMENT:
 	
 	print '\n>>>>>>>>>>Used nUBL = %s, nt = %s, nf = %s.\n' % (nUBL_used, nt_used, nf_used)
 	sys.stdout.flush()
+	
+	Plot_RedundanctBaselines = True
+	Tolerance_2 = 10. ** (-2)
+	if Plot_RedundanctBaselines:
+		Ubl_list_2 = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
+		                           data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
+		                           FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants, freq=freq, nside_standard=nside_standard,
+		                           baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
+		                           baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
+		
+		for i in range(2):
+			for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
+				if len(redundant_baselines) > 3:
+					plt.figure(1700000 + 1000 * i + id_rbl)
+					for redundant_baseline in redundant_baselines:
+						plt.plot(np.abs(vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+					plt.legend(loc='best', fontsize='xx-small')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-abs_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
+					plt.title('Redundant Baselines Comparison at {0:.4f}MHz - Amplitude'.format(freq))
+					plt.show(block=False)
+					
+					plt.figure(2700000 + 1000 * i + id_rbl)
+					for redundant_baseline in redundant_baselines:
+						plt.plot(np.angle(vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+					plt.legend(loc='best', fontsize='xx-small')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-angle_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
+					plt.title('Redundant Baselines Comparison at {0:.4f}MHz - Angle'.format(freq))
+					plt.show(block=False)
+					
+					plt.figure(3700000 + 1000 * i + id_rbl)
+					for redundant_baseline in redundant_baselines:
+						plt.plot(np.abs(np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+					plt.legend(loc='best', fontsize='xx-small')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
+					plt.title('Redundant Baselines Comparison at multiple frequencies - Amplitude')
+					plt.show(block=False)
+					
+					plt.figure(4700000 + 1000 * i + id_rbl)
+					for redundant_baseline in redundant_baselines:
+						plt.plot(np.angle(np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+					plt.legend(loc='best', fontsize='xx-small')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
+					plt.title('Redundant Baselines Comparison at multiple frequencies - Angle')
+					plt.show(block=False)
 	
 	######################### Beam Pattern #############################
 	# Old_BeamPattern = True # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
@@ -7533,6 +7582,7 @@ except:
 	print('No point spread function plotted.')
 
 try:
+	AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 	AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
 	Discrepancy_Ratio = np.abs(w_solution) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
 	print('>>>>>>>>>>>>>> Discrepancy Ratio: \n{}'.format(Discrepancy_Ratio))
