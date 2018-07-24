@@ -3677,7 +3677,7 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [4, 4]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 	Specific_FileIndex_end = [15, 15]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
@@ -3818,7 +3818,7 @@ elif 'hera47' in INSTRUMENT:
 	INSTRUMENT = INSTRUMENT + ('-CAA' if Conjugate_A_append else '') + ('-SA{0:.1f}'.format(Scale_AtNiA) if Scale_AtNiA != 1. else '')
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 4  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Frequency_Average_preload = 1  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -4891,41 +4891,45 @@ elif 'hera47' in INSTRUMENT:
 		for i in range(2):
 			for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
 				if len(redundant_baselines) > 3:
-					plt.figure(1700000 + 1000 * i + id_rbl)
+					plt.figure(17000000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.abs(vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(np.abs((1. / jansky2kelvin) * vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
 					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-abs_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at {0:.4f}MHz - Amplitude'.format(freq))
 					plt.show(block=False)
+					plt.close()
 					
-					plt.figure(2700000 + 1000 * i + id_rbl)
+					plt.figure(27000000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.angle(vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(np.angle((1. / jansky2kelvin) * vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
 					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-angle_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at {0:.4f}MHz - Angle'.format(freq))
 					plt.show(block=False)
+					plt.close()
 					
-					plt.figure(3700000 + 1000 * i + id_rbl)
+					plt.figure(37000000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.abs(np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(np.abs((1. / jansky2kelvin_multifreq) * np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
 					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at multiple frequencies - Amplitude')
 					plt.show(block=False)
+					plt.close()
 					
-					plt.figure(4700000 + 1000 * i + id_rbl)
+					plt.figure(47000000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.angle(np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(np.angle((1. / jansky2kelvin_multifreq) * np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
 					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at multiple frequencies - Angle')
 					plt.show(block=False)
+					plt.close()
 	
 	######################### Beam Pattern #############################
 	# Old_BeamPattern = True # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
