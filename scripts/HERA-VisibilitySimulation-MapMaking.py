@@ -4889,7 +4889,7 @@ elif 'hera47' in INSTRUMENT:
 		                           FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants, freq=freq, nside_standard=nside_standard,
 		                           baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
 		                           baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
-		
+		vis_data_time_std = [[], []]
 		vis_data_mfreq_std = [[], []]
 		time_eigValues_ratio = [[], []]
 		time_eigValues = [[], []]
@@ -4904,13 +4904,23 @@ elif 'hera47' in INSTRUMENT:
 			for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
 				if len(redundant_baselines) > 3:
 					
-					vis_data_mfreq_std[i].append(np.std((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1), axis=0))
-					plt.figure(700000 + 1000 * i + id_rbl)
-					plt.plot(vis_data_mfreq_std[i][-1])
+					vis_data_time_std[i].append(np.std((1. / jansky2kelvin) * vis_data[i][tmask][:, list(redundant_baselines)], axis=1))
+					plt.figure(600000 + 1000 * i + id_rbl)
+					plt.plot(lsts, vis_data_time_std[i][-1])
 					ticks_list = [bls[i].keys()[id_bs] for id_bs in redundant_baselines]
-					plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
-					plt.title('Redundant Baselines Comparison at multiple frequencies - STD')
-					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
+					# plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
+					plt.title('Redundant Baselines Comparison at {0}MHz - STD among rbls-{1}'.format(freq, id_rbl))
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-STD_bsl_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
+					plt.show(block=False)
+					plt.close()
+					
+					vis_data_mfreq_std[i].append(np.std((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1), axis=1))
+					plt.figure(700000 + 1000 * i + id_rbl)
+					plt.plot(flist[i], vis_data_mfreq_std[i][-1])
+					ticks_list = [bls[i].keys()[id_bs] for id_bs in redundant_baselines]
+					# plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
+					plt.title('Redundant Baselines Comparison along frequencies - STD among rbls-{0}'.format(id_rbl))
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.show(block=False)
 					plt.close()
 					
@@ -4971,6 +4981,25 @@ elif 'hera47' in INSTRUMENT:
 					mfreq_eigValues[i].append(pca_mfreq.singular_values_)
 					mfreq_eigVectors[i].append(pca_mfreq.components_)
 					mfreq_newspace[i].append(pca_mfreq.fit_transform(np.abs((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1)).T))
+					
+					plt.figure(5700000 + 1000 * i + id_rbl)
+					for id_eigen_vec,eigen_vec in enumerate(time_eigVectors[i][-1]):
+						plt.plot(lsts, eigen_vec, label='{}'.format(id_eigen_vec))
+					plt.legend(loc='best', fontsize='x-small')
+					plt.title('Eigenvectors of the Amplitudes of Redundant Baselines at {0:.3f}MHz - Time'.format(freq))
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison_EigVec-{1:.3f}MHz-{2}-{3}-abs_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
+					plt.show(block=False)
+					plt.close()
+					
+					plt.figure(6700000 + 1000 * i + id_rbl)
+					for id_eigen_vec,eigen_vec in enumerate(mfreq_eigVectors[i][-1]):
+						plt.plot(flist[i], eigen_vec, label='{}'.format(id_eigen_vec))
+					plt.legend(loc='best', fontsize='x-small')
+					plt.title('Eigenvectors of the Amplitudes of Redundant Baselines mfreq - Frequency')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison_EigVec-mfreq-{1}-{2}-abs_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
+					plt.show(block=False)
+					plt.close()
+					
 		
 	
 	######################### Beam Pattern #############################
