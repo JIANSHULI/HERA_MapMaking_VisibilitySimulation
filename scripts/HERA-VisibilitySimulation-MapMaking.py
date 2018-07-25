@@ -59,6 +59,7 @@ from HERA_MapMaking_VisibilitySimulation.RA2LST import RA2LST
 import multiprocessing
 from multiprocessing import Pool
 
+from sklearn.decomposition import PCA
 # from HERA_MapMaking_VisibilitySimulation.HERA_MapMaking_VisibilitySimulation_Functions import *
 
 PI = np.pi
@@ -4879,6 +4880,7 @@ elif 'hera47' in INSTRUMENT:
 	print '\n>>>>>>>>>>Used nUBL = %s, nt = %s, nf = %s.\n' % (nUBL_used, nt_used, nf_used)
 	sys.stdout.flush()
 	
+	# 040: 3, 74, 277, 368, 526, 
 	Plot_RedundanctBaselines = True
 	Tolerance_2 = 10. ** (-2)
 	if Plot_RedundanctBaselines:
@@ -4888,48 +4890,88 @@ elif 'hera47' in INSTRUMENT:
 		                           baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
 		                           baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
 		
+		vis_data_mfreq_std = [[], []]
+		time_eigValues_ratio = [[], []]
+		time_eigValues = [[], []]
+		time_eigVectors  = [[], []]
+		time_newspace = [[], []]
+		mfreq_eigValues_ratio = [[], []]
+		mfreq_eigValues = [[], []]
+		mfreq_eigVectors  = [[], []]
+		mfreq_newspace = [[], []]
+		
 		for i in range(2):
 			for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
 				if len(redundant_baselines) > 3:
-					plt.figure(17000000 + 1000 * i + id_rbl)
+					
+					vis_data_mfreq_std[i].append(np.std((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1), axis=0))
+					plt.figure(700000 + 1000 * i + id_rbl)
+					plt.plot(vis_data_mfreq_std[i][-1])
+					ticks_list = [bls[i].keys()[id_bs] for id_bs in redundant_baselines]
+					plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
+					plt.title('Redundant Baselines Comparison at multiple frequencies - STD')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
+					plt.show(block=False)
+					plt.close()
+					
+					plt.figure(1700000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.abs((1. / jansky2kelvin) * vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(lsts, np.abs((1. / jansky2kelvin) * vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
-					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-abs_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at {0:.4f}MHz - Amplitude'.format(freq))
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-abs_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
 					plt.show(block=False)
 					plt.close()
 					
-					plt.figure(27000000 + 1000 * i + id_rbl)
+					plt.figure(2700000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.angle((1. / jansky2kelvin) * vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(lsts, np.angle((1. / jansky2kelvin) * vis_data[i][tmask, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
-					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-angle_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at {0:.4f}MHz - Angle'.format(freq))
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-{1:.3f}MHz-{2}-{3}-angle_tmasked.pdf'.format(INSTRUMENT, freq, ['xx', 'yy'][i], id_rbl))
 					plt.show(block=False)
 					plt.close()
 					
-					plt.figure(37000000 + 1000 * i + id_rbl)
+					plt.figure(3700000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.abs((1. / jansky2kelvin_multifreq) * np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(flist[i], np.abs((1. / jansky2kelvin_multifreq) * np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
-					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at multiple frequencies - Amplitude')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.show(block=False)
 					plt.close()
 					
-					plt.figure(47000000 + 1000 * i + id_rbl)
+					plt.figure(4700000 + 1000 * i + id_rbl)
 					for redundant_baseline in redundant_baselines:
-						plt.plot(np.angle((1. / jansky2kelvin_multifreq) * np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+						plt.plot(flist[i], np.angle((1. / jansky2kelvin_multifreq) * np.mean(vis_data_mfreq[i][:, tmask, redundant_baseline], axis=1)), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 					# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 					plt.legend(loc='best', fontsize='xx-small')
-					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.title('Redundant Baselines Comparison at multiple frequencies - Angle')
+					plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 					plt.show(block=False)
 					plt.close()
+					
+					# pca = PCA(n_components=2)
+					# pca = PCA()
+					pca_time = PCA(copy=True, iterated_power='auto', n_components=None, random_state=None,
+					             svd_solver='auto', tol=0.0, whiten=False)
+					pca_time.fit(np.abs((1. / jansky2kelvin) * vis_data[i][tmask][:, list(redundant_baselines)]).T)
+					time_eigValues_ratio[i].append(pca_time.explained_variance_ratio_)
+					time_eigValues[i].append(pca_time.singular_values_)
+					time_eigVectors[i].append(pca_time.components_)
+					time_newspace[i].append(pca_time.fit_transform(np.abs((1. / jansky2kelvin) * vis_data[i][tmask][:, list(redundant_baselines)]).T))
+					
+					pca_mfreq = PCA(copy=True, iterated_power='auto', n_components=None, random_state=None,
+					               svd_solver='auto', tol=0.0, whiten=False)
+					pca_mfreq.fit(np.abs((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1)).T)
+					mfreq_eigValues_ratio[i].append(pca_mfreq.explained_variance_ratio_)
+					mfreq_eigValues[i].append(pca_mfreq.singular_values_)
+					mfreq_eigVectors[i].append(pca_mfreq.components_)
+					mfreq_newspace[i].append(pca_mfreq.fit_transform(np.abs((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1)).T))
+		
 	
 	######################### Beam Pattern #############################
 	# Old_BeamPattern = True # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
