@@ -4970,11 +4970,11 @@ elif 'hera47' in INSTRUMENT:
 					try:
 						ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					except:
-						print('Something get wrong when saving .html file')
+						print('Something gets wrong when saving .html file')
 					try:
 						ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					except:
-						print('Necessary Modules such as ffmpeg have not been installed yet')
+						print('Necessary Modules (such as ffmpeg) have not been installed yet')
 					plt.show(block=False)
 					plt.close()
 					
@@ -4982,11 +4982,11 @@ elif 'hera47' in INSTRUMENT:
 					try:
 						ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					except:
-						print('Something get wrong when saving .html file')
+						print('Something gets wrong when saving .html file')
 					try:
 						ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					except:
-						print('Necessary Modules such as ffmpeg have not been installed yet')
+						print('Necessary Modules (such as ffmpeg) have not been installed yet')
 					plt.show(block=False)
 					plt.close()
 					
@@ -4994,11 +4994,11 @@ elif 'hera47' in INSTRUMENT:
 					try:
 						ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					except:
-						print('Something get wrong when saving .html file')
+						print('Something gets wrong when saving .html file')
 					try:
 						ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					except:
-						print('Necessary Modules such as ffmpeg have not been installed yet')
+						print('Necessary Modules (such as) ffmpeg have not been installed yet')
 					plt.show(block=False)
 					plt.close()
 						
