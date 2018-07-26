@@ -3678,8 +3678,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [15, 15]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3845,7 +3845,7 @@ elif 'hera47' in INSTRUMENT:
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
 	Freq_Low = [110., 110.]
-	Freq_High = [190s., 190.]
+	Freq_High = [190., 190.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3855,7 +3855,8 @@ elif 'hera47' in INSTRUMENT:
 	PCA_for_RedundancyAnalysis = False
 	Plot_RedundanctBaselines_Only = True # If True, Terminate the program after Redundancy Analysis.
 	Tolerance_2 = 10. ** (-2) # Tolerance used when Comparing Redundant Baselines.
-	time_step = 60 # time step used to plot along frequency axis.
+	time_step =10 # time step used to plot along frequency axis.
+	Plot_RedundanctBaselines_timeseperate = False # Whether to plot time-dependant spectrum of redundant baselines by seperate plots or Animation.
 	
 	Check_Dred_AFreq_ATime = False
 	Tolerance = 1.e-9  # meter, Criterion for De-Redundancy
@@ -4929,7 +4930,110 @@ elif 'hera47' in INSTRUMENT:
 			for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
 				if len(redundant_baselines) > 3:
 					
+					import matplotlib.animation as animation
 					
+					fig_animate_redundancy_amp = plt.figure(3700000000 + 100000000 * i + id_rbl)
+					fig_animate_redundancy_pha = plt.figure(4700000000 + 100000000 * i + id_rbl)
+					fig_animate_redundancy_std = plt.figure(7000000000 + 1000000000 * i + id_rbl)
+					ax1_amp = fig_animate_redundancy_amp.add_subplot(1, 1, 1)
+					ax1_pha = fig_animate_redundancy_pha.add_subplot(1, 1, 1)
+					ax1_std = fig_animate_redundancy_std.add_subplot(1, 1, 1)
+					
+					
+					def Animate_Redundancy_amp(id_time):
+						id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
+						ax1_amp.clear()
+						for redundant_baseline in redundant_baselines:
+							ax1_amp.plot(flist[i][list(tmask_mfreq[id_time])], np.abs((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}-LST{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], data_lsts[i][id_time]))
+						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+						ax1_amp.legend(loc='best', fontsize='xx-small')
+						# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+					
+					def Animate_Redundancy_pha(id_time):
+						id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
+						ax1_pha.clear()
+						for redundant_baseline in redundant_baselines:
+							ax1_pha.plot(flist[i][list(tmask_mfreq[id_time])], np.angle((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}-LST{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], data_lsts[i][id_time]))
+						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+						ax1_pha.legend(loc='best', fontsize='xx-small')
+					# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+					
+					def Animate_Redundancy_std(id_time):
+						id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
+						ax1_std.clear()
+						ax1_std.plot(flist[i][list(tmask_mfreq[id_time])], np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1), label='STD at LST{}'.format(data_lsts[i][id_time]))
+						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+						ax1_std.legend(loc='best', fontsize='xx-small')
+					# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+					
+					ani_amp = animation.FuncAnimation(fig_animate_redundancy_amp, Animate_Redundancy_amp, interval=100)
+					try:
+						ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					except:
+						print('Something get wrong when saving .html file')
+					try:
+						ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					except:
+						print('Necessary Modules such as ffmpeg have not been installed yet')
+					plt.show(block=False)
+					plt.close()
+					
+					ani_pha = animation.FuncAnimation(fig_animate_redundancy_pha, Animate_Redundancy_pha, interval=100)
+					try:
+						ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					except:
+						print('Something get wrong when saving .html file')
+					try:
+						ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					except:
+						print('Necessary Modules such as ffmpeg have not been installed yet')
+					plt.show(block=False)
+					plt.close()
+					
+					ani_std = animation.FuncAnimation(fig_animate_redundancy_std, Animate_Redundancy_std, interval=100)
+					try:
+						ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					except:
+						print('Something get wrong when saving .html file')
+					try:
+						ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					except:
+						print('Necessary Modules such as ffmpeg have not been installed yet')
+					plt.show(block=False)
+					plt.close()
+						
+					# Plot_RedundanctBaselines_timeseperate = False
+					if Plot_RedundanctBaselines_timeseperate:
+						for id_time in range(0, len(data_lsts[i]), time_step):
+							plt.figure(37000000 + 1000000 * i + id_time * 100  + id_rbl)
+							for redundant_baseline in redundant_baselines:
+								plt.plot(flist[i][list(tmask_mfreq[id_time])], np.abs((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+							# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+							plt.legend(loc='best', fontsize='xx-small')
+							plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+							plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
+							plt.show(block=False)
+							plt.close()
+						
+							plt.figure(47000000 + 1000000 * i + id_time * 100 + id_rbl)
+							for redundant_baseline in redundant_baselines:
+								plt.plot(flist[i][list(tmask_mfreq[id_time])], np.angle((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+							# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+							plt.legend(loc='best', fontsize='xx-small')
+							plt.title('Redundant Baselines Comparison along Frequency Axis-Pha-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+							plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
+							plt.show(block=False)
+							plt.close()
+							
+							# vis_data_mfreq_std[i].append(np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1))
+							plt.figure(70000000 + 10000000 * i + id_time * 100 + id_rbl)
+							plt.plot(flist[i][list(tmask_mfreq[id_time])], np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1))
+							ticks_list = [bls[i].keys()[id_bs] for id_bs in redundant_baselines]
+							# plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
+							plt.title('Redundant Baselines Comparison along frequencies - STD rbls-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+							plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
+							plt.show(block=False)
+							plt.close()
 					
 					# vis_data_time_std[i].append(np.std((1. / jansky2kelvin) * vis_data[i][tmask][:, list(redundant_baselines)], axis=1))
 					plt.figure(600000 + 1000 * i + id_rbl)
@@ -4972,37 +5076,6 @@ elif 'hera47' in INSTRUMENT:
 					plt.show(block=False)
 					plt.close()
 					
-					for id_time in range(0, len(tmask), time_step):
-						plt.figure(37000000 + 1000000 * i + id_time * 100  + id_rbl)
-						for redundant_baseline in redundant_baselines:
-							plt.plot(flist[i][list(tmask_mfreq[id_time])], np.abs((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
-						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-						plt.legend(loc='best', fontsize='xx-small')
-						plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
-						plt.show(block=False)
-						plt.close()
-					
-						plt.figure(47000000 + 1000000 * i + id_time * 100 + id_rbl)
-						for redundant_baseline in redundant_baselines:
-							plt.plot(flist[i][list(tmask_mfreq[id_time])], np.angle((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
-						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-						plt.legend(loc='best', fontsize='xx-small')
-						plt.title('Redundant Baselines Comparison along Frequency Axis-Pha-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
-						plt.show(block=False)
-						plt.close()
-						
-						# vis_data_mfreq_std[i].append(np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1))
-						plt.figure(70000000 + 10000000 * i + id_time * 100 + id_rbl)
-						plt.plot(flist[i][list(tmask_mfreq[id_time])], np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1))
-						ticks_list = [bls[i].keys()[id_bs] for id_bs in redundant_baselines]
-						# plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
-						plt.title('Redundant Baselines Comparison along frequencies - STD rbls-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
-						plt.show(block=False)
-						plt.close()
-						
 					if PCA_for_RedundancyAnalysis:
 						# pca = PCA(n_components=2)
 						# pca = PCA()
