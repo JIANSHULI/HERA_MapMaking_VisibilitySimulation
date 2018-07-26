@@ -3844,8 +3844,8 @@ elif 'hera47' in INSTRUMENT:
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [105., 105.]
-	Freq_High = [185., 185.]
+	Freq_Low = [110., 110.]
+	Freq_High = [190s., 190.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -4978,8 +4978,8 @@ elif 'hera47' in INSTRUMENT:
 							plt.plot(flist[i][list(tmask_mfreq[id_time])], np.abs((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 						plt.legend(loc='best', fontsize='xx-small')
-						plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, lsts[id_time]))
-						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, lsts[id_time]))
+						plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-abs_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
 						plt.show(block=False)
 						plt.close()
 					
@@ -4988,8 +4988,8 @@ elif 'hera47' in INSTRUMENT:
 							plt.plot(flist[i][list(tmask_mfreq[id_time])], np.angle((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
 						# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
 						plt.legend(loc='best', fontsize='xx-small')
-						plt.title('Redundant Baselines Comparison along Frequency Axis-Pha-{0}-LST{1:.4f}'.format(id_rbl, lsts[id_time]))
-						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, lsts[id_time]))
+						plt.title('Redundant Baselines Comparison along Frequency Axis-Pha-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-angle_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
 						plt.show(block=False)
 						plt.close()
 						
@@ -4998,8 +4998,8 @@ elif 'hera47' in INSTRUMENT:
 						plt.plot(flist[i][list(tmask_mfreq[id_time])], np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1))
 						ticks_list = [bls[i].keys()[id_bs] for id_bs in redundant_baselines]
 						# plt.xticks(np.arange(len(vis_data_mfreq_std[i][-1])), ticks_list, fontsize='xx-small')
-						plt.title('Redundant Baselines Comparison along frequencies - STD rbls-{0}-LST{1:.4f}'.format(id_rbl, lsts[id_time]))
-						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, lsts[id_time]))
+						plt.title('Redundant Baselines Comparison along frequencies - STD rbls-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
 						plt.show(block=False)
 						plt.close()
 						
