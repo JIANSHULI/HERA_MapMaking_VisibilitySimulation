@@ -3679,7 +3679,7 @@ elif 'hera47' in INSTRUMENT:
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
 	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [15, 15]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_end = [11, 11]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3851,7 +3851,7 @@ elif 'hera47' in INSTRUMENT:
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
 	
 	
-	
+	# classic source Confusion limit -- 32: 12.687(0.1), 2.7612(1.)  ;
 	# 040: 3, 74, 277, 368, 526,
 	Plot_RedundanctBaselines = True
 	PCA_for_RedundancyAnalysis = False
@@ -4722,7 +4722,7 @@ elif 'hera47' in INSTRUMENT:
 		else:
 			print('Redundancy_preload: %s' % len(redundancy[i]))
 			redundancy[i] = redundancy_pro[i]
-					
+			
 	
 	# Noise_from_Diff_Freq = True # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
 	
@@ -4942,6 +4942,7 @@ elif 'hera47' in INSTRUMENT:
 		for i in range(2):
 			for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
 				if len(redundant_baselines) > length_thresh_redundancy:
+					timer_red_bsl = time.time()
 					
 					fig_animate_redundancy_amp = plt.figure(3700000000 + 100000000 * i + id_rbl)
 					fig_animate_redundancy_pha = plt.figure(4700000000 + 100000000 * i + id_rbl)
@@ -4980,40 +4981,43 @@ elif 'hera47' in INSTRUMENT:
 							ax1_std.legend(loc='best')
 						# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
 					
-					ani_amp = animation.FuncAnimation(fig_animate_redundancy_amp, Animate_Redundancy_amp, interval=100)
-					try:
-						ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-					except:
-						print('Something gets wrong when saving .html file')
-					try:
-						ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-					except:
-						print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_amp = animation.FuncAnimation(fig_animate_redundancy_amp, Animate_Redundancy_amp, interval=100, frames=len(range(0, len(data_lsts[i]), time_step)))
+					# try:
+					# 	ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					# except:
+					# 	print('Something gets wrong when saving .html file')
+					# try:
+					# 	ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					# except:
+					# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					plt.show(block=False)
 					plt.close()
 					
-					ani_pha = animation.FuncAnimation(fig_animate_redundancy_pha, Animate_Redundancy_pha, interval=100)
-					try:
-						ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-					except:
-						print('Something gets wrong when saving .html file')
-					try:
-						ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-					except:
-						print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_pha = animation.FuncAnimation(fig_animate_redundancy_pha, Animate_Redundancy_pha, interval=100, frames=len(range(0, len(data_lsts[i]), time_step)))
+					# try:
+					# 	ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					# except:
+					# 	print('Something gets wrong when saving .html file')
+					# try:
+					# 	ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+					# except:
+					# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 					plt.show(block=False)
 					plt.close()
 					
 					if (len(redundant_baselines) > length_thresh_redundancy_std) and Plot_RedundanctBaselines_frequency_std:
-						ani_std = animation.FuncAnimation(fig_animate_redundancy_std, Animate_Redundancy_std, interval=100)
-						try:
-							ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-						except:
-							print('Something gets wrong when saving .html file')
-						try:
-							ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-						except:
-							print('Necessary Modules (such as) ffmpeg have not been installed yet')
+						ani_std = animation.FuncAnimation(fig_animate_redundancy_std, Animate_Redundancy_std, interval=100, frames=len(range(0, len(data_lsts[i]), time_step_std)))
+						# try:
+						# 	ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+						# except:
+						# 	print('Something gets wrong when saving .html file')
+						# try:
+						# 	ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+						# except:
+						# 	print('Necessary Modules (such as) ffmpeg have not been installed yet')
+						ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 						plt.show(block=False)
 						plt.close()
 						
@@ -5049,6 +5053,9 @@ elif 'hera47' in INSTRUMENT:
 							plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
 							plt.show(block=False)
 							plt.close()
+					
+					print('Time consumed by Plotting mfreq-movie for redundant Baselines-{0}: {1} minutes'.format(id_rbl, (time.time() - timer_red_bsl) / 60.))
+					timer_red_bsl = time.time()
 					
 					# frequency_step = 64
 					
@@ -5095,40 +5102,43 @@ elif 'hera47' in INSTRUMENT:
 					
 					# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
 					
-					ani_time_amp = animation.FuncAnimation(fig_animate_redundancy_time_amp, Animate_Redundancy_time_amp, interval=100)
-					try:
-						ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-					except:
-						print('Something gets wrong when saving .html file')
-					try:
-						ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-					except:
-						print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_time_amp = animation.FuncAnimation(fig_animate_redundancy_time_amp, Animate_Redundancy_time_amp, interval=100, frames=len(range(0, len(flist[i]), frequency_step)))
+					# try:
+					# 	ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+					# except:
+					# 	print('Something gets wrong when saving .html file')
+					# try:
+					# 	ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+					# except:
+					# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
 					plt.show(block=False)
 					plt.close()
 					
-					ani_time_pha = animation.FuncAnimation(fig_animate_redundancy_time_pha, Animate_Redundancy_time_pha, interval=100)
-					try:
-						ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nf{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-					except:
-						print('Something gets wrong when saving .html file')
-					try:
-						ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-					except:
-						print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_time_pha = animation.FuncAnimation(fig_animate_redundancy_time_pha, Animate_Redundancy_time_pha, interval=100, frames=len(range(0, len(flist[i]), frequency_step)))
+					# try:
+					# 	ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+					# except:
+					# 	print('Something gets wrong when saving .html file')
+					# try:
+					# 	ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+					# except:
+					# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+					ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
 					plt.show(block=False)
 					plt.close()
 					
 					if (len(redundant_baselines) > length_thresh_redundancy_std) and Plot_RedundanctBaselines_time_std:
-						ani_time_std = animation.FuncAnimation(fig_animate_redundancy_time_std, Animate_Redundancy_time_std, interval=100)
-						try:
-							ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nf{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-						except:
-							print('Something gets wrong when saving .html file')
-						try:
-							ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-						except:
-							print('Necessary Modules (such as) ffmpeg have not been installed yet')
+						ani_time_std = animation.FuncAnimation(fig_animate_redundancy_time_std, Animate_Redundancy_time_std, interval=100, frames=len(range(0, len(flist[i]), frequency_step_std)))
+						# try:
+						# 	ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+						# except:
+						# 	print('Something gets wrong when saving .html file')
+						# try:
+						# 	ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+						# except:
+						# 	print('Necessary Modules (such as) ffmpeg have not been installed yet')
+						ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
 						plt.show(block=False)
 						plt.close()
 					
@@ -5175,7 +5185,11 @@ elif 'hera47' in INSTRUMENT:
 						plt.show(block=False)
 						plt.close()
 					
+					print('Time consumed by Plotting time-movie for redundant Baselines-{0}: {1} minutes'.format(id_rbl, (time.time() - timer_red_bsl) / 60.))
+					
+					
 					if PCA_for_RedundancyAnalysis:
+						timer_red_bsl = time.time()
 						# pca = PCA(n_components=2)
 						# pca = PCA()
 						pca_time = PCA(copy=True, iterated_power='auto', n_components=None, random_state=None,
@@ -5211,9 +5225,8 @@ elif 'hera47' in INSTRUMENT:
 						plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison_EigVec-mfreq-{1}-{2}-abs_tmasked.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl))
 						plt.show(block=False)
 						plt.close()
+						print('Time consumed by Plotting PCA for redundant Baselines-{0}: {1} minutes'.format(id_rbl, (time.time() - timer_red_bsl)))
 		
-		if Plot_RedundanctBaselines_Only:
-			exit()
 		
 	
 	######################### Beam Pattern #############################
@@ -5293,6 +5306,9 @@ elif 'hera47' in INSTRUMENT:
 
 print ('\n>>>>>>>>>>>>>>%s minutes used for preparing data.\n' % ((time.time() - timer_pre) / 60.))
 sys.stdout.flush()
+
+if Plot_RedundanctBaselines_Only and Plot_RedundanctBaselines:
+	exit()
 
 #################
 ####set up vs and beam
