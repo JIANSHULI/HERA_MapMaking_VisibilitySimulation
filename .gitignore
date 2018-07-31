@@ -1,6 +1,7 @@
 # Distribution and Packaging
 *.so
 *.pyc
+*.mp4
 src/*.pyc
 # *.py
 *.DS_Store
