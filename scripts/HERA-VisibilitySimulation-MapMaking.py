@@ -3678,8 +3678,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [11, 11]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [6, 6]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [13, 13]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3819,7 +3819,7 @@ elif 'hera47' in INSTRUMENT:
 	INSTRUMENT = INSTRUMENT + ('-CAA' if Conjugate_A_append else '') + ('-SA{0:.1f}'.format(Scale_AtNiA) if Scale_AtNiA != 1. else '')
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 1  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Frequency_Average_preload = 4  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -3844,8 +3844,8 @@ elif 'hera47' in INSTRUMENT:
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [110., 110.]
-	Freq_High = [190., 190.]
+	Freq_Low = [145., 145.]
+	Freq_High = [155., 155.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3853,7 +3853,7 @@ elif 'hera47' in INSTRUMENT:
 	
 	# classic source Confusion limit -- 32: 12.687(0.1), 2.7612(1.)  ;
 	# 040: 3, 74, 277, 368, 526,
-	Plot_RedundanctBaselines = True
+	Plot_RedundanctBaselines = False
 	PCA_for_RedundancyAnalysis = False
 	Plot_RedundanctBaselines_Only = True # If True, Terminate the program after Redundancy Analysis.
 	
@@ -5308,7 +5308,7 @@ print ('\n>>>>>>>>>>>>>>%s minutes used for preparing data.\n' % ((time.time() -
 sys.stdout.flush()
 
 if Plot_RedundanctBaselines_Only and Plot_RedundanctBaselines:
-	exit()
+	sys.exit('Exit right after Redundancy Analysis.')
 
 #################
 ####set up vs and beam
