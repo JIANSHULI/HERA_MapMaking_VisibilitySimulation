@@ -3840,12 +3840,12 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 187.  # MHz, the single frequency as reference.
+	Frequency_Select = 110.  # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [185., 185.]
-	Freq_High = [195., 195.]
+	Freq_Low = [105., 105.]
+	Freq_High = [115., 115.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3906,8 +3906,8 @@ elif 'hera47' in INSTRUMENT:
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
-	nside_start = 32  # starting point to calculate dynamic A
-	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+	nside_start = 64  # starting point to calculate dynamic A
+	nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
 	nside_beamweight = 16  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = True
@@ -4908,10 +4908,10 @@ elif 'hera47' in INSTRUMENT:
 	# Tolerance_2 = 10. ** (-2)
 	if Plot_RedundanctBaselines:
 		Ubl_list_2 = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
-		                           data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
-		                           FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants, freq=freq, nside_standard=nside_standard,
-		                           baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
-		                           baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
+								   data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
+								   FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants, freq=freq, nside_standard=nside_standard,
+								   baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
+								   baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
 		
 		tmasks_mfreq =[[], []]
 		vis_data_time_std = [[], []]
@@ -5193,7 +5193,7 @@ elif 'hera47' in INSTRUMENT:
 						# pca = PCA(n_components=2)
 						# pca = PCA()
 						pca_time = PCA(copy=True, iterated_power='auto', n_components=None, random_state=None,
-						             svd_solver='auto', tol=0.0, whiten=False)
+									 svd_solver='auto', tol=0.0, whiten=False)
 						pca_time.fit(np.abs((1. / jansky2kelvin) * vis_data[i][tmask][:, list(redundant_baselines)]).T)
 						time_eigValues_ratio[i].append(pca_time.explained_variance_ratio_)
 						time_eigValues[i].append(pca_time.singular_values_)
@@ -5201,7 +5201,7 @@ elif 'hera47' in INSTRUMENT:
 						time_newspace[i].append(pca_time.fit_transform(np.abs((1. / jansky2kelvin) * vis_data[i][tmask][:, list(redundant_baselines)]).T))
 						
 						pca_mfreq = PCA(copy=True, iterated_power='auto', n_components=None, random_state=None,
-						               svd_solver='auto', tol=0.0, whiten=False)
+									   svd_solver='auto', tol=0.0, whiten=False)
 						pca_mfreq.fit(np.abs((1. / jansky2kelvin_multifreq).reshape(len(jansky2kelvin_multifreq), 1) * np.mean(vis_data_mfreq[i][:, tmask][:, :, list(redundant_baselines)], axis=1)).T)
 						mfreq_eigValues_ratio[i].append(pca_mfreq.explained_variance_ratio_)
 						mfreq_eigValues[i].append(pca_mfreq.singular_values_)
@@ -7267,6 +7267,18 @@ else:
 				AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
 			else:
 				AtNiAi = sv.InverseCholeskyMatrix(AtNiA).astype(Precision_AtNiAi)
+				
+			# Check Whether the matrix is well-inverse or not using two methods - Mean and RMS.
+			Check_Iverse_AtNiA = True
+			Check_Iverse_AtNiA_threshold = 0.1
+			if Check_Iverse_AtNiA:
+				AtNiA_AtNiAi = np.dot(AtNiA, AtNiAi)
+				rms_reconstruct = np.std(np.diagonal(AtNiA_AtNiAi))
+				mean_reconstruct = np.mean(np.diagonal(AtNiA_AtNiAi))
+				print('\n >>>>>>>>>>>>>>>>>>>>> rms_reconstruct: {0} <<<<<<<<<<<<<<<<<<<<'.format(rms_reconstruct))
+				print('\n >>>>>>>>>>>>>>>>>>>>> mean_reconstruct: {0} <<<<<<<<<<<<<<<<<<<< \n'.format(mean_reconstruct))
+			
+			
 			# del (AtNiA)
 			try:
 				AtNiAi.tofile(AtNiAi_path, overwrite=True)
@@ -7616,18 +7628,18 @@ else:
 thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 if Constrain_Stripe:
 	Re_Mask = ((thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard[valid_pix_mask] > lsts[0] * np.pi / 12.) & (phis_standard[valid_pix_mask] < lsts[-1] * np.pi / 12.)) \
-	          + (np.isclose(90. - thetas_standard[valid_pix_mask] * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard[valid_pix_mask] * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. + 38.)))
+			  + (np.isclose(90. - thetas_standard[valid_pix_mask] * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard[valid_pix_mask] * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. + 38.)))
 	sizes = sizes[Re_Mask]
 	# sizes = np.where((np.where(valid_pix_mask > 0)[0] == np.where((valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))) > 0)[0]
 	valid_pix_mask = (valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard > lsts[0] * np.pi / 12.) & (phis_standard < lsts[-1] * np.pi / 12.)) \
-	                 + (np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard * 180. / np.pi < (90. + 38.)))
+					 + (np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard * 180. / np.pi < (90. + 38.)))
 	valid_npix = np.sum(valid_pix_mask)
 	final_index = np.arange(npix)
 else:
 	Re_Mask = np.ones(valid_npix).astype('bool')
 	
 FornaxA_Direction = np.array([90. - thetas_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi,
-                              phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
+							  phis_standard[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)] * 180. / np.pi])
 FornaxA_Index = np.arange(len(thetas_standard))[np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.)]
 
 new_map = fits.HDUList()
