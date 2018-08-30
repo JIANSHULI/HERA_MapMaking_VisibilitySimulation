@@ -3400,11 +3400,11 @@ plot_pixelization = True and not AtNiA_only
 plot_projection = True and not AtNiA_only
 plot_data_error = True and not AtNiA_only
 
-force_recompute = False
-force_recompute_AtNiAi_eig = False
+force_recompute = True
+force_recompute_AtNiAi_eig = True
 force_recompute_AtNiAi = True
-force_recompute_S = False
-force_recompute_SEi = False
+force_recompute_S = True
+force_recompute_SEi = True
 
 C = 299.792458
 kB = 1.3806488 * 1.e-23
@@ -3678,8 +3678,8 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [6, 6]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [13, 13]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3798,10 +3798,10 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Files = True if not Parallel_DataPolsLoad else False
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
-	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
+	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Parallel_A = True  # Parallel Computing for A matrix.
+	Parallel_A = False # Parallel Computing for A matrix.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
 	nchunk = 1  # UseDot to Parallel but not Parallel_AtNiA.
@@ -3819,7 +3819,7 @@ elif 'hera47' in INSTRUMENT:
 	INSTRUMENT = INSTRUMENT + ('-CAA' if Conjugate_A_append else '') + ('-SA{0:.1f}'.format(Scale_AtNiA) if Scale_AtNiA != 1. else '')
 	
 	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 4  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -3840,12 +3840,12 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 150.  # MHz, the single frequency as reference.
+	Frequency_Select = 187.  # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [145., 145.]
-	Freq_High = [155., 155.]
+	Freq_Low = [185., 185.]
+	Freq_High = [195., 195.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3901,8 +3901,8 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-1.31)
-	Constrain_Stripe = True # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
+	valid_pix_thresh = 10 ** (-1.3)
+	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
@@ -7615,11 +7615,11 @@ else:
 # DEC_range = np.array([-22., -38.])
 thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 if Constrain_Stripe:
-	Re_Mask = ((thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard[valid_pix_mask] > lsts[10] * np.pi / 12.) & (phis_standard[valid_pix_mask] < lsts[-10] * np.pi / 12.)) \
+	Re_Mask = ((thetas_standard[valid_pix_mask] * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard[valid_pix_mask] > lsts[0] * np.pi / 12.) & (phis_standard[valid_pix_mask] < lsts[-1] * np.pi / 12.)) \
 	          + (np.isclose(90. - thetas_standard[valid_pix_mask] * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard[valid_pix_mask] * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard[valid_pix_mask] * 180. / np.pi < (90. + 38.)))
 	sizes = sizes[Re_Mask]
 	# sizes = np.where((np.where(valid_pix_mask > 0)[0] == np.where((valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1]))) > 0)[0]
-	valid_pix_mask = (valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard > lsts[10] * np.pi / 12.) & (phis_standard < lsts[-10] * np.pi / 12.)) \
+	valid_pix_mask = (valid_pix_mask & (thetas_standard * 180. / np.pi > (90. - DEC_range[0])) & (thetas_standard * 180. / np.pi < (90. - DEC_range[1])) & (phis_standard > lsts[0] * np.pi / 12.) & (phis_standard < lsts[-1] * np.pi / 12.)) \
 	                 + (np.isclose(90. - thetas_standard * 180. / np.pi, -37.20833, atol=2.) & np.isclose(phis_standard * 180. / np.pi, 50.67375, atol=2.) & (thetas_standard * 180. / np.pi < (90. + 38.)))
 	valid_npix = np.sum(valid_pix_mask)
 	final_index = np.arange(npix)
