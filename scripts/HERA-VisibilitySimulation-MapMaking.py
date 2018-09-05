@@ -1534,7 +1534,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					
 					# beam
 					
-					print "Computing sky weighting A matrix for pol: %s, for freq: %s" % (p, f)
+					print ("Computing full sky weighting A matrix for pol: %s, for freq: %s" % (p, f))
 					sys.stdout.flush()
 					
 					# A[p] = np.zeros((nt_used * len(used_common_ubls), 12 * nside_beamweight ** 2), dtype='complex128')
@@ -1934,7 +1934,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							break
 						except:
 							if (i + nchunk_AtNiA_step) >= nchunk_AtNiA_maxcut:
-								print "Allocating AtNiA..."
+								print ("Allocating AtNiA...")
 								AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
 								ATNIA(A, CNi, AtNiA, nchunk=nchunk, dot=UseDot)
 							continue
@@ -1953,7 +1953,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						try:
 							AtNiA = np.dot(A.transpose() * CNi, A)
 						except MemoryError:
-							nchunk = 5
+							nchunk = nchunk_AtNiA
 							print "Allocating AtNiA..."
 							AtNiA = np.zeros((A.shape[1], A.shape[1]), dtype=Precision_masked)
 							try:
@@ -3046,19 +3046,19 @@ def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre
 		
 		cadd = get_complex_data(additive_term, nubl=nUBL_used, nt=nt_used)
 	
-	try:
-		print 'saving data to', os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_nubl%s_nt%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none')
-		np.savez(os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_%s_%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'),
-				 data=data,
-				 simdata=stitch_complex_data(fullsim_vis),
-				 psdata=[stitch_complex_data(vis) for vis in pt_vis],
-				 pt_sources=pt_sources,
-				 ubls=used_common_ubls,
-				 tlist=lsts,
-				 Ni=Ni,
-				 freq=freq)
-	except:
-		print('Error when Saving Calibrated Results Package.')
+	# try:
+	# 	print 'saving data to', os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_nubl%s_nt%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none')
+	# 	np.savez(os.path.dirname(data_filename) + '/' + INSTRUMENT + tag + datatag + vartag + '_gsmcal_n%i_bn%i_%s_%s-mtbin%s-mfbin%s-tbin%s.npz' % (nside_standard, bnside, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none'),
+	# 			 data=data,
+	# 			 simdata=stitch_complex_data(fullsim_vis),
+	# 			 psdata=[stitch_complex_data(vis) for vis in pt_vis],
+	# 			 pt_sources=pt_sources,
+	# 			 ubls=used_common_ubls,
+	# 			 tlist=lsts,
+	# 			 Ni=Ni,
+	# 			 freq=freq)
+	# except:
+	# 	print('Error when Saving Calibrated Results Package.')
 	
 	try:
 		if plot_data_error:
@@ -3852,12 +3852,12 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 130.  # MHz, the single frequency as reference.
+	Frequency_Select = 171.  # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [125., 125.]
-	Freq_High = [135., 135.]
+	Freq_Low = [165., 165.]
+	Freq_High = [175., 175.]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3913,7 +3913,7 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-1.4)
+	valid_pix_thresh = 10 ** (-2.7)
 	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
@@ -7301,8 +7301,8 @@ else:
 			except:
 				print('AtNiAi cannot be saved to file via AiNiAi_path.')
 			del (AtNiA)
-			print "%f minutes used" % (float(time.time() - timer) / 60.)
-			print "regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes)
+			print ("%f minutes used" % (float(time.time() - timer) / 60.))
+			print ("regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes))
 			break
 		except:
 			if Add_Rcond:
