@@ -18,13 +18,13 @@ import os
 sys.stdout.flush()
 
 Frequency_Min = 110.
-Frequency_Max = 120.
-Frequency_Step = 5.
+Frequency_Max = 190.
+Frequency_Step = 10.
 
 File_Start = 3
-File_End = 21
-File_Width = 18 # Number of files loaded into each iteration.
+File_End = 15
 File_Step = 200 # Step to iterate Start_File
+File_Width = 12 # Number of files loaded into each iteration.
 
 nside_start = 64  # starting point to calculate dynamic A
 nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
@@ -33,7 +33,7 @@ nside_beamweight = 16  # undynamic A matrix shape
 Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
 Frequency_Average_preload = 1  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 
-Valid_Threshold = 10**(-1.31)
+Valid_Threshold = 10**(-1.1)
 
 for freq in np.arange(Frequency_Min, Frequency_Max, Frequency_Step):
     for id_file in range(File_Start, File_End, File_Step):

@@ -810,7 +810,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 					data[(i, j)][pol] = copy.deepcopy(uvd.get_data((i, j, pol)))
 					flags[(i, j)][pol] = copy.deepcopy(uvd.get_flags((i, j, pol)))
 				redundancy = np.append(redundancy, redundancy_temp[nbl])
-				print('Index of Baselines not popped out: %s' % (str(nbl) + ': ' + str((i, j, pol))))
+				# print('Index of Baselines not popped out: %s' % (str(nbl) + ': ' + str((i, j, pol))))
 	
 	# 	# If we don't want nested dicts, convert to DataContainer
 	# 	if not nested_dict:
@@ -3867,7 +3867,7 @@ elif 'hera47' in INSTRUMENT:
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Width = 5.
+	Freq_Width = 0.85
 	Freq_Low = [Frequency_Select - Freq_Width, Frequency_Select - Freq_Width]
 	Freq_High = [Frequency_Select + Freq_Width, Frequency_Select + Freq_Width]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
