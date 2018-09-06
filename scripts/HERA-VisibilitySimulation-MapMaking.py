@@ -3385,10 +3385,10 @@ def DeBadBaselines(dflags_dred_mfreq=None, dflags_dred=None, fullsim_vis=None, f
 INSTRUMENT = ''
 
 #####commandline inputs#####
-if len(sys.argv) == 1:
-	INSTRUMENT = 'hera47'
-else:
-	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
+# if len(sys.argv) == 1:
+# 	INSTRUMENT = 'hera47'
+# else:
+# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 
 INSTRUMENT = 'hera47'  # 'hera47'; 'miteor'
 print INSTRUMENT
@@ -3396,9 +3396,9 @@ print INSTRUMENT
 tag = '-ampcal-'  # '-ampcal-' #sys.argv[2]; if use real uncalibrated data, set tag = '-ampcal-' for amplitude calibration.
 
 AtNiA_only = False
-if len(sys.argv) > 3 and sys.argv[3][:5] == 'atnia':
-	AtNiA_only = True
-	pixel_scheme_number = int(sys.argv[3][5:])
+# if len(sys.argv) > 3 and sys.argv[3][:5] == 'atnia':
+# 	AtNiA_only = True
+# 	pixel_scheme_number = int(sys.argv[3][5:])
 
 simulation_opt = 1
 
@@ -3689,8 +3689,12 @@ elif 'hera47' in INSTRUMENT:
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
-	Specific_FileIndex_start = [0, 0]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-	Specific_FileIndex_end = [40, 40]  # Ending point of selected data sets. [51, 51], [26, 27]
+	if len(sys.argv) > 2:
+		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
+	else:
+		Specific_FileIndex_start = [5, 5]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+		Specific_FileIndex_end = [11, 11]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3830,8 +3834,12 @@ elif 'hera47' in INSTRUMENT:
 	Precision_AtNiAi = 'float64' # Precision to calculate AtNiAi for masked sky.
 	INSTRUMENT = INSTRUMENT + ('-CAA' if Conjugate_A_append else '') + ('-SA{0:.1f}'.format(Scale_AtNiA) if Scale_AtNiA != 1. else '')
 	
-	Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-	Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	if len(sys.argv) > 7:
+		Time_Average_preload = int(sys.argv[7])
+		Frequency_Average_preload = int(sys.argv[8])
+	else:
+		Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
+		Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -3852,12 +3860,16 @@ elif 'hera47' in INSTRUMENT:
 	Time_Average = (Time_Average_preload if not Select_time else 1) * (Time_Average_afterload if not use_select_time else 1)
 	Frequency_Average = (Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1)
 	
-	Frequency_Select = 171.  # MHz, the single frequency as reference.
+	if len(sys.argv) > 1:
+		Frequency_Select = np.float(sys.argv[1])
+	else:
+		Frequency_Select = 110.  # MHz, the single frequency as reference.
 	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Low = [165., 165.]
-	Freq_High = [175., 175.]
+	Freq_Width = 5.
+	Freq_Low = [Frequency_Select - Freq_Width, Frequency_Select - Freq_Width]
+	Freq_High = [Frequency_Select + Freq_Width, Frequency_Select + Freq_Width]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	badants_append = [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]  # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137];
@@ -3913,14 +3925,19 @@ elif 'hera47' in INSTRUMENT:
 	seek_optimal_threshs = False and not AtNiA_only
 	dynamic_precision = .2  # .1#ratio of dynamic pixelization error vs data std, in units of data, so not power
 	thresh = 0.2  # .2#2.#.03125#
-	valid_pix_thresh = 10 ** (-2.7)
+	valid_pix_thresh = 10 ** (-1.31)
 	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
 	
-	nside_start = 32  # starting point to calculate dynamic A
-	nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
-	nside_beamweight = 16  # undynamic A matrix shape
+	if len(sys.argv) > 4:
+		nside_start = int(sys.argv[4])  # starting point to calculate dynamic A
+		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
+	else:
+		nside_start = 128  # starting point to calculate dynamic A
+		nside_standard = 128  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = 16  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = True
 	WaterFall_Plot_with_MultiFreqSimulation = False
