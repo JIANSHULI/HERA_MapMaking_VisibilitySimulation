@@ -3938,8 +3938,8 @@ elif 'hera47' in INSTRUMENT:
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 128  # starting point to calculate dynamic A
-		nside_standard = 128  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_start = 64  # starting point to calculate dynamic A
+		nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = 16  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = True

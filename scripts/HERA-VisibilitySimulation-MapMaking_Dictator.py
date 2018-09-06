@@ -17,17 +17,17 @@ import os
 
 sys.stdout.flush()
 
-Frequency_Min = 109.
-Frequency_Max = 112.
-Frequency_Step = 1.
+Frequency_Min = 110.
+Frequency_Max = 120.
+Frequency_Step = 5.
 
-File_Start = 8
-File_End = 10
-File_Width = 1 # Number of files loaded into each iteration.
-File_Step = 1 # Step to iterate Start_File
+File_Start = 3
+File_End = 21
+File_Width = 18 # Number of files loaded into each iteration.
+File_Step = 200 # Step to iterate Start_File
 
-nside_start = 32  # starting point to calculate dynamic A
-nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+nside_start = 64  # starting point to calculate dynamic A
+nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
 nside_beamweight = 16  # undynamic A matrix shape
 
 Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
