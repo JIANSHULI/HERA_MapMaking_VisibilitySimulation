@@ -2911,7 +2911,7 @@ def echo(message, type=0, verbose=True):
 
 
 def Pre_Calibration(pre_calibrate=False, pre_ampcal=False, pre_phscal=False, pre_addcal=False, comply_ps2mod_autocorr=False, Use_PsAbsCal=False, Use_AbsCal=False, Use_Fullsim_Noise=False, Precal_time_bin_temp=None, nt_used=None, nUBL_used=None, data_shape=None, cal_times=1, niter_max=50, antpairs=None, ubl_index=None, Only_AbsData=False, fit_for_additive=False,
-					autocorr_vis_normalized=None, fullsim_vis=None, data=None, Ni=None, pt_vis=None, pt_sources=None, used_common_ubls=None, freq=None, lsts=None, lst_offset=None, INSTRUMENT=None, Absolute_Calibration_dred_mfreq=False, mocal_time_bin=None, mocal_freq_bin=None, bnside=None, nside_standard=None, scale_noise=False, ubl_sort=None):
+					autocorr_vis_normalized=None, fullsim_vis=None, data=None, Ni=None, pt_vis=None, pt_sources=None, used_common_ubls=None, freq=None, lsts=None, lst_offset=None, INSTRUMENT=None, Absolute_Calibration_dred_mfreq=False, mocal_time_bin=None, mocal_freq_bin=None, bnside=None, nside_standard=None, scale_noise=False, ubl_sort=None, plot_data_error=False):
 	if nt_used is not None:
 		if nt_used != len(lsts):
 			raise ValueError('nt_used doesnot match len(lsts).')
@@ -3407,9 +3407,9 @@ baseline_safety_factor = 2.  # max_ubl = 1.4*lambda*nside_standard/baseline_safe
 crosstalk_type = 'autocorr'
 # pixel_directory = '/home/omniscope/data/GSM_data/absolute_calibrated_data/'
 
-plot_pixelization = True and not AtNiA_only
-plot_projection = True and not AtNiA_only
-plot_data_error = True and not AtNiA_only
+plot_pixelization = False and not AtNiA_only
+plot_projection = False and not AtNiA_only
+plot_data_error = False and not AtNiA_only
 
 force_recompute = True
 force_recompute_AtNiAi_eig = True
@@ -3638,7 +3638,8 @@ elif 'hera47' in INSTRUMENT:
 	Noise_from_Diff_Freq = True  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
 	Gaussianized_Noise = False # Whether to use the noise amplitude as reference so as to calculate noise or not.
 	DivedeRedundacny_NoiseDiffFreq = False if Noise_from_Diff_Freq else False
-	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if (Noise_from_Diff_Freq and Gaussianized_Noise) else '-DFNng' if (Noise_from_Diff_Freq and not Gaussianized_Noise) else '') + '-nsc%s' % int(scale_noise_ratio)
+	No_Jansky2kelven = False
+	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if (Noise_from_Diff_Freq and Gaussianized_Noise) else '-DFNng' if (Noise_from_Diff_Freq and not Gaussianized_Noise) else '') + '-nsc%s' % int(scale_noise_ratio) + ('-NJ' if No_Jansky2kelven else '')
 	
 	Replace_Data = True
 	
@@ -3693,8 +3694,8 @@ elif 'hera47' in INSTRUMENT:
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
-		Specific_FileIndex_start = [5, 5]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-		Specific_FileIndex_end = [11, 11]  # Ending point of selected data sets. [51, 51], [26, 27]
+		Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+		Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if Specific_Files else False
@@ -3825,7 +3826,7 @@ elif 'hera47' in INSTRUMENT:
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
-	Use_LinalgInv = True # Whether to use np.linalg.inv to inverse AtNiA.
+	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
 	Conjugate_A_append = False # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
@@ -3839,8 +3840,8 @@ elif 'hera47' in INSTRUMENT:
 		Frequency_Average_preload = int(sys.argv[8])
 	else:
 		Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-		Frequency_Average_preload = 16  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
-	Select_freq = False  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
+		Frequency_Average_preload = 1  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+	Select_freq = True  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
 	inplace_preload = True  # Change the self when given to the function select_average in uvdata.py.
@@ -3863,11 +3864,11 @@ elif 'hera47' in INSTRUMENT:
 	if len(sys.argv) > 1:
 		Frequency_Select = np.float(sys.argv[1])
 	else:
-		Frequency_Select = 110.  # MHz, the single frequency as reference.
-	RFI_Free_Thresh = 0.6  # Will be used for choosing good selected freq by ratio of RFI-Free items.
+		Frequency_Select = 120.  # MHz, the single frequency as reference.
+	RFI_Free_Thresh = 0.6  # Will be used for choosing good     selected freq by ratio of RFI-Free items.
 	RFI_AlmostFree_Thresh = 0.9  # Will be used for choosing good flist by ratio of RFI-Free items.
 	RFI_Free_Thresh_bslStrengthen = 10. ** 0  # RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen is the RFI free threshold for ubl selection in DeRedundancy().
-	Freq_Width = 0.85
+	Freq_Width = 5.
 	Freq_Low = [Frequency_Select - Freq_Width, Frequency_Select - Freq_Width]
 	Freq_High = [Frequency_Select + Freq_Width, Frequency_Select + Freq_Width]
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
@@ -3938,11 +3939,11 @@ elif 'hera47' in INSTRUMENT:
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 64  # starting point to calculate dynamic A
-		nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_start = 128  # starting point to calculate dynamic A
+		nside_standard = 128  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = 16  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
-	WaterFall_Plot = True
+	WaterFall_Plot = False
 	WaterFall_Plot_with_MultiFreqSimulation = False
 	
 	Old_BeamPattern = False  # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
@@ -4660,6 +4661,11 @@ elif 'hera47' in INSTRUMENT:
 	jansky2kelvin = 1.e-26 * ((C / freq) ** 2 / (2. * kB)) / (4 * np.pi / (12 * nside_standard ** 2))  # Jansky=10^-26 * W/(m^2 * Hz) = 10^-23 * erg/(s * cm^2 * Hz)
 	jansky2kelvin_multifreq = 1.e-26 * ((C / flist[0]) ** 2 / (2. * kB)) / (4 * np.pi / (12 * nside_standard ** 2))
 	
+	# No_Jansky2kelven = True
+	if No_Jansky2kelven:
+		jansky2kelvin = np.ones_like(jansky2kelvin)
+		jansky2kelvin_multifreq = np.ones_like(jansky2kelvin_multifreq)
+	
 	for i in range(2):
 		autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
 		autocorr_data[i] = autocorr_data[i] * jansky2kelvin
@@ -4766,11 +4772,11 @@ elif 'hera47' in INSTRUMENT:
 				Noise_DiffFreq_mfreq[i] = np.ones_like(np.abs(vis_data_dred_mfreq[i]))
 				for id_f in range(vis_data_dred_mfreq[i].shape[0]):
 					if id_f > 0 and id_f < (vis_data_dred_mfreq[i].shape[0] - 1):
-						Noise_DiffFreq_mfreq[i][id_f] = np.mean(np.array([np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]), np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])]), axis=0) * jansky2kelvin_multifreq[id_f]
+						Noise_DiffFreq_mfreq[i][id_f] = np.mean(np.array([np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]), np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])]), axis=0)# * jansky2kelvin_multifreq[id_f]
 					elif id_f == 0:
-						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])]) * jansky2kelvin_multifreq[id_f]
+						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.min([id_f + 1, vis_data_dred_mfreq[i].shape[0]])])# * jansky2kelvin_multifreq[id_f]
 					elif id_f == (vis_data_dred_mfreq[i].shape[0] - 1):
-						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])]) * jansky2kelvin_multifreq[id_f]
+						Noise_DiffFreq_mfreq[i][id_f] = np.abs(vis_data_dred_mfreq[i][id_f] - vis_data_dred_mfreq[i][np.max([id_f - 1, 0])])# * jansky2kelvin_multifreq[id_f]
 				Noise_DiffFreq[i] = Noise_DiffFreq_mfreq[i][index_freq[i]]
 			else:
 				print('Noise_from_Different_Frequency_Chanels cannot be done due to only single frequency provided.')
@@ -6709,28 +6715,28 @@ try:
 	if pre_calibrate:
 		if Absolute_Calibration_dred_mfreq and PointSource_AbsCal:
 			data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Only_AbsData=Only_AbsData,
-																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used, plot_data_error=plot_data_error,
 																								 data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
 																								 lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard, ubl_sort=ubl_sort)
 		elif Absolute_Calibration_dred_mfreq:
 			data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Only_AbsData=Only_AbsData,
-																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used, plot_data_error=plot_data_error,
 																								 data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
 																								 lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard, ubl_sort=ubl_sort)
 		elif PointSource_AbsCal:
 			data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Only_AbsData=Only_AbsData,
-																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used, plot_data_error=plot_data_error,
 																								 data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=pt_vis, pt_sources=pt_sources, used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
 																								 lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=None, mocal_freq_bin=None, bnside=bnside, nside_standard=nside_standard, ubl_sort=ubl_sort)
 		else:
 			data, Ni, additive_A, additive_term, additive_sol, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Only_AbsData=Only_AbsData,
-																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+																								 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used, plot_data_error=plot_data_error,
 																								 data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
 																								 lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=None, mocal_freq_bin=None, bnside=bnside, nside_standard=nside_standard, ubl_sort=ubl_sort)
 	
 	else:
 		additive_A, additive_term, precal_time_bin = Pre_Calibration(pre_calibrate=pre_calibrate, pre_ampcal=pre_ampcal, pre_phscal=pre_phscal, pre_addcal=pre_addcal, comply_ps2mod_autocorr=comply_ps2mod_autocorr, Use_PsAbsCal=Use_PsAbsCal, Use_AbsCal=Use_AbsCal, Use_Fullsim_Noise=Use_Fullsim_Noise, Only_AbsData=Only_AbsData,
-																	 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used,
+																	 fit_for_additive=fit_for_additive, Precal_time_bin_temp=Precal_time_bin_temp, nt_used=nt_used, nUBL_used=nUBL_used, plot_data_error=plot_data_error,
 																	 data_shape=data_shape, cal_times=1, niter_max=50, antpairs=None, ubl_index=ubl_index, autocorr_vis_normalized=autocorr_vis_normalized, fullsim_vis=fullsim_vis, data=data, Ni=Ni, pt_vis=[], pt_sources=[], used_common_ubls=used_common_ubls, freq=freq, lsts=lsts,
 																	 lst_offset=lst_offset, INSTRUMENT=INSTRUMENT, Absolute_Calibration_dred_mfreq=Absolute_Calibration_dred_mfreq, mocal_time_bin=mocal_time_bin, mocal_freq_bin=mocal_freq_bin, bnside=bnside, nside_standard=nside_standard, ubl_sort=ubl_sort)
 		
@@ -7724,9 +7730,11 @@ GSM_NoMask = GSM_NoMask_all[valid_pix_mask]
 
 # thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi])
-bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi])
+bright_pixels_w_GSM = np.array([90. - thetas_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_GSM_all)[-20:]] * 180. / np.pi])
+bright_pixels_GSM = np.array([90. - thetas_standard[np.argsort(GSM_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(GSM_all)[-20:]] * 180. / np.pi])
 
 print('Bright_Pixels_Data: {}'.format(bright_pixels_Data))
+print('Bright_Pixels_w_GSM: {}'.format(bright_pixels_w_GSM))
 print('Bright_Pixels_GSM: {}'.format(bright_pixels_GSM))
 
 # Fornax A: {'ra': 50.67375, 'dec': -37.20833}
@@ -7743,9 +7751,9 @@ try:
 		Max_FornaxA_sim = ww_GSM_all[Max_FornaxA_sim_index]
 		Max_FornaxA_GSM = GSM_all[Max_FornaxA_GSM_index]
 		
-		Flux_FornaxA_solution = np.sum(Max_FornaxA_solution[Max_FornaxA_solution > np.max([250. * nside_standard / 32, np.mean(ww_solution)])]) / jansky2kelvin
-		Flux_FornaxA_sim = np.sum(Max_FornaxA_sim[Max_FornaxA_sim > np.max([250. * nside_standard / 32, np.mean(ww_GSM)])]) / jansky2kelvin
-		Flux_FornaxA_GSM = np.sum(Max_FornaxA_GSM[Max_FornaxA_GSM > np.max([250. * nside_standard / 32, np.mean(GSM)])]) / jansky2kelvin
+		Flux_FornaxA_solution = np.sum(Max_FornaxA_solution[Max_FornaxA_solution > 250.]) / jansky2kelvin
+		Flux_FornaxA_sim = np.sum(Max_FornaxA_sim[Max_FornaxA_sim > 250.]) / jansky2kelvin
+		Flux_FornaxA_GSM = np.sum(Max_FornaxA_GSM[Max_FornaxA_GSM > 250.]) / jansky2kelvin
 		
 		print('\n'
 			  '>>>>>>>>>>>>>>>>>>>>                                                                         <<<<<<<<<<<<<<<<<<<<<<< \n'
@@ -7788,9 +7796,9 @@ try:
 		# plt.clf()
 		plt.figure(98000000 + crd)
 		crd += 10
-		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-		# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
+		plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 		plt.show(block=False)
 except:
@@ -7799,9 +7807,9 @@ except:
 			# plt.clf()
 			plt.figure(98000000 + crd)
 			crd += 10
-			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-			# plot_IQU_unlimit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 3), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
+			plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 			plt.show(block=False)
 	except:
