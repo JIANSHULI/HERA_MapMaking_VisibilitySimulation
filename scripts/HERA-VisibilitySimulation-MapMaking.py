@@ -3677,7 +3677,7 @@ elif 'hera47' in INSTRUMENT:
 	ReCalculate_Auto = False  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
 	Noise_from_Diff_Freq = True  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
 	Gaussianized_Noise = False # Whether to use the noise amplitude as reference so as to calculate noise or not.
-	Noise_from_IntrumentModel = False # Use (100. + 120.*(frequency/150)**(-2.55)) / (frequency_channel_width * integration_time)**0.5
+	Noise_from_IntrumentModel = False if not Noise_from_Diff_Freq else False # Use (100. + 120.*(frequency/150)**(-2.55)) / (frequency_channel_width * integration_time)**0.5
 	DivedeRedundacny_NoiseDiffFreq = False if Noise_from_Diff_Freq else False
 	No_Jansky2kelven = False
 	INSTRUMENT = INSTRUMENT + ('-RN' if ReCalculate_Auto else '') + ('-DFN' if (Noise_from_Diff_Freq and Gaussianized_Noise) else '-DFNng' if (Noise_from_Diff_Freq and not Gaussianized_Noise) else '') + ('-nsc%s' % int(scale_noise_ratio) if scale_noise else '') + ('-NJ' if No_Jansky2kelven else '')
@@ -4826,9 +4826,10 @@ elif 'hera47' in INSTRUMENT:
 		# Integration_Time = 1.
 		# Frequency_Bin = 1.
 	
-	if scale_noise:
-		Noise_DiffFreq *= scale_noise_ratio
-		Noise_DiffFreq_mfreq *= scale_noise_ratio
+	# if scale_noise:
+	# 	for i in range(2):
+	# 		Noise_DiffFreq[i] *= scale_noise_ratio
+	# 		Noise_DiffFreq_mfreq[i] *= scale_noise_ratio
 	
 	# if Noise_from_IntrumentModel:
 		
@@ -6625,10 +6626,8 @@ sys.stdout.flush()
 # Only_AbsData = False
 
 # Merge data
-data = np.array([data['xx'], data['yy']]).reshape([2] + list(data_shape['xx'])).transpose(
-	(1, 0, 2)).flatten()
-Ni = np.concatenate((Ni['xx'], Ni['yy'])).reshape([2] + list(data_shape['xx'])).transpose(
-	(1, 0, 2)).flatten()
+data = np.array([data['xx'], data['yy']]).reshape([2] + list(data_shape['xx'])).transpose((1, 0, 2)).flatten() # (2, nUBL_used, nt_used).transpose() to (nUBL_used, 2, nt_used)
+Ni = np.concatenate((Ni['xx'], Ni['yy'])).reshape([2] + list(data_shape['xx'])).transpose((1, 0, 2)).flatten()
 if Only_AbsData:
 	# data = np.abs(data)
 	Ni = Ni + Ni * 1.j
@@ -6641,19 +6640,31 @@ if Noise_from_Diff_Freq:
 	if Gaussianized_Noise:
 		if DivedeRedundacny_NoiseDiffFreq:
 			noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
-											  np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+											  np.random.normal(0., Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2.
 		else:
 			noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(),
-											  np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten())) ** 2. * scale_noise_ratio ** 2.
+											  np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten())) ** 2.
 	else:
 		if DivedeRedundacny_NoiseDiffFreq:
 			noise2_DiffFreq = np.concatenate(((Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpoe().flatten(), (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten(), (Noise_DiffFreq[0][tmask] / used_redundancy[0]).transpose().flatten(),
-											  (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2. * scale_noise_ratio**2.
+											  (Noise_DiffFreq[1][tmask] / used_redundancy[1]).transpose().flatten())) ** 2.
 		else:
-			noise2_DiffFreq = np.concatenate((np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten(), np.random.normal(0., Noise_DiffFreq[0][tmask]).transpose().flatten(),
-											  np.random.normal(0., Noise_DiffFreq[1][tmask]).transpose().flatten())) ** 2. * scale_noise_ratio ** 2.
+			noise2_DiffFreq = np.concatenate((Noise_DiffFreq[0][tmask].transpose().flatten(), Noise_DiffFreq[1][tmask].transpose().flatten(), Noise_DiffFreq[0][tmask].transpose().flatten(), Noise_DiffFreq[1][tmask].transpose().flatten())) ** 2.
+	if scale_noise:
+		noise2_DiffFreq *= scale_noise_ratio ** 2.
 	Ni = 1./noise2_DiffFreq
-	
+
+
+if Noise_from_IntrumentModel:
+	rms_temperature = rms_temperature_calculator(integration_time=Integration_Time, frequency_channel_width=Frequency_Bin, frequency=freq)
+	if Gaussianized_Noise:
+		noise2_Instrument = np.array([[[np.random.normal(0., rms_temperature, nUBL_used) / np.array(used_redundancy[id_p]) ** 0.5 for id_p in range(2)] for id_t in range(nt_used)] for id_ri in range(2)]).transpose((0, 3, 2, 1)).flatten() ** 2.
+	else:
+		noise2_Instrument = np.array([[[np.ones(nUBL_used) * rms_temperature / np.array(used_redundancy[id_p]) ** 0.5 for id_p in range(2)] for id_t in range(nt_used)] for id_ri in range(2)]).transpose((0, 3, 2, 1)).flatten() ** 2.
+	if scale_noise:
+		noise2_Instrument *= scale_noise_ratio ** 2.
+	Ni = 1./noise2_Instrument
+
 
 sys.stdout.flush()
 
