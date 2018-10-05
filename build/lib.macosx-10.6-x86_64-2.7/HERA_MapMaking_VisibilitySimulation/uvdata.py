@@ -18,6 +18,15 @@ except:
     print('No HERA_Mapmaking_VisibilitySimulation module detected.')
 from collections import OrderedDict as odict
 
+
+def read_miriad_fromUVData(filepath, correct_lat_lon=True, run_check=True,
+                check_extra=True,
+                run_check_acceptability=True, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
+    uv2 = UVData()
+    uv2.read_miriad(filepath=filepath, correct_lat_lon=correct_lat_lon, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability, phase_type=phase_type)
+    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+    return uv2
+    
 class UVData(UVBase):
     """
     A class for defining a radio interferometer dataset.
@@ -1524,7 +1533,7 @@ class UVData(UVBase):
                         uv_object.time_array = np.append(uv_object.time_array, self.time_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
                         uv_object.lst_array = np.append(uv_object.lst_array, self.lst_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
                         uv_object.data_array = np.append(uv_object.data_array, np.mean(self.data_array[blt_inds_red, :, :, :].reshape(uv_object.Ntimes, nred, self.data_array.shape[1], self.data_array.shape[2], self.data_array.shape[3]), axis=1))
-                        uv_object.flag_array = np.append(uv_object.flag_array, np.mean(self.flag_array[blt_inds_red, :, :, :].reshape(uv_object.Ntimes, nred, self.flag_array.shape[1], self.flag_array.shape[2], self.flag_array.shape[3]), axis=1)) == 1
+                        uv_object.flag_array = np.append(uv_object.flag_array, np.mean(self.flag_array[blt_inds_red, :, :, :].reshape(uv_object.Ntimes, nred, self.flag_array.shape[1], self.flag_array.shape[2], self.flag_array.shape[3]), axis=1)) != 0
                         uv_object.nsample_array = np.append(uv_object.nsample_array, np.mean(self.nsample_array[blt_inds_red, :, :, :].reshape(uv_object.Ntimes, nred, self.nsample_array.shape[1], self.nsample_array.shape[2], self.nsample_array.shape[3]), axis=1))
                         uv_object.uvw_array = np.append(uv_object.uvw_array, np.mean(self.uvw_array[blt_inds_red, :].reshape(uv_object.Ntimes, nred, self.uvw_array.shape[1]), axis=1))
         
@@ -1673,14 +1682,16 @@ class UVData(UVBase):
                 uv_object.flag_array = uv_object.flag_array[:, :, :-remove_freqs, :]
                 uv_object.nsample_array = uv_object.nsample_array[:, :, :-remove_freqs, :]
                 
-                uv_object.freq_array = uv_object.freq_array.reshape(uv_object.freq_array.shape[0], uv_object.Nfreqs / Frequency_Average, Frequency_Average)[:,:,0]
+                # uv_object.freq_array = uv_object.freq_array.reshape(uv_object.freq_array.shape[0], uv_object.Nfreqs / Frequency_Average, Frequency_Average)[:,:,0]
                 if not Select_freq:
+                    uv_object.freq_array = np.mean(uv_object.freq_array.reshape(uv_object.freq_array.shape[0], uv_object.Nfreqs / Frequency_Average, Frequency_Average), axis=-1)
                     uv_object.data_array = np.mean(uv_object.data_array.reshape(uv_object.data_array.shape[0], uv_object.data_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.data_array.shape[3]), axis=-2)
-                    uv_object.flag_array = np.mean(uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3]), axis=-2) == 1
+                    uv_object.flag_array = np.mean(uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3]), axis=-2) != 0
                     uv_object.nsample_array = np.mean(uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3]), axis=-2)
                 else:
+                    uv_object.freq_array = uv_object.freq_array.reshape(uv_object.freq_array.shape[0], uv_object.Nfreqs / Frequency_Average, Frequency_Average)[:, :, 0]
                     uv_object.data_array = uv_object.data_array.reshape(uv_object.data_array.shape[0], uv_object.data_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.data_array.shape[3])[:, :, :, 0, :]
-                    uv_object.flag_array = uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3])[:, :, :, 0, :] == 1
+                    uv_object.flag_array = uv_object.flag_array.reshape(uv_object.flag_array.shape[0], uv_object.flag_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.flag_array.shape[3])[:, :, :, 0, :] != 0
                     uv_object.nsample_array = uv_object.nsample_array.reshape(uv_object.nsample_array.shape[0], uv_object.nsample_array.shape[1], uv_object.Nfreqs / Frequency_Average, Frequency_Average, uv_object.nsample_array.shape[3])[:, :, :, 0, :]
 
                 freq_arr_use = uv_object.freq_array[0, :]
@@ -1752,7 +1763,7 @@ class UVData(UVBase):
                         tbin = uv_object.time_array.reshape(uv_object.Ntimes, uv_object.Nbls)[id_tbin * tbin_width:(id_tbin + 1) * tbin_width, 0]
                     else:
                         tbin_width = uv_object.Ntimes - id_tbin * Time_Average
-                        tbin = uv_object.time_array.reshape(uv_object.Ntimes, uv_object.Nbls)[id_tbin * tbin_width:, 0]
+                        tbin = uv_object.time_array.reshape(uv_object.Ntimes, uv_object.Nbls)[id_tbin * Time_Average:, 0]
                     
                     blt_inds_tbin = None
                     time_blt_inds = np.zeros(0, dtype=np.int)
@@ -1796,16 +1807,20 @@ class UVData(UVBase):
                         print('Tbin_width: %s'%tbin_width)
                         uv_object_time.baseline_array = np.append(uv_object_time.baseline_array, uv_object.baseline_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         # uv_object_time.Nbls += 1
-                        uv_object_time.time_array = np.append(uv_object_time.time_array, uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
-                        uv_object_time.lst_array = np.append(uv_object_time.lst_array, uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                        # uv_object_time.time_array = np.append(uv_object_time.time_array, uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                        # uv_object_time.lst_array = np.append(uv_object_time.lst_array, uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         if not Select_time:
+                            uv_object_time.time_array = np.append(uv_object_time.time_array, np.mean(uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                            uv_object_time.lst_array = np.append(uv_object_time.lst_array, np.mean(uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
                             uv_object_time.data_array = np.append(uv_object_time.data_array, np.mean(uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3]), axis=0))
-                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, np.mean(uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3]), axis=0)) == 1
+                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, np.mean(uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3]), axis=0)) != 0
                             uv_object_time.nsample_array = np.append(uv_object_time.nsample_array, np.mean(uv_object.nsample_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.nsample_array.shape[1], uv_object.nsample_array.shape[2], uv_object.nsample_array.shape[3]), axis=0))
                             uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, np.mean(uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1]), axis=0))
                         else:
+                            uv_object_time.time_array = np.append(uv_object_time.time_array, uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                            uv_object_time.lst_array = np.append(uv_object_time.lst_array, uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                             uv_object_time.data_array = np.append(uv_object_time.data_array, uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3])[0, :, :, :, :])
-                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3])[0, :, :, :, :]) == 1
+                            uv_object_time.flag_array = np.append(uv_object_time.flag_array, uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3])[0, :, :, :, :]) != 0
                             uv_object_time.nsample_array = np.append(uv_object_time.nsample_array, uv_object.nsample_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.nsample_array.shape[1], uv_object.nsample_array.shape[2], uv_object.nsample_array.shape[3])[0, :, :, :, :])
                             uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1])[0, :, :])
 
@@ -2163,7 +2178,8 @@ class UVData(UVBase):
 
     def read_miriad(self, filepath, correct_lat_lon=True, run_check=True,
                     check_extra=True,
-                    run_check_acceptability=True, phase_type=None, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
+                    run_check_acceptability=True, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], antenna_nums=None, ant_str=None, ant_pairs_nums=None,
+                    polarizations=None, time_range=None):
         """
         Read in data from a miriad file.
 
@@ -2190,31 +2206,58 @@ class UVData(UVBase):
             print('File Loaded: %s' % (filepath[0]))
             
             if len(filepath) > 1:
-                for id_f, f in enumerate(filepath[1:]):
+                if Parallel_Files:
+                    from multiprocessing import Pool
+                    pool = Pool()
+                    uv2 = {}
                     
-                    uv2 = UVData()
-                    uv2.read_miriad(f, correct_lat_lon=correct_lat_lon,
-                                    run_check=run_check, check_extra=check_extra,
-                                    run_check_acceptability=run_check_acceptability,
-                                    phase_type=phase_type)
-                    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
-                    self += uv2
-                    
-                    print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
-                    print('Number of Unique baselines after Dred: %s' % self.Nubls)
-                    print('Number of Times after Averaging: %s' % self.Ntimes)
-                    print('File Loaded %s : %s' % (id_f + 1, f))
+                    FilesData_Process = [pool.apply_async(read_miriad_fromUVData, args=(f, correct_lat_lon, run_check, check_extra, run_check_acceptability, phase_type, Parallel_Files, Time_Average, Frequency_Average, Dred, inplace, tol, Select_freq, Select_time, Badants)) for id_f, f in enumerate(filepath[1:])]
+                    uv2 = [filedata.get() for filedata in FilesData_Process]
+                    pool.close()
+                    for id_f, f in enumerate(filepath[1:]):
+                        # uv2[id_f] = UVData()
+                        # uv2[id_f] = FilesData_Process[id_f].get()
+                        # uv2[id_f].select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+                        self += uv2[id_f]
+
+                        print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
+                        print('Number of Unique baselines after Dred: %s' % self.Nubls)
+                        print('Number of Times after Averaging: %s' % self.Ntimes)
+                        print('File Loaded %s : %s' % (id_f + 1, f))
+                else:
+                    for id_f, f in enumerate(filepath[1:]):
+                        
+                        uv2 = UVData()
+                        uv2.read_miriad(f, correct_lat_lon=correct_lat_lon,
+                                        run_check=run_check, check_extra=check_extra,
+                                        run_check_acceptability=run_check_acceptability,
+                                        phase_type=phase_type)
+                        uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+                        self += uv2
+                        
+                        print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
+                        print('Number of Unique baselines after Dred: %s' % self.Nubls)
+                        print('Number of Times after Averaging: %s' % self.Ntimes)
+                        print('File Loaded %s : %s' % (id_f + 1, f))
                     
                 del(uv2)
         else:
             miriad_obj = miriad.Miriad()
+            # miriad_obj.read_miriad(filepath, correct_lat_lon=correct_lat_lon,
+            #                        run_check=run_check, check_extra=check_extra,
+            #                        run_check_acceptability=run_check_acceptability,
+            #                        phase_type=phase_type)
             miriad_obj.read_miriad(filepath, correct_lat_lon=correct_lat_lon,
                                    run_check=run_check, check_extra=check_extra,
                                    run_check_acceptability=run_check_acceptability,
-                                   phase_type=phase_type)
+                                   phase_type=phase_type, antenna_nums=antenna_nums,
+                                   ant_str=ant_str, ant_pairs_nums=ant_pairs_nums,
+                                   polarizations=polarizations, time_range=time_range)
             self._convert_from_filetype(miriad_obj)
             print(filepath)
             del(miriad_obj)
+            # if Parallel_Files:
+            #     return self
 
     def write_miriad(self, filepath, run_check=True, check_extra=True,
                      run_check_acceptability=True, clobber=False, no_antnums=False):

@@ -33,13 +33,13 @@ def RA2LST(RA, lon, lat, jd):
     obs.lat = lat * np.pi / 180.0
     obs.date = Time(jd, format='jd', scale='utc').datetime
     #obs.date = datetime.datetime(2000, 03, 20, 12, 0, 0, 0, pytz.UTC)
-
+    
     # get RA at zenith of observer in degrees
     ra_now = obs.radec_of(0, np.pi/2)[0] * 180 / np.pi
-
+    
     # get LST of observer
-    LST_now = obs.sidereal_time() * 12.0 / np.pi 
-
+    LST_now = obs.sidereal_time() * 12.0 / np.pi
+    
     # get the LST of the RA via difference
     LST_RA = LST_now + (RA - ra_now) / 15.0
     return LST_RA
