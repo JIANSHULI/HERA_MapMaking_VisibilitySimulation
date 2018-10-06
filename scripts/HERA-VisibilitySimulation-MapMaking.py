@@ -1909,6 +1909,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			if fake_solution is None:
 				raise ValueError('Cannot calculate A derivants because No fake_solution loaded or calculated.')
 			clean_sim_data = A.dot(fake_solution.astype(A.dtype))
+			Csim_data = (clean_sim_data + np.random.randn(len(clean_sim_data)) / Ni ** .5) if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / Ni ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
 			
 			# compute AtNi.y
 			AtNi_data = np.transpose(A).dot((Cdata * CNi).astype(A.dtype))
@@ -4000,7 +4001,7 @@ elif 'hera47' in INSTRUMENT:
 	if len(sys.argv) > 9:
 		valid_pix_thresh = np.float(sys.argv[9])
 	else:
-		valid_pix_thresh = 10 ** (-1.4)
+		valid_pix_thresh = 10 ** (-2.)
 	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
@@ -4010,8 +4011,8 @@ elif 'hera47' in INSTRUMENT:
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 32  # starting point to calculate dynamic A
-		nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_start = 128  # starting point to calculate dynamic A
+		nside_standard = 128  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = 32  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = False
@@ -7116,6 +7117,8 @@ if NoA_Out:
 									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild)
 			else:
 				raise ValueError('get_A_multifreq() misfunction.')
+	
+	# sim_data = (clean_sim_data + np.random.randn(len(data)) / Ni ** .5) if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / Ni ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
 else:
 	try:
 		A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
@@ -8034,7 +8037,7 @@ try:
 		plt.figure(98000000 + crd)
 		crd += 10
 		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
-		plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+		plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 		#plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 		plt.savefig(script_dir + '/../Output/Results_wGSM-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 		plt.show(block=False)
@@ -8187,10 +8190,14 @@ except:
 try:
 	AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 	AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
-	Discrepancy_Ratio = np.abs(w_solution - fake_solution) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+	if not Simulation_For_All:
+		Discrepancy_Ratio = np.abs(w_solution - w_sim_sol) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+	else:
+		Discrepancy_Ratio = np.abs(w_sim_sol - fake_solution) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
 	print('>>>>>>>>>>>>>> Discrepancy Ratio: \n{0}'.format(Discrepancy_Ratio))
 	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean: {0}'.format(np.mean(Discrepancy_Ratio)))
 	print('>>>>>>>>>>>>>> Mean of AtNiAi: {0}'.format(np.mean(AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5)))
+	
 except:
 	print('Discrepancy Ratio not Calculated')
 
