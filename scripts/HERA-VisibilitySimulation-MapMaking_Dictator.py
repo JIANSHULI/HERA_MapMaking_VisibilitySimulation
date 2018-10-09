@@ -26,10 +26,10 @@ File_End = 10
 File_Step = 200 # Step to iterate Start_File
 File_Width = 1 # Number of files loaded into each iteration.
 
-Lsts_List_start = 1.5 # -12.5
-Lsts_List_end = 6.5 # 12.5
-Lsts_List_step = 2.5 # 2.5
-Lsts_Width = 3.
+Lsts_List_start = -0.5 # -12.5
+Lsts_List_end = 5.5 # 12.5
+Lsts_List_step = 0.5 # 2.5
+Lsts_Width = 1.
 
 nside_start = 256  # starting point to calculate dynamic A
 nside_standard = 256  # resolution of sky, dynamic A matrix length of a row before masking.
@@ -46,8 +46,8 @@ for freq in np.arange(Frequency_Min, Frequency_Max, Frequency_Step):
         nside_standard = 128 # 128
         nside_beamweight = 32 # 32
     else:
-        nside_start = 32 # 256
-        nside_standard = 32 # 256
+        nside_start = 256 # 256
+        nside_standard = 256 # 256
         nside_beamweight = 32 # 64
     
     for id_file in range(File_Start, File_End, File_Step):

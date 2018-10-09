@@ -1341,14 +1341,15 @@ def Calculate_pointsource_visibility(vs, ra, dec, d, freq, beam_healpix_hor=None
 	return vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose)
 
 def Calculate_pointsource_visibility_R_I(vs, ra, dec, d, freq, beam_healpix_hor=None, beam_heal_equ=None, nt=None, tlist=None, verbose=False):
-	return np.array([np.real(vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose)), np.imag(vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose))]).astype('float64')
+	temp_visibility = vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose)
+	return np.array([np.real(temp_visibility), np.imag(temp_visibility)]).astype('float64')
 
 
 def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=True, Compute_beamweight=False, A_path='', A_RE_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=True, Flist_select_index=None, Flist_select=None, flist=None, Reference_Freq_Index=None, Reference_Freq=None,
 					equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=None, thresh=2., valid_pix_thresh=1.e-4, Use_BeamWeight=False, Only_AbsData=False, Del_A=False, valid_npix=None, NoA_Out_fullsky=True,
 					beam_weight=None, ubls=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, Parallel_A=False, Precision_full='complex64',
 					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144, Use_nside_bw_forFullsim=False,
-					nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False):
+					nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False, equatorial_GSM_beamweight=None, equatorial_GSM_beamweight_mfreq=None, gsm_beamweighted=None, nside_distribution=None, final_index=None, thetas=None, phis=None, sizes=None, abs_thresh=None, npix=None, valid_pix_mask=None, fake_solution_map=None, fake_solution_map_mfreq=None):
 	print('flist: %s' % str(flist))
 	
 	if Synthesize_MultiFreq:
@@ -1455,8 +1456,9 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 		if equatorial_GSM_standard is None and Synthesize_MultiFreq:
 			equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
 		
+		equatorial_GSM_beamweight_nest = equatorial_GSM_beamweight[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]
 		if Parallel_A:
-			print('Parallel Computing Full-Sky A matrix.')
+			print('Parallel Computing Full-Sky A matrix. \n')
 			timer = time.time()
 			if maxtasksperchild == None:
 				pool = Pool()
@@ -1486,9 +1488,11 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					del (A_multiprocess_list)
 					pool.terminate()
 					pool.join()
+					if Use_nside_bw_forFullsim:
+						fullsim_vis = np.dot(A, equatorial_GSM_beamweight_nest).reshape((2, len(Flist_select[id_p]) * len(used_common_ubls), nt_used)).transpose(1, 0, 2)
 				else:
 					# A_list = np.zeros(0)
-					equatorial_GSM_beamweight_nest = equatorial_GSM_standard[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]
+					# equatorial_GSM_beamweight_nest = equatorial_GSM_beamweight[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]
 					for id_pix_chunk in range(0, 12 * nside_beamweight ** 2, 12 * nside_beamweight ** 2 / nchunk_A_full):
 						id_time_stamp = time.time()
 						if maxtasksperchild == None:
@@ -1591,84 +1595,108 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			print('{0}s minutes used for parallel_computing A' .format(((time.time() - timer) / 60.)))
 		
 		else:
-			A = np.array([np.zeros((len(Flist_select[id_p]), len(used_common_ubls), nt_used, 12 * nside_beamweight ** 2), dtype=Precision_full) for id_p in range(2)])
-			for id_p, p in enumerate(['x', 'y']):
-				pol = p + p
-				try:
-					print ("%i UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(ubls[p]), np.max(np.linalg.norm(ubls[p], axis=1)) / (C / Reference_Freq[id_p]), pol))
-					print ("%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol))
-				except:
+			print('Calculate A with no parallel...')
+			# A = np.array([np.zeros((len(Flist_select[id_p]), len(used_common_ubls), nt_used, 12 * nside_beamweight ** 2), dtype=Precision_full) for id_p in range(2)])
+			# for id_p, p in enumerate(['x', 'y']):
+			# 	pol = p + p
+			# 	try:
+			# 		print ("%i UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(ubls[p]), np.max(np.linalg.norm(ubls[p], axis=1)) / (C / Reference_Freq[id_p]), pol))
+			# 		print ("%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol))
+			# 	except:
+			# 		try:
+			# 			print ("%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol))
+			# 		except:
+			# 			pass
+			#
+			# 	# A = np.array([np.zeros((len(Flist_select[id_p]), len(used_common_ubls), nt_used, 12 * nside_beamweight ** 2), dtype=Precision_full) for id_p in range(2)])
+			#
+			# 	for id_f, f in enumerate(Flist_select[id_p]):
+			# 		if not Synthesize_MultiFreq:
+			# 			if beam_heal_equ_x is None:
+			# 				try:
+			# 					beam_heal_equ_x = beam_heal_equ_x_mfreq[Reference_Freq_Index[0]]
+			# 				except:
+			# 					raise ValueError('No beam_heal_equ_x can be loaded or calculated from mfreq version.')
+			#
+			# 			if beam_heal_equ_y is None:
+			# 				try:
+			# 					beam_heal_equ_y = beam_heal_equ_x_mfreq[Reference_Freq_Index[1]]
+			# 				except:
+			# 					raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
+			#
+			# 			if p == 'x':
+			# 				beam_heal_equ = beam_heal_equ_x
+			# 			elif p == 'y':
+			# 				beam_heal_equ = beam_heal_equ_y
+			# 		else:
+			# 			if p == 'x':
+			# 				beam_heal_equ = beam_heal_equ_x_mfreq[Flist_select_index[id_p][id_f]]
+			# 			elif p == 'y':
+			# 				beam_heal_equ = beam_heal_equ_y_mfreq[Flist_select_index[id_p][id_f]]
+			#
+			# 		# beam
+			#
+			# 		print ("Computing full sky weighting A matrix for pol: %s, for freq: %s" % (p, f))
+			# 		sys.stdout.flush()
+			#
+			# 		# A[p] = np.zeros((nt_used * len(used_common_ubls), 12 * nside_beamweight ** 2), dtype='complex128')
+			#
+			# 		# if not NoA_Out_fullsky:
+			# 		timer = time.time()
+			# 		for i in np.arange(12 * nside_beamweight ** 2):
+			# 			dec, ra = hpf.pix2ang(nside_beamweight, i)  # gives theta phi
+			# 			dec = np.pi / 2 - dec
+			# 			print "\r%.1f%% completed" % (100. * float(i) / (12. * nside_beamweight ** 2)),
+			# 			sys.stdout.flush()
+			# 			if abs(dec - lat_degree * PI / 180) <= np.pi / 2:
+			# 				if Synthesize_MultiFreq:
+			# 					A[id_p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], i] / equatorial_GSM_standard[i]) / 2.
+			# 				else:
+			# 					A[id_p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) / 2.
+			#
+			# 		print ("%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), pol, f))
+			# 		sys.stdout.flush()
+			# 		# else:
+			# 		# 	for id_pix_chunk in range(0, 12 * nside_beamweight ** 2, 12 * nside_beamweight ** 2 / nchunk_A_full):
+			# 		# 		id_time_stamp = time.time()
+			# 		# 		num_pix_chunk = np.min([12 * nside_beamweight ** 2 / nchunk_A_full, 12 * nside_beamweight ** 2 - id_pix_chunk])
+			# 		# 		print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+			timer = time.time()
+			if Synthesize_MultiFreq:
+				beam_heal_equ = {0: beam_heal_equ_x_mfreq, 1: beam_heal_equ_y_mfreq}
+				# A[id_p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], i] / equatorial_GSM_standard[i]) / 2.
+				A = np.array([[[vs.calculate_pointsource_visibility(hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], n] / equatorial_GSM_standard[n]) / 2. for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)]).transpose((0, 1, 3, 4, 2)).reshape(2, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used,  12 * nside_beamweight ** 2)
+			else:
+				if beam_heal_equ_x is None:
 					try:
-						print ("%i Used-Common-UBLs to include, longest baseline is %i wavelengths for Pol: %s" % (len(used_common_ubls), np.max(np.linalg.norm(used_common_ubls, axis=1)) / (C / Reference_Freq[id_p]), pol))
+						beam_heal_equ_x = beam_heal_equ_x_mfreq[Reference_Freq_Index[0]]
 					except:
-						pass
+						raise ValueError('No beam_heal_equ_x can be loaded or calculated from mfreq version.')
 				
-				# A = np.array([np.zeros((len(Flist_select[id_p]), len(used_common_ubls), nt_used, 12 * nside_beamweight ** 2), dtype=Precision_full) for id_p in range(2)])
-				
-				for id_f, f in enumerate(Flist_select[id_p]):
-					if not Synthesize_MultiFreq:
-						if beam_heal_equ_x is None:
-							try:
-								beam_heal_equ_x = beam_heal_equ_x_mfreq[Reference_Freq_Index[0]]
-							except:
-								raise ValueError('No beam_heal_equ_x can be loaded or calculated from mfreq version.')
-						
-						if beam_heal_equ_y is None:
-							try:
-								beam_heal_equ_y = beam_heal_equ_x_mfreq[Reference_Freq_Index[1]]
-							except:
-								raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
-						
-						if p == 'x':
-							beam_heal_equ = beam_heal_equ_x
-						elif p == 'y':
-							beam_heal_equ = beam_heal_equ_y
-					else:
-						if p == 'x':
-							beam_heal_equ = beam_heal_equ_x_mfreq[Flist_select_index[id_p][id_f]]
-						elif p == 'y':
-							beam_heal_equ = beam_heal_equ_y_mfreq[Flist_select_index[id_p][id_f]]
-					
-					# beam
-					
-					print ("Computing full sky weighting A matrix for pol: %s, for freq: %s" % (p, f))
-					sys.stdout.flush()
-					
-					# A[p] = np.zeros((nt_used * len(used_common_ubls), 12 * nside_beamweight ** 2), dtype='complex128')
-					
-					# if not NoA_Out_fullsky:
-					timer = time.time()
-					for i in np.arange(12 * nside_beamweight ** 2):
-						dec, ra = hpf.pix2ang(nside_beamweight, i)  # gives theta phi
-						dec = np.pi / 2 - dec
-						print "\r%.1f%% completed" % (100. * float(i) / (12. * nside_beamweight ** 2)),
-						sys.stdout.flush()
-						if abs(dec - lat_degree * PI / 180) <= np.pi / 2:
-							if Synthesize_MultiFreq:
-								A[id_p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) * (equatorial_GSM_standard_mfreq[Flist_select_index[id_p][id_f], i] / equatorial_GSM_standard[i]) / 2.
-							else:
-								A[id_p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) / 2.
-					
-					print ("%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), pol, f))
-					sys.stdout.flush()
-					# else:
-					# 	for id_pix_chunk in range(0, 12 * nside_beamweight ** 2, 12 * nside_beamweight ** 2 / nchunk_A_full):
-					# 		id_time_stamp = time.time()
-					# 		num_pix_chunk = np.min([12 * nside_beamweight ** 2 / nchunk_A_full, 12 * nside_beamweight ** 2 - id_pix_chunk])
-					# 		print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
-							
-							
-							
-				# A[p] = A[p].reshape(len(Flist_select[id_p]) * len(used_common_ubls),  nt_used , 12 * nside_beamweight ** 2)
-				# print('Shape of A[%s]: %s' % (p, str(A[p].shape)))
-				A[id_p] = A[id_p].reshape(len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, 12 * nside_beamweight ** 2)
-				print('Shape of A: {0}'.format(A.shape))
-		
+				if beam_heal_equ_y is None:
+					try:
+						beam_heal_equ_y = beam_heal_equ_x_mfreq[Reference_Freq_Index[1]]
+					except:
+						raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
+				beam_heal_equ = {0: beam_heal_equ_x, 1: beam_heal_equ_y}
+				# A[id_p][id_f, :, :, i] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts)) / 2.
+				A = np.array([[[vs.calculate_pointsource_visibility(hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)]).transpose((0, 1, 3, 4, 2)).reshape(2, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used,  12 * nside_beamweight ** 2)
+			print ("{0} minutes used for A" .format((time.time() - timer) / 60.))
+			
+			# A[p] = A[p].reshape(len(Flist_select[id_p]) * len(used_common_ubls),  nt_used , 12 * nside_beamweight ** 2)
+			# print('Shape of A[%s]: %s' % (p, str(A[p].shape)))
+			# A = A.reshape(2, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, 12 * nside_beamweight ** 2)
+			print('Shape of A: {0}'.format(A.shape))
+			
+			if Use_nside_bw_forFullsim:
+				fullsim_vis = np.dot(A, equatorial_GSM_beamweight_nest).reshape((2, len(Flist_select[id_p]) * len(used_common_ubls), nt_used)).transpose(1, 0, 2)
+				print('Shape of fullsim_vis: {0}'.format(fullsim_vis.shape))
+			
 		if Compute_beamweight:
 			if not beam_weight_calculated:
-				print ("Computing beam weight...")
+				print ("Computing beam weight...\n")
 				sys.stdout.flush()
-				if not NoA_Out_fullsky:
+				if not NoA_Out_fullsky or not Parallel_A:
 					if nchunk_A_full == 1:
 						beam_weight = ((la.norm(A[0], axis=0) ** 2 + la.norm(A[1], axis=0) ** 2) ** .5)[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
 						print('Shape of beam_weight: {0}'.format(beam_weight.shape))
@@ -1689,6 +1717,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						beam_weight = beam_weight[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
 						
 					beam_weight_calculated = True
+
 			else:
 				beam_weight = beam_weight[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
 						
@@ -1696,18 +1725,73 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			beam_weight = beam_weight / np.mean(beam_weight)
 			thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 			beam_weight = hpf.get_interp_val(beam_weight, thetas_standard, phis_standard, nest=True)  # np.array([beam_weight for i in range(nside_standard ** 2 / nside_beamweight ** 2)]).transpose().flatten()
-			print "done."
+			print('Shape of beam_weight outputed: {0}'.format(beam_weight.shape))
+			print ("done.")
 			sys.stdout.flush()
+			
+			gsm_beamweighted = equatorial_GSM_standard * beam_weight
+			
+			nside_distribution = np.zeros(12 * nside_standard ** 2)
+			final_index = np.zeros(12 * nside_standard ** 2, dtype=int)
+			thetas, phis, sizes = [], [], []
+			abs_thresh = np.mean(gsm_beamweighted) * thresh
+			pixelize(gsm_beamweighted, nside_distribution, nside_standard, nside_start, abs_thresh,
+					 final_index, thetas, phis, sizes)
+			npix = len(thetas)
+			if Use_BeamWeight:
+				valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > valid_pix_thresh * max(beam_weight)
+			else:
+				valid_pix_mask = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > valid_pix_thresh * max(gsm_beamweighted)
+			valid_npix = np.sum(valid_pix_mask)
+			print ('>>>>>>>>> VALID NPIX = {0}'.format(valid_npix))
+			
+			fake_solution_map = np.zeros_like(thetas)
+			for i in range(len(fake_solution_map)):
+				fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
+			fake_solution_map = fake_solution_map[valid_pix_mask]
+			
+			if Synthesize_MultiFreq:
+				fake_solution_map_mfreq_temp = np.zeros((len(Flist_select[0]), npix))
+				fake_solution_map_mfreq = np.zeros((len(Flist_select[0]), valid_npix))
+				for id_f, f in enumerate(Flist_select_index[0]):
+					for i in range(npix):
+						fake_solution_map_mfreq_temp[id_f, i] = np.sum(equatorial_GSM_standard_mfreq[f, final_index == i])
+					fake_solution_map_mfreq[id_f] = fake_solution_map_mfreq_temp[id_f, valid_pix_mask]
+			
+			try:
+				del (equatorial_GSM_standard)
+				# del(beam_weight)
+				print('equatorial_GSM_standard and beam_weight have been successfully deleted.')
+			except:
+				print('No equatorial_GSM_standard or beam_weight to be deleted.')
+			
+			try:
+				del (equatorial_GSM_standard_mfreq)
+				del (fake_solution_map_mfreq_temp)
+				print('equatorial_GSM_standard_mfreq and fake_solution_map_mfreq_temp have been successfully deleted.')
+			except:
+				print('No equatorial_GSM_standard_mfreq or fake_solution_map_mfreq_temp to be deleted.')
+			
+			sizes = np.array(sizes)[valid_pix_mask]
+			thetas = np.array(thetas)[valid_pix_mask]
+			phis = np.array(phis)[valid_pix_mask]
+			
+			if not fit_for_additive:
+				fake_solution = np.copy(fake_solution_map)
+			else:
+				fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
+			print('fake_solution calculated in the function.')
+			
 			if not NoA_Out_fullsky:
 				if Use_nside_bw_forFullsim:
-					return A, beam_weight, fullsim_vis
+					return A, beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
 				else:
-					return A, beam_weight
+					return A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
 			else:
 				if Use_nside_bw_forFullsim:
-					return beam_weight, fullsim_vis
+					return beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
 				else:
-					return beam_weight
+					return beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
 		else:
 			if Use_nside_bw_forFullsim:
 				return A, fullsim_vis
@@ -1728,7 +1812,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			# 	return A
 			
 		elif os.path.isfile(A_path) and not force_recompute:
-			print "Reading A matrix from %s" % A_path
+			print ("Reading A matrix from {0}" .format(A_path))
 			sys.stdout.flush()
 			if fit_for_additive:
 				A = np.fromfile(A_path, dtype=Precision_masked).reshape((2, nUBL_used * len(Flist_select[0]), 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])))
@@ -1777,91 +1861,91 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 		# return A
 		else:
 			
-			if equatorial_GSM_standard is None:
-				try:
-					equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
-				except:
-					print('No equatorial_GSM_standard calculated.')
-			if beam_weight is None:
-				if A_got is None:
-					A_got = get_A_multifreq(additive_A=None, A_path=None, A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Flist_select_index=None, Reference_Freq_Index=Reference_Freq_Index, Reference_Freq=Reference_Freq, equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq,
-											used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=None, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
-				print ("Computing beam weight...",)
-				sys.stdout.flush()
-				beam_weight = ((la.norm(A_got['x'], axis=0) ** 2 + la.norm(A_got['y'], axis=0) ** 2) ** .5)[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
-				beam_weight = beam_weight / np.mean(beam_weight)
-				thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
-				beam_weight = hpf.get_interp_val(beam_weight, thetas_standard, phis_standard, nest=True)  # np.array([beam_weight for i in range(nside_standard ** 2 / nside_beamweight ** 2)]).transpose().flatten()
-				try:
-					del (A_got)
-					print('A_got has been successfully deleted.')
-				except:
-					print('No A_got to be deleted.')
-				print ("done.")
-				sys.stdout.flush()
-			
-			gsm_beamweighted = equatorial_GSM_standard * beam_weight
-			
-			nside_distribution = np.zeros(12 * nside_standard ** 2)
-			final_index = np.zeros(12 * nside_standard ** 2, dtype=int)
-			thetas, phis, sizes = [], [], []
-			abs_thresh = np.mean(gsm_beamweighted) * thresh
-			pixelize(gsm_beamweighted, nside_distribution, nside_standard, nside_start, abs_thresh,
-					 final_index, thetas, phis, sizes)
-			npix = len(thetas)
-			if Use_BeamWeight:
-				valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > valid_pix_thresh * max(beam_weight)
-			else:
-				valid_pix_mask = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > valid_pix_thresh * max(gsm_beamweighted)
-			valid_npix = np.sum(valid_pix_mask)
-			print '>>>>>>VALID NPIX =', valid_npix
-			
-			fake_solution_map = np.zeros_like(thetas)
-			for i in range(len(fake_solution_map)):
-				fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
-			fake_solution_map = fake_solution_map[valid_pix_mask]
-			
-			if Synthesize_MultiFreq:
-				fake_solution_map_mfreq_temp = np.zeros((len(Flist_select[0]), npix))
-				fake_solution_map_mfreq = np.zeros((len(Flist_select[0]), valid_npix))
-				for id_f, f in enumerate(Flist_select_index[0]):
-					for i in range(npix):
-						fake_solution_map_mfreq_temp[id_f, i] = np.sum(equatorial_GSM_standard_mfreq[f, final_index == i])
-					fake_solution_map_mfreq[id_f] = fake_solution_map_mfreq_temp[id_f, valid_pix_mask]
-			
-			try:
-				del (equatorial_GSM_standard)
-				# del(beam_weight)
-				print('equatorial_GSM_standard and beam_weight have been successfully deleted.')
-			except:
-				print('No equatorial_GSM_standard or beam_weight to be deleted.')
-			
-			try:
-				del (equatorial_GSM_standard_mfreq)
-				del (fake_solution_map_mfreq_temp)
-				print('equatorial_GSM_standard_mfreq and fake_solution_map_mfreq_temp have been successfully deleted.')
-			except:
-				print('No equatorial_GSM_standard_mfreq or fake_solution_map_mfreq_temp to be deleted.')
-			
-			sizes = np.array(sizes)[valid_pix_mask]
-			thetas = np.array(thetas)[valid_pix_mask]
-			phis = np.array(phis)[valid_pix_mask]
-			try:
-				np.savez(pixel_directory + '/../Output/' + 'pixel_scheme_%i_%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s.npz' % (valid_npix, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none',
-																																					  bnside, nside_standard), gsm=fake_solution_map, thetas=thetas, phis=phis, sizes=sizes, nside_distribution=nside_distribution, final_index=final_index,
-						 n_fullsky_pix=npix, valid_pix_mask=valid_pix_mask, thresh=thresh)
-			except:
-				print('Not Saving to pixel_directory.')
-			
-			if not fit_for_additive:
-				fake_solution = np.copy(fake_solution_map)
-			else:
-				fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
-			print('fake_solution calculated in the function.')
-			
-			if not Compute_A:
-				return beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
-			
+			# if equatorial_GSM_standard is None:
+			# 	try:
+			# 		equatorial_GSM_standard = equatorial_GSM_standard_mfreq[Reference_Freq_Index[0]]  # choose x freq.
+			# 	except:
+			# 		print('No equatorial_GSM_standard calculated.')
+			# if beam_weight is None:
+			# 	if A_got is None:
+			# 		A_got = get_A_multifreq(additive_A=None, A_path=None, A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Flist_select_index=None, Reference_Freq_Index=Reference_Freq_Index, Reference_Freq=Reference_Freq, equatorial_GSM_standard=None, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq,
+			# 								used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=None, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts)
+			# 	print ("Computing beam weight...",)
+			# 	sys.stdout.flush()
+			# 	beam_weight = ((la.norm(A_got['x'], axis=0) ** 2 + la.norm(A_got['y'], axis=0) ** 2) ** .5)[hpf.nest2ring(nside_beamweight, range(12 * nside_beamweight ** 2))]
+			# 	beam_weight = beam_weight / np.mean(beam_weight)
+			# 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
+			# 	beam_weight = hpf.get_interp_val(beam_weight, thetas_standard, phis_standard, nest=True)  # np.array([beam_weight for i in range(nside_standard ** 2 / nside_beamweight ** 2)]).transpose().flatten()
+			# 	try:
+			# 		del (A_got)
+			# 		print('A_got has been successfully deleted.')
+			# 	except:
+			# 		print('No A_got to be deleted.')
+			# 	print ("done.")
+			# 	sys.stdout.flush()
+			#
+			# gsm_beamweighted = equatorial_GSM_standard * beam_weight
+			#
+			# nside_distribution = np.zeros(12 * nside_standard ** 2)
+			# final_index = np.zeros(12 * nside_standard ** 2, dtype=int)
+			# thetas, phis, sizes = [], [], []
+			# abs_thresh = np.mean(gsm_beamweighted) * thresh
+			# pixelize(gsm_beamweighted, nside_distribution, nside_standard, nside_start, abs_thresh,
+			# 		 final_index, thetas, phis, sizes)
+			# npix = len(thetas)
+			# if Use_BeamWeight:
+			# 	valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > valid_pix_thresh * max(beam_weight)
+			# else:
+			# 	valid_pix_mask = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > valid_pix_thresh * max(gsm_beamweighted)
+			# valid_npix = np.sum(valid_pix_mask)
+			# print ('>>>>>>>>> VALID NPIX = {0}'.format(valid_npix))
+			#
+			# fake_solution_map = np.zeros_like(thetas)
+			# for i in range(len(fake_solution_map)):
+			# 	fake_solution_map[i] = np.sum(equatorial_GSM_standard[final_index == i])
+			# fake_solution_map = fake_solution_map[valid_pix_mask]
+			#
+			# if Synthesize_MultiFreq:
+			# 	fake_solution_map_mfreq_temp = np.zeros((len(Flist_select[0]), npix))
+			# 	fake_solution_map_mfreq = np.zeros((len(Flist_select[0]), valid_npix))
+			# 	for id_f, f in enumerate(Flist_select_index[0]):
+			# 		for i in range(npix):
+			# 			fake_solution_map_mfreq_temp[id_f, i] = np.sum(equatorial_GSM_standard_mfreq[f, final_index == i])
+			# 		fake_solution_map_mfreq[id_f] = fake_solution_map_mfreq_temp[id_f, valid_pix_mask]
+			#
+			# try:
+			# 	del (equatorial_GSM_standard)
+			# 	# del(beam_weight)
+			# 	print('equatorial_GSM_standard and beam_weight have been successfully deleted.')
+			# except:
+			# 	print('No equatorial_GSM_standard or beam_weight to be deleted.')
+			#
+			# try:
+			# 	del (equatorial_GSM_standard_mfreq)
+			# 	del (fake_solution_map_mfreq_temp)
+			# 	print('equatorial_GSM_standard_mfreq and fake_solution_map_mfreq_temp have been successfully deleted.')
+			# except:
+			# 	print('No equatorial_GSM_standard_mfreq or fake_solution_map_mfreq_temp to be deleted.')
+			#
+			# sizes = np.array(sizes)[valid_pix_mask]
+			# thetas = np.array(thetas)[valid_pix_mask]
+			# phis = np.array(phis)[valid_pix_mask]
+			# try:
+			# 	np.savez(pixel_directory + '/../Output/' + 'pixel_scheme_%i_%s-nubl%s-nt%s-mtbin%s-mfbin%s-tbin%s-bnside-%s-nside_standard-%s.npz' % (valid_npix, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_none', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_none', precal_time_bin if pre_calibrate else '_none',
+			# 																																		  bnside, nside_standard), gsm=fake_solution_map, thetas=thetas, phis=phis, sizes=sizes, nside_distribution=nside_distribution, final_index=final_index,
+			# 			 n_fullsky_pix=npix, valid_pix_mask=valid_pix_mask, thresh=thresh)
+			# except:
+			# 	print('Not Saving to pixel_directory.')
+			#
+			# if not fit_for_additive:
+			# 	fake_solution = np.copy(fake_solution_map)
+			# else:
+			# 	fake_solution = np.concatenate((fake_solution_map, np.zeros(4 * nUBL_used)))
+			# print('fake_solution calculated in the function.')
+			#
+			# if not Compute_A:
+			# 	return beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution
+
 			# if os.path.isfile(A_path) and not force_recompute:
 			# 	print "Reading A matrix from %s" % A_path
 			# 	sys.stdout.flush()
@@ -1875,16 +1959,18 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			# else:
 			
 			if Parallel_A:
-				print('Parallel Computing A matrix...')
+				print('Parallel Computing A matrix...\n')
 			else:
-				print ("Computing A matrix...")
+				print ("Computing A matrix... \n")
 			sys.stdout.flush()
-			if fit_for_additive:
-				# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
-				A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
-			else:
-				# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
-				A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+			#
+			# if fit_for_additive:
+			# 	# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
+			# 	A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
+			# else:
+			# 	# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+			# 	A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+			
 			timer = time.time()
 			if Parallel_A:
 				if maxtasksperchild == None:
@@ -1907,7 +1993,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					
 					if nchunk_A_valid == 1:
 						A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(2)])
-						A[:, :, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+						A = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
 					else:
 						for id_pix_chunk in range(0, valid_npix, valid_npix / nchunk_A_valid):
 							id_time_stamp = time.time()
@@ -1919,8 +2005,14 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							print('id_pix_chunk:{0} ; num_pix_chunk:{1} \n.'.format(id_pix_chunk, num_pix_chunk))
 							
 							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for f in Flist_select[id_p]] for id_p in range(2)])
-							A[:, :, :, :, :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+							#A[:, :, :, :, :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+							A_list_id_chunk = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+							if id_pix_chunk == 0:
+								A = A_list_id_chunk
+							else:
+								A = np.concatenate((A, A_list_id_chunk), axis=-1)
 							del (A_multiprocess_list)
+							del (A_list_id_chunk)
 							pool.terminate()
 							pool.join()
 							print('Time used for this chunk: {0} seconds'.format(time.time() - id_time_stamp))
@@ -1930,7 +2022,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					
 					if nchunk_A_valid == 1:
 						A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
-						A[:, :, :, :, :, :valid_npix] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+						A = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
 					else:
 						for id_pix_chunk in range(0, valid_npix, valid_npix / nchunk_A_valid):
 							id_time_stamp = time.time()
@@ -1942,73 +2034,103 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							print('id_pix_chunk:{0} ; num_pix_chunk:{1} \n.'.format(id_pix_chunk, num_pix_chunk))
 							
 							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)])
-							A[:, :, :, :, :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+							#A[:, :, :, :, :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+							A_list_id_chunk = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2))
+							if id_pix_chunk == 0:
+								A = A_list_id_chunk
+							else:
+								A = np.concatenate((A, A_list_id_chunk), axis=-1)
 							del (A_multiprocess_list)
+							del (A_list_id_chunk)
 							pool.terminate()
 							pool.join()
 							print('Time used for this chunk: {0} seconds'.format(time.time() - id_time_stamp))
 							
-				print('A shape: {0}'.format(A.shape))
 				print('{0} minutes used for parallel_computing A'.format((time.time() - timer) / 60.))
+				print('>>>>>>>>>>>>>>>>> Shape of A before reshaping: {0}'.format(A.shape))
 				
-				
-				if fit_for_additive:
-					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
-				else:
-					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix)
-				print('>>>>>>>>>>>>>>>>> Shape of A: %s' % (str(A.shape)))
+				# if fit_for_additive:
+				# 	A = A.reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
+				# else:
+				# 	A = A.reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix)
+				# print('>>>>>>>>>>>>>>>>> Shape of A after reshaping: {0}' .format(A.shape))
 			# if Del_A:
 			# 	try:
 			# 		A.tofile(A_path)
 			# 	except:
 			# 		print('A not saved.')
 			else:
-				for id_p, p in enumerate(['x', 'y']):
-					for id_f, f in enumerate(Flist_select[id_p]):
-						if not Synthesize_MultiFreq:
-							if beam_heal_equ_x is None:
-								try:
-									beam_heal_equ_x = beam_heal_equ_x_mfreq[Reference_Freq_Index[0]]
-								except:
-									raise ValueError('No beam_heal_equ_x can be loaded or calculated from mfreq version.')
-							
-							if beam_heal_equ_y is None:
-								try:
-									beam_heal_equ_y = beam_heal_equ_x_mfreq[Reference_Freq_Index[1]]
-								except:
-									raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
-							
-							if p == 'x':
-								beam_heal_equ = beam_heal_equ_x
-							elif p == 'y':
-								beam_heal_equ = beam_heal_equ_y
-						else:
-							if p == 'x':
-								beam_heal_equ = beam_heal_equ_x_mfreq[Flist_select_index[id_p][id_f]]
-							elif p == 'y':
-								beam_heal_equ = beam_heal_equ_y_mfreq[Flist_select_index[id_p][id_f]]
+				# if fit_for_additive:
+				# 	# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
+				# 	A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0])), dtype=Precision_masked)
+				# else:
+				# 	# A = np.empty((len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+				# 	A = np.empty((2, len(Flist_select[0]), nUBL_used, 2, nt_used, valid_npix), dtype=Precision_masked)
+				# for id_p, p in enumerate(['x', 'y']):
+				# 	for id_f, f in enumerate(Flist_select[id_p]):
+						# if not Synthesize_MultiFreq:
+						# 	if beam_heal_equ_x is None:
+						# 		try:
+						# 			beam_heal_equ_x = beam_heal_equ_x_mfreq[Reference_Freq_Index[0]]
+						# 		except:
+						# 			raise ValueError('No beam_heal_equ_x can be loaded or calculated from mfreq version.')
+						#
+						# 	if beam_heal_equ_y is None:
+						# 		try:
+						# 			beam_heal_equ_y = beam_heal_equ_x_mfreq[Reference_Freq_Index[1]]
+						# 		except:
+						# 			raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
+						#
+						# 	if p == 'x':
+						# 		beam_heal_equ = beam_heal_equ_x
+						# 	elif p == 'y':
+						# 		beam_heal_equ = beam_heal_equ_y
+						# else:
+						# 	if p == 'x':
+						# 		beam_heal_equ = beam_heal_equ_x_mfreq[Flist_select_index[id_p][id_f]]
+						# 	elif p == 'y':
+						# 		beam_heal_equ = beam_heal_equ_y_mfreq[Flist_select_index[id_p][id_f]]
 						
-						for n in range(valid_npix):
-							ra = phis[n]
-							dec = np.pi / 2. - thetas[n]
-							print "\r%f%% completed, %f minutes left for %s-%s" % (
-								100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.), id_f, f),
-							sys.stdout.flush()
-							if Synthesize_MultiFreq:
-								A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
-							else:
-								A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.)  # xx and yy are each half of I
+						# for n in range(valid_npix):
+						# 	ra = phis[n]
+						# 	dec = np.pi / 2. - thetas[n]
+						# 	print "\r%f%% completed, %f minutes left for %s-%s" % (
+						# 		100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.), id_f, f),
+						# 	sys.stdout.flush()
+						# 	if Synthesize_MultiFreq:
+						# 		A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
+						# 	else:
+						# 		A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) / 2.)  # xx and yy are each half of I
 						# A[:, -1, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_y, tlist=lsts) / 2
 						
-						print ("%f minutes used for pol: %s, freq: %s" % ((float(time.time() - timer) / 60.), p, f))
-					print('Shape of A[%s]: %s' % (p, str(A[:, :, :, id_p, :, :].shape)))
-					sys.stdout.flush()
-				
-				if fit_for_additive:
-					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
+				if Synthesize_MultiFreq:
+					beam_heal_equ = {0: beam_heal_equ_x_mfreq, 1: beam_heal_equ_y_mfreq}
+					A = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n]) for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix)  # xx and yy are each half of I
 				else:
-					A = A.reshape(2, len(Flist_select[0]) * nUBL_used, 2, nt_used, valid_npix)
-				print('>>>>>>>>>>>>>>>>> Shape of A: %s' % (str(A.shape)))
+					if beam_heal_equ_x is None:
+						try:
+							beam_heal_equ_x = beam_heal_equ_x_mfreq[Reference_Freq_Index[0]]
+						except:
+							raise ValueError('No beam_heal_equ_x can be loaded or calculated from mfreq version.')
+					
+					if beam_heal_equ_y is None:
+						try:
+							beam_heal_equ_y = beam_heal_equ_x_mfreq[Reference_Freq_Index[1]]
+						except:
+							raise ValueError('No beam_heal_equ_y can be loaded or calculated from mfreq version.')
+					print('Shape of beam_heal_equ_x: {0}; Shape of beam_heal_equ_y: {1}'.format(beam_heal_equ_x.shape, beam_heal_equ_y.shape))
+					beam_heal_equ = {0: beam_heal_equ_x, 1: beam_heal_equ_y}
+					A = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(2)]).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix)  # xx and yy are each half of I
+						
+				print ("{0} minutes used A uparallel".format((float(time.time() - timer) / 60.)))
+				print ('Shape of A after reshaping: {0}' .format(A.shape))
+				sys.stdout.flush()
+				
+			# if fit_for_additive:
+			# 	A = A.reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix + 4 * nUBL_used * len(Flist_select[0]))
+			# else:
+			# 	A = A.reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix)
+			# print('>>>>>>>>>>>>>>>>> Shape of A after reshaping: {0}' .format(A.shape))
 			
 			if Del_A and not NoA_Out:
 				try:
@@ -2055,13 +2177,14 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			#         A[i, p, :, valid_npix + 4 * i + 2 * p] = 1. * autocorr_vis_normalized[p]
 			#         A[i, p, :, valid_npix + 4 * i + 2 * p + 1] = 1.j * autocorr_vis_normalized[p]
 			
-			A.shape = (2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
+			# A.shape = (2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, A.shape[-1])
+
 			if not fit_for_additive:
 				A = A[:, :valid_npix]
 			else:
 				A[:, valid_npix:] = additive_A[:, 1:]
 			try:
-				print('>>>>>>>>>>>>>>>>> Shape of A after fit_for_additive: %s' % (str(A.shape)))
+				print('>>>>>>>>>>>>>>>>> Shape of A after fit_for_additive: {0}'.format(A.shape))
 			# print('>>>>>>>>>>>>>>>>> Shape of A after Real/Imag Seperation: %s' % (str(np.concatenate((np.real(A), np.imag(A))).shape)))
 			except:
 				print('No printing A.')
@@ -4045,7 +4168,7 @@ elif 'hera47' in INSTRUMENT:
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
 	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 10 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	nchunk_A_full = 20 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex64' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	NoA_Out_fullsky = True # Whether or not to calculate full A matrix
@@ -4157,13 +4280,13 @@ elif 'hera47' in INSTRUMENT:
 	if Simulation_For_All:
 		antenna_num = 350 # number of antennas that enter simulation: 37,128,243,350
 		flist = np.array([np.arange(100., 200., Frequency_Bin*10.**(-6)) for i in range(2)])
-		index_freq = np.array([len(flist[i]) / 2 for i in range(2)])
+		index_freq = np.array([len(flist[i]) / 10 for i in range(2)])
 		if len(sys.argv) > 10:
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.
-			lsts_end = 5.
+			lsts_start = 2.5
+			lsts_end = 4.
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -5824,7 +5947,7 @@ elif 'hera47' in INSTRUMENT:
 sys.stdout.flush()
 equ_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=JulianEpoch))
 ang0, ang1 = hp.rotator.rotateDirection(equ_to_gal_matrix,
-                                        hpf.pix2ang(nside_standard, range(12 * nside_standard ** 2), nest=True))
+										hpf.pix2ang(nside_standard, range(12 * nside_standard ** 2), nest=True))
 equatorial_GSM_standard = hpf.get_interp_val(gsm_standard, ang0, ang1)
 equatorial_GSM_standard_mfreq = np.zeros(0)
 if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
@@ -5867,7 +5990,7 @@ elif 'hera47' in INSTRUMENT:
 sys.stdout.flush()
 equ_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=JulianEpoch))
 ang0, ang1 = hp.rotator.rotateDirection(equ_to_gal_matrix,
-                                        hpf.pix2ang(nside_beamweight, range(12 * nside_beamweight ** 2), nest=True))
+										hpf.pix2ang(nside_beamweight, range(12 * nside_beamweight ** 2), nest=True))
 equatorial_GSM_beamweight = hpf.get_interp_val(gsm_beamweight, ang0, ang1)
 equatorial_GSM_beamweight_mfreq = np.zeros(0)
 if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
@@ -5900,22 +6023,28 @@ sys.stdout.flush()
 
 try:
 	if NoA_Out_fullsky:
-		beam_weight, fullsim_vis = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True, A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A_fullsky,
-		                                           Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_beamweight, equatorial_GSM_standard_mfreq=equatorial_GSM_beamweight_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild, nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
-		                                           ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky)
+		beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
+																																																		   A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A_fullsky,
+												   Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild, nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
+												   ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky,
+												   Use_BeamWeight=Use_BeamWeight, thresh=thresh, valid_pix_thresh=valid_pix_thresh, equatorial_GSM_beamweight=equatorial_GSM_beamweight, equatorial_GSM_beamweight_mfreq=equatorial_GSM_beamweight_mfreq)
 		
 	else:
-		A, beam_weight, fullsim_vis = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True, A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A_fullsky,
-										 Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_beamweight, equatorial_GSM_standard_mfreq=equatorial_GSM_beamweight_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild, nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
-										 ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky)
+		A, beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
+																																																			  A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A_fullsky,
+										 Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild, nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
+										 ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky,
+										Use_BeamWeight=Use_BeamWeight, thresh=thresh, valid_pix_thresh=valid_pix_thresh, equatorial_GSM_beamweight=equatorial_GSM_beamweight, equatorial_GSM_beamweight_mfreq=equatorial_GSM_beamweight_mfreq)
 
 except:
 	sys.stdout.flush()
 	try:
 		if Parallel_A_fullsky and Precision_full=='complex64':
-			A, beam_weight = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True, A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=False,
-											 Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, Precision_full='complex64', maxtasksperchild=maxtasksperchild, nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
-											 ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=None, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky)
+			A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
+			                                                                                                                                                                                         A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=False,
+			                                                                                                                                                                                         Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild, nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
+			                                                                                                                                                                                         ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky,
+			                                                                                                                                                                                         Use_BeamWeight=Use_BeamWeight, thresh=thresh, valid_pix_thresh=valid_pix_thresh, equatorial_GSM_beamweight=equatorial_GSM_beamweight, equatorial_GSM_beamweight_mfreq=equatorial_GSM_beamweight_mfreq)
 		else:
 			raise ValueError('Already use unparallel computing with complex64 precision for full-sky A matrix, still not enough memory so not try again.')
 	except:
@@ -7250,10 +7379,10 @@ sys.stdout.flush()
 ######################################### Dynamica Pixelization and A Matrix Calculation ################################################
 #########################################################################################################################################
 
-beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
-	get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, A_path='', A_got=None, A_version=1.0, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData,
-					flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, NoA_Out=NoA_Out,
-					used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
+# beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
+# 	get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, A_path='', A_got=None, A_version=1.0, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData,
+# 					flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, NoA_Out=NoA_Out,
+# 					used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=lsts)
 
 try:
 	if plot_pixelization:
@@ -7335,6 +7464,15 @@ except:
 	
 NoA_Out = NoA_Out if not fit_for_additive else False
 # Precision_masked = 'complex128'
+
+# clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1  = \
+# 	get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
+# 					flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
+# 					used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
+# 					NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
+# 					Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid,gsm_beamweighted=gsm_beamweighted, thetas=thetas, phis=phis, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
+
+
 # maxtasksperchild = 50
 if NoA_Out:
 	try:
@@ -7343,7 +7481,8 @@ if NoA_Out:
 							flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
 							used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
 							NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
-							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid)
+							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
+							npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 	
 	except:
 		try:
@@ -7353,10 +7492,11 @@ if NoA_Out:
 				print('Use Unparallel Computing for A instead.')
 				clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
 					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
-									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
-									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-									NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
-									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid)
+					                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
+					                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
+					                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
+					                Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
+					                npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 		
 		except:
 			sys.stdout.flush()
@@ -7364,10 +7504,11 @@ if NoA_Out:
 				Del_A = True
 				clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
 					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
-									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
-									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-									NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
-									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid)
+					                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
+					                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
+					                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
+					                Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
+					                npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 			else:
 				raise ValueError('get_A_multifreq() misfunction.')
 	
@@ -7375,10 +7516,12 @@ if NoA_Out:
 else:
 	try:
 		A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
-			get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
-							flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
-							used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid)
+			get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
+			                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
+			                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
+			                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
+			                Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
+			                npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 	except:
 		try:
 			sys.stdout.flush()
@@ -7386,20 +7529,24 @@ else:
 				Parallel_A = False
 				print('Use Unparallel Computing for A instead.')
 				A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
-					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
-									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
-									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid)
+					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
+					                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
+					                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
+					                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
+					                Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
+					                npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 		
 		except:
 			sys.stdout.flush()
 			if not Del_A:
 				Del_A = True
 				A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution = \
-					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=False, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
-									flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
-									used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
-									Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid)
+					get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
+					                flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=[freq, freq], equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
+					                used_common_ubls=used_common_ubls_sinfreq, nt_used=nt_used, nUBL_used=nUBL_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=beam_heal_equ_x_mfreq, beam_heal_equ_y_mfreq=beam_heal_equ_y_mfreq, lsts=lsts, Parallel_A=Parallel_A,
+					                NoA_Out=NoA_Out, CNi=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
+					                Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
+					                npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 			else:
 				raise ValueError('get_A_multifreq() misfunction.')
 
