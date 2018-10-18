@@ -4444,7 +4444,7 @@ elif 'hera' in INSTRUMENT:
 	A_Method_leg = True # Whether to use the legacy method for calculating A or not.
 	
 	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 60 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	nchunk_A_full = 20 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	NoA_Out_fullsky = True # Whether or not to calculate full A matrix
@@ -4454,7 +4454,7 @@ elif 'hera' in INSTRUMENT:
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 10  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 7  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -4555,7 +4555,7 @@ elif 'hera' in INSTRUMENT:
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
 		antenna_num = 128 # number of antennas that enter simulation: 37,128,243,350
-		flist = np.array([np.arange(100., 200., Frequency_Bin*10.**(-5)) for i in range(Num_Pol)])
+		flist = np.array([np.arange(100., 200., Frequency_Bin*10.**(-6)) for i in range(Num_Pol)])
 		index_freq = np.array([int(len(flist[i]) / 2) for i in range(Num_Pol)])
 		if len(sys.argv) > 10:
 			lsts_start = np.float(sys.argv[10])
@@ -4607,7 +4607,7 @@ elif 'hera' in INSTRUMENT:
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-4.)
 		else:
-			valid_pix_thresh = 10. ** (-1.3)
+			valid_pix_thresh = 10. ** (-4.)
 	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
@@ -4617,9 +4617,9 @@ elif 'hera' in INSTRUMENT:
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 256  # starting point to calculate dynamic A
-		nside_standard = 256  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = 256  # undynamic A matrix shape
+		nside_start = 64  # starting point to calculate dynamic A
+		nside_standard = 64  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = 64  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = False
 	WaterFall_Plot_with_MultiFreqSimulation = False
@@ -6628,22 +6628,25 @@ autocorr_vis_normalized = np.array([autocorr_vis[p, :] / (la.norm(autocorr_vis[p
 
 random_pix_phi_theta = np.array([[uniform(phis.min() + 0.1, phis.max() - 0.1), uniform(thetas.min() + 0.1, thetas.max() - 0.1)] for id_pix in range(num_figures)])
 random_pix_id_valid = np.array([np.argmin(la.norm(random_pix_phi_theta[id_fig] - np.array([phis, thetas]).transpose(), axis=-1)) for id_fig in range(num_figures)])
+random_pix_phi_theta_invalid = np.array([[uniform(0., 2*np.pi), uniform(0., np.pi)] for id_pix in range(num_figures)])
 # fullsim_vis_ps = np.array([[[Calculate_pointsource_visibility_R_I(vs, uniform(phis.min() + 0.1, phis.max() - 0.1), (np.pi / 2. - uniform(thetas.min() + 0.1, thetas.max() - 0.1)), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
 # 						  dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)) # xx and yy are each half of I # .transpose((3, 1, 4, 0, 5, 2)).reshape(2 * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
 # fullsim_vis_ps_center = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[id_pix], (np.pi / 2. - thetas[id_pix]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
 #                           dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2))
 fullsim_vis_ps = np.array([[[Calculate_pointsource_visibility_R_I(vs, random_pix_phi_theta[id_pix, 0], (np.pi / 2. - random_pix_phi_theta[id_pix, 1]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
-                          dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)) # xx and yy are each half of I # .transpose((3, 1, 4, 0, 5, 2)).reshape(2 * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
+						  dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)) # xx and yy are each half of I # .transpose((3, 1, 4, 0, 5, 2)).reshape(2 * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
 fullsim_vis_ps_center = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[random_pix_id_valid[id_pix]], (np.pi / 2. - thetas[random_pix_id_valid[id_pix]]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
-                                 dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2))
-
+								 dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2))
+fullsim_vis_ps_invalid = np.array([[[Calculate_pointsource_visibility_R_I(vs, random_pix_phi_theta_invalid[id_pix, 0], (np.pi / 2. - random_pix_phi_theta_invalid[id_pix, 1]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
+								  dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2))
 
 print('\nShape of fullsim_vis_ps: {0} \n'.format(fullsim_vis_ps.shape))
 fullsim_vis_ps = fullsim_vis_ps.reshape(2 * len(Flist_select_point[0]) * nUBL_used * Num_Pol * nt_used, num_figures)
-fullsim_vis_ps_center= fullsim_vis_ps_center.reshape(2 * len(Flist_select_point[0]) * nUBL_used * Num_Pol * nt_used, num_figures)
-fullsim_vis_ps = np.concatenate((fullsim_vis_ps, fullsim_vis_ps_center), axis=-1)
+fullsim_vis_ps_center = fullsim_vis_ps_center.reshape(2 * len(Flist_select_point[0]) * nUBL_used * Num_Pol * nt_used, num_figures)
+fullsim_vis_ps_invalid = fullsim_vis_ps_invalid.reshape(2 * len(Flist_select_point[0]) * nUBL_used * Num_Pol * nt_used, num_figures)
+fullsim_vis_ps = np.concatenate((fullsim_vis_ps, fullsim_vis_ps_center, fullsim_vis_ps_invalid), axis=-1)
 random_pix_center_phi_theta = np.array([[phis[random_pix_id_valid[id_pix]], thetas[random_pix_id_valid[id_pix]]] for id_pix in range(num_figures)])
-random_pix_phi_theta = np.concatenate((random_pix_phi_theta, random_pix_center_phi_theta), axis=0)
+random_pix_phi_theta = np.concatenate((random_pix_phi_theta, random_pix_center_phi_theta, random_pix_phi_theta_invalid), axis=0)
 print('Shape of fullsim_vis_ps after reshaping and concatenating: {0}\n'.format((fullsim_vis_ps.shape)))
 
 # # Parallel_A_Convert = False # If to parallel Convert A from nside_beam to nside_standard.
@@ -9226,10 +9229,13 @@ try:
 	else:
 		Discrepancy_Ratio = np.abs(w_sim_sol - w_GSM) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
 		Discrepancy_Ratio_wienned = np.abs(w_GSM - fake_solution) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
-	print('>>>>>>>>>>>>>> Discrepancy Ratio: {0}'.format(Discrepancy_Ratio))
-	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean: {0}\n'.format(np.mean(Discrepancy_Ratio)))
-	print('>>>>>>>>>>>>>> Discrepancy Ratio wienned: {0}'.format(Discrepancy_Ratio_wienned))
+		Discrepancy_Ratio_full = np.abs(w_solution - w_sim_sol) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+	# print('\n>>>>>>>>>>>>>> Discrepancy Ratio: {0}'.format(Discrepancy_Ratio))
+	print('\n>>>>>>>>>>>>>> Discrepancy Ratio Mean: {0}\n'.format(np.mean(Discrepancy_Ratio)))
+	# print('>>>>>>>>>>>>>> Discrepancy Ratio wienned: {0}'.format(Discrepancy_Ratio_wienned))
 	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean wienned: {0}\n'.format(np.mean(Discrepancy_Ratio_wienned)))
+	# print('>>>>>>>>>>>>>> Discrepancy Ratio full: {0}'.format(Discrepancy_Ratio_full))
+	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean full: {0}\n'.format(np.mean(Discrepancy_Ratio_full)))
 	print('>>>>>>>>>>>>>> Mean of AtNiAi: {0}'.format(np.mean(AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5)))
 	
 except:
