@@ -40,3 +40,5 @@ def rms_temperature_calculator(frequency=150, integration_time=10., frequency_ch
 	
 	return system_temperature
 	
+	
+print ('Run on Cluster')

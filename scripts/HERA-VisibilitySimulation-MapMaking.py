@@ -10,6 +10,7 @@ import HERA_MapMaking_VisibilitySimulation.Bulm
 # import simulate_visibilities.simulate_visibilities as sv
 import HERA_MapMaking_VisibilitySimulation.simulate_visibilities as sv
 import numpy as np
+import scipy.stats as sps
 import numpy.linalg as la
 import scipy.linalg as sla
 import aipy as ap
@@ -1569,7 +1570,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						else:
 							pool = Pool(maxtasksperchild=maxtasksperchild)
 						num_pix_chunk = np.min([12 * nside_beamweight ** 2 / nchunk_A_full, 12 * nside_beamweight ** 2 - id_pix_chunk])
-						print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+						print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / (12 * nside_beamweight ** 2)))
 						A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 
 						A_list_id_chunk = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
@@ -1632,7 +1633,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						else:
 							pool = Pool(maxtasksperchild=maxtasksperchild)
 						num_pix_chunk = np.min([12 * nside_beamweight ** 2 / nchunk_A_full, 12 * nside_beamweight ** 2 - id_pix_chunk])
-						print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+						# print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+						print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / (12 * nside_beamweight ** 2)))
 						A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)])
 						
 						A_list_id_chunk = np.array([[[A_multiprocess_list[id_p][id_f][n].get() / 2. * (equatorial_GSM_beamweight_mfreq_nest[Flist_select_index[id_p][id_f], n] / equatorial_GSM_beamweight_nest[n]) for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_full).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
@@ -1813,7 +1815,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						for id_pix_chunk in range(0, 12 * nside_beamweight ** 2, 12 * nside_beamweight ** 2 / nchunk_A_full):
 							id_time_stamp = time.time()
 							num_pix_chunk = np.min([12 * nside_beamweight ** 2 / nchunk_A_full, 12 * nside_beamweight ** 2 - id_pix_chunk])
-							print('For beam_weight: id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+							print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / (12 * nside_beamweight ** 2)))
 							if Num_Pol == 2:
 								beam_weight_id_chunk = (la.norm(A[0][:, id_pix_chunk: id_pix_chunk + num_pix_chunk], axis=0) ** 2 + la.norm(A[1][:, id_pix_chunk: id_pix_chunk + num_pix_chunk], axis=0) ** 2) ** 0.5
 							else:
@@ -2137,7 +2139,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							else:
 								pool = Pool(maxtasksperchild=maxtasksperchild)
 							num_pix_chunk = np.min([valid_npix / nchunk_A_valid, valid_npix - id_pix_chunk])
-							print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+							print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / (12 * nside_beamweight ** 2)))
 							
 							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 							if A_Method_leg:
@@ -2172,7 +2174,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							else:
 								pool = Pool(maxtasksperchild=maxtasksperchild)
 							num_pix_chunk = np.min([valid_npix / nchunk_A_valid, valid_npix - id_pix_chunk])
-							print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+							# print('id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk))
+							print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / (12 * nside_beamweight ** 2)))
 							
 							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p][Flist_select_index[id_p][id_f]], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)])
 							if A_Method_leg:
@@ -2382,7 +2385,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			if fake_solution is None:
 				raise ValueError('Cannot calculate A derivants because No fake_solution loaded or calculated.')
 			clean_sim_data = A.dot(fake_solution.astype(A.dtype))
-			Csim_data = (clean_sim_data + np.random.randn(len(clean_sim_data)) / CNi ** .5) if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / CNi ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
+			# Csim_data = (clean_sim_data + np.random.randn(len(clean_sim_data)) / CNi ** .5) if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / CNi ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
 			
 			# compute AtNi.y
 			AtNi_data = np.transpose(A).dot((Cdata * CNi).astype(A.dtype))
@@ -3993,7 +3996,7 @@ INSTRUMENT = ''
 # else:
 # 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 Num_Pol = int(2)
-INSTRUMENT = 'hera'  # 'hera'; 'miteor' 'hera-spar' (space array, cone)
+INSTRUMENT = 'hera'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; '-vivaldi'
 INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol)
 print INSTRUMENT
 
@@ -4454,12 +4457,12 @@ elif 'hera' in INSTRUMENT:
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 7  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 12  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
-	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
+	Use_LinalgInv = True # Whether to use np.linalg.inv to inverse AtNiA.
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
 	Conjugate_A_append = False # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
@@ -4561,8 +4564,8 @@ elif 'hera' in INSTRUMENT:
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.8
-			lsts_end = 3.8
+			lsts_start = 1.8
+			lsts_end = 4.8
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -4590,9 +4593,9 @@ elif 'hera' in INSTRUMENT:
 	
 	
 	Add_S_diag = False # Add S_matrix onto AtNiA to calculate inverse or not.
-	Add_Rcond = False # Add R_matrix onto AtNiA to calculate inverse or not.
+	Add_Rcond = True # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
-	rcond_list = 10. ** np.arange(-20, 10., 1.)
+	rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -4607,7 +4610,7 @@ elif 'hera' in INSTRUMENT:
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-4.)
 		else:
-			valid_pix_thresh = 10. ** (-4.)
+			valid_pix_thresh = 10. ** (-5.)
 	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
@@ -4804,7 +4807,7 @@ elif 'hera' in INSTRUMENT:
 			print('Badants before appending: %s' % str(badants))
 			if len(badants_append) >= 1:
 				for bat in badants_append:
-					if (bat, 'x') in antmets['final_metrics']['meanVij'].keys() or (bat, 'y') in antmets['final_metrics']['meanVij'].keys():
+					if (bat, 'x') in  antmets['final_metrics']['meanVij'].keys() or (bat, 'y') in antmets['final_metrics']['meanVij'].keys():
 						badants = np.append(badants, bat)
 			badants = np.unique(badants)
 		else:
@@ -6127,7 +6130,7 @@ elif 'hera' in INSTRUMENT:
 	# Beam_Normalization = True
 	
 	if 'spar' in INSTRUMENT:
-		beam_pattern_map = np.ones(12 * nside_standard ** 2)
+		# beam_pattern_map = np.ones(12 * nside_standard ** 2)
 		thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
 		# freq = 10. ** (0)  # MHz
 		flist_beam = flist[0][::10]
@@ -6140,7 +6143,7 @@ elif 'hera' in INSTRUMENT:
 		
 		beam_pattern_normalized_map_mfreq_z = (beam_pattern_map_mfreq.transpose() / np.max(beam_pattern_map_mfreq, axis=-1)).transpose()
 		
-		beam_pattern_normalized_map_mfreq = np.ones((3, len(flist_beam), 12*nside_standard**2))
+		beam_pattern_normalized_map_mfreq = np.ones((Num_Pol, len(flist_beam), 12*nside_standard**2))
 		beam_pattern_normalized_map_mfreq[2] = beam_pattern_normalized_map_mfreq_z
 		
 		R_zy = hp.Rotator(rot=[0, 0, np.pi/2.], deg=False)
@@ -6152,6 +6155,38 @@ elif 'hera' in INSTRUMENT:
 		
 		local_beam_unpol = si.interp1d(flist_beam, beam_pattern_normalized_map_mfreq.transpose(1, 0, 2), axis=0)
 		
+	
+	elif 'vivaldi' in INSTRUMENT:
+		thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=False)
+		# freq = 10. ** (0)  # MHz
+		flist_beam = flist[0][::10]
+		lambda_D_list = (C / flist_beam) / 14. # Diameter of HERA
+		# for id_pix in range(12 * nside_standard ** 2):
+		# 	beam_pattern_map[id_pix] = (((np.cos(np.pi * length_lambda * np.cos(thetas_standard[id_pix])) - np.cos(np.pi * length_lambda))) / np.sin(thetas_standard[id_pix])) ** 2.
+		
+		beam_pattern_map_mfreq = np.array([[sps.norm.pdf(thetas_standard[id_pix], loc=0, scale=lambda_D) for id_pix in range(12 * nside_standard ** 2)] for lambda_D in lambda_D_list])
+		print('lambda_over_D_list: {0}-{1}'.format(lambda_D_list.min(), lambda_D_list.max()))
+		
+		beam_pattern_normalized_map_mfreq_z = (beam_pattern_map_mfreq.transpose() / np.max(beam_pattern_map_mfreq, axis=-1)).transpose()
+		
+		beam_pattern_normalized_map_mfreq = np.ones((Num_Pol, len(flist_beam), 12 * nside_standard ** 2))
+		if Num_Pol == 3:
+			beam_pattern_normalized_map_mfreq[2] = beam_pattern_normalized_map_mfreq_z
+		
+			R_zy = hp.Rotator(rot=[0, 0, np.pi / 2.], deg=False)
+			R_zx = hp.Rotator(rot=[0, np.pi / 2., 0], deg=False)
+			thetas_y, phis_y = R_zy(thetas_standard, phis_standard)
+			thetas_x, phis_x = R_zx(thetas_standard, phis_standard)
+			beam_pattern_normalized_map_mfreq[1] = np.array(map(lambda x: hp.get_interp_val(x, thetas_y, phis_y), beam_pattern_normalized_map_mfreq_z))
+			beam_pattern_normalized_map_mfreq[0] = np.array(map(lambda x: hp.get_interp_val(x, thetas_x, phis_x), beam_pattern_normalized_map_mfreq_z))
+		else:
+			R = hp.Rotator(rot=[np.pi / 2, 0, 0], deg=False)
+			beam_pattern_normalized_map_mfreq[0] = beam_pattern_normalized_map_mfreq_z
+			thetas_y, phis_y = R(thetas_standard, phis_standard)
+			beam_pattern_normalized_map_mfreq[1] = np.array(map(lambda x: hp.get_interp_val(x, thetas_y, phis_y), beam_pattern_normalized_map_mfreq_z))
+		
+		local_beam_unpol = si.interp1d(flist_beam, beam_pattern_normalized_map_mfreq.transpose(1, 0, 2), axis=0)
+	
 	
 	elif Old_BeamPattern:
 		filename_pre = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
@@ -6626,7 +6661,8 @@ autocorr_vis = np.array([[[vs.calculate_pointsource_visibility(phis_standard[n],
 autocorr_vis_normalized = np.array([autocorr_vis[p, :] / (la.norm(autocorr_vis[p, :]) / la.norm(np.ones_like(autocorr_vis[p, :]))) for p in range(Num_Pol)])
 
 
-random_pix_phi_theta = np.array([[uniform(phis.min() + 0.1, phis.max() - 0.1), uniform(thetas.min() + 0.1, thetas.max() - 0.1)] for id_pix in range(num_figures)])
+# random_pix_phi_theta = np.array([[uniform(phis.min() + 0.1, phis.max() - 0.1), uniform(thetas.min() + 0.1, thetas.max() - 0.1)] for id_pix in range(num_figures)])
+random_pix_phi_theta = np.array([[uniform(lsts.min(), lsts.max()) * np.pi/12., uniform(112./180.*np.pi, 128./180.*np.pi)] for id_pix in range(num_figures)])
 random_pix_id_valid = np.array([np.argmin(la.norm(random_pix_phi_theta[id_fig] - np.array([phis, thetas]).transpose(), axis=-1)) for id_fig in range(num_figures)])
 random_pix_phi_theta_invalid = np.array([[uniform(0., 2*np.pi), uniform(0., np.pi)] for id_pix in range(num_figures)])
 # fullsim_vis_ps = np.array([[[Calculate_pointsource_visibility_R_I(vs, uniform(phis.min() + 0.1, phis.max() - 0.1), (np.pi / 2. - uniform(thetas.min() + 0.1, thetas.max() - 0.1)), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
@@ -8553,7 +8589,7 @@ else:
 				AtNiAi.tofile(AtNiAi_path, overwrite=True)
 			except:
 				print('AtNiAi cannot be saved to file via AiNiAi_path.')
-			del (AtNiA)
+			# del (AtNiA)
 			print ("{0} minutes used" .format((time.time() - timer) / 60.))
 			print ("regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes))
 			break
@@ -8596,7 +8632,7 @@ else:
 print ("Memory usage: {0:.3f}MB" .format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024))
 sys.stdout.flush()
 
-del (AtNiAi)
+# del (AtNiAi)
 
 if not NoA_Out:
 	try:
@@ -9054,9 +9090,9 @@ try:
 		plt.figure(98000000 + crd)
 		crd += 10
 		plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-		plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-		plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 4, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
+		plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+		plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 4, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+		plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 		plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
 		plt.show(block=False)
 	
@@ -9222,14 +9258,19 @@ sys.stdout.flush()
 # 	print('No point spread function plotted.')
 
 try:
-	AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
-	AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
-	if not Simulation_For_All:
-		Discrepancy_Ratio = np.abs(w_solution - w_sim_sol) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+	AtNiA_noR = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
+	if not Use_LinalgInv:
+		AtNiAi = np.linalg.inv(AtNiA).astype(Precision_AtNiAi)
+	if Add_Rcond and rcond != 0.:
+		Sigma = (AtNiAi.dot(AtNiA_noR)).dot(AtNiAi)
 	else:
-		Discrepancy_Ratio = np.abs(w_sim_sol - w_GSM) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
-		Discrepancy_Ratio_wienned = np.abs(w_GSM - fake_solution) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
-		Discrepancy_Ratio_full = np.abs(w_solution - w_sim_sol) / AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+		Sigma = AtNiAi
+	if not Simulation_For_All:
+		Discrepancy_Ratio = np.abs(w_solution - fake_solution) / Sigma[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+	else:
+		Discrepancy_Ratio = np.abs(w_sim_sol - fake_solution) / Sigma[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+		Discrepancy_Ratio_wienned = np.abs(w_GSM - fake_solution) / Sigma[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
+		Discrepancy_Ratio_full = np.abs(w_solution - fake_solution) / Sigma[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
 	# print('\n>>>>>>>>>>>>>> Discrepancy Ratio: {0}'.format(Discrepancy_Ratio))
 	print('\n>>>>>>>>>>>>>> Discrepancy Ratio Mean: {0}\n'.format(np.mean(Discrepancy_Ratio)))
 	# print('>>>>>>>>>>>>>> Discrepancy Ratio wienned: {0}'.format(Discrepancy_Ratio_wienned))
@@ -9237,9 +9278,11 @@ try:
 	# print('>>>>>>>>>>>>>> Discrepancy Ratio full: {0}'.format(Discrepancy_Ratio_full))
 	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean full: {0}\n'.format(np.mean(Discrepancy_Ratio_full)))
 	print('>>>>>>>>>>>>>> Mean of AtNiAi: {0}'.format(np.mean(AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5)))
+	print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time))
+	print('INSTRUMENT: {0} \n'.format(INSTRUMENT))
 	
 except:
-	print('Discrepancy Ratio not Calculated')
+	print('\nDiscrepancy Ratio not Calculated. \n')
 
 sys.stdout.flush()
 
