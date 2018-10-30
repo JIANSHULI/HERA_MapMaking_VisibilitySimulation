@@ -1,56 +1,83 @@
+# -*- mode: python; coding: utf-8 -*
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
+from __future__ import absolute_import, division, print_function
+
 import os
+import six
 import subprocess
 import json
 
+pyuvdata_dir = os.path.dirname(os.path.realpath(__file__))
+
+
+def _get_git_output(args, capture_stderr=False):
+    """Get output from Git, ensuring that it is of the ``str`` type,
+    not bytes."""
+
+    argv = ['git', '-C', pyuvdata_dir] + args
+
+    if capture_stderr:
+        data = subprocess.check_output(argv, stderr=subprocess.STDOUT)
+    else:
+        data = subprocess.check_output(argv)
+
+    data = data.strip()
+
+    if six.PY2:
+        return data
+    return data.decode('utf8')
+
+
+def _get_gitinfo_file(git_file=None):
+    """Get saved info from GIT_INFO file that was created when installing package"""
+    if git_file is None:
+        git_file = os.path.join(pyuvdata_dir, 'GIT_INFO')
+
+    with open(git_file) as data_file:
+        data = [_unicode_to_str(x) for x in json.loads(data_file.read().strip())]
+        git_origin = data[0]
+        git_hash = data[1]
+        git_description = data[2]
+        git_branch = data[3]
+
+    return {'git_origin': git_origin, 'git_hash': git_hash,
+            'git_description': git_description, 'git_branch': git_branch}
+
+
+def _unicode_to_str(u):
+    if six.PY2:
+        return u.encode('utf8')
+    return u
+
 
 def construct_version_info():
-    pyuvdata_dir = os.path.dirname(os.path.realpath(__file__))
+
     version_file = os.path.join(pyuvdata_dir, 'VERSION')
-    version = open(version_file).read().strip()
-    print('pyuvdata: %s'%pyuvdata_dir)
-    print('version_file: %s'%version_file)
-    print('version: %s'%version)
+    with open(version_file) as f:
+        version = f.read().strip()
+
+    git_origin = ''
+    git_hash = ''
+    git_description = ''
+    git_branch = ''
+
+    version_info = {'version': version, 'git_origin': '', 'git_hash': '',
+                    'git_description': '', 'git_branch': ''}
 
     try:
-        git_origin = subprocess.check_output(['git', '-C', pyuvdata_dir, 'config',
-                                              '--get', 'remote.origin.url'],
-                                             stderr=subprocess.STDOUT).strip()
-        git_hash = subprocess.check_output(['git', '-C', pyuvdata_dir, 'rev-parse', 'HEAD'],
-                                           stderr=subprocess.STDOUT).strip()
-        git_description = subprocess.check_output(['git', '-C', pyuvdata_dir,
-                                                   'describe', '--dirty', '--tag', '--always']).strip()
-        git_branch = subprocess.check_output(['git', '-C', pyuvdata_dir, 'rev-parse',
-                                              '--abbrev-ref', 'HEAD'],
-                                             stderr=subprocess.STDOUT).strip()
-        try:
-            git_version = subprocess.check_output(['git', '-C', pyuvdata_dir, 'describe',
-                                               '--tags', '--abbrev=0']).strip()
-        except:
-            # assert type(exception).__name__ == 'NameError'
-            # assert exception.__class__.__name__ == 'NameError'
-            print('Exception: git_version.')
-            pass
-        
-    except subprocess.CalledProcessError:
+        version_info['git_origin'] = _get_git_output(['config', '--get', 'remote.origin.url'], capture_stderr=True)
+        version_info['git_hash'] = _get_git_output(['rev-parse', 'HEAD'], capture_stderr=True)
+        version_info['git_description'] = _get_git_output(['describe', '--dirty', '--tag', '--always'])
+        version_info['git_branch'] = _get_git_output(['rev-parse', '--abbrev-ref', 'HEAD'], capture_stderr=True)
+    except subprocess.CalledProcessError:  # pragma: no cover
         try:
             # Check if a GIT_INFO file was created when installing package
-            git_file = os.path.join(pyuvdata_dir, 'GIT_INFO')
-            print('git_file: %s'%git_file)
-            with open(git_file) as data_file:
-                data = [x.encode('UTF8') for x in json.loads(data_file.read().strip())]
-                git_origin = data[0]
-                git_hash = data[1]
-                git_description = data[2]
-                git_branch = data[3]
+            version_info.update(_get_gitinfo_file())
         except (IOError, OSError):
-            git_origin = ''
-            git_hash = ''
-            git_description = ''
-            git_branch = ''
+            pass
 
-    version_info = {'version': version, 'git_origin': git_origin,
-                    'git_hash': git_hash, 'git_description': git_description,
-                    'git_branch': git_branch}
     return version_info
 
 
@@ -69,5 +96,5 @@ def main():
     print('git description = {0}'.format(git_description))
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: no cover
     main()

@@ -1,11 +1,21 @@
-"""Class for reading FHD save files."""
-from astropy import constants as const
-from scipy.io.idl import readsav
+# -*- mode: python; coding: utf-8 -*-
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
+"""Class for reading FHD save files.
+
+"""
+from __future__ import absolute_import, division, print_function
+
 from itertools import islice
 import numpy as np
 import warnings
-from uvdata import UVData
-import utils as uvutils
+from scipy.io.idl import readsav
+from astropy import constants as const
+
+from . import UVData
+from . import utils as uvutils
+from . import telescopes as uvtel
 
 
 def get_fhd_history(settings_file, return_user=False):
@@ -14,7 +24,8 @@ def get_fhd_history(settings_file, return_user=False):
 
     Includes information about the command line call, the user, machine name and date
     """
-    settings_lines = open(settings_file, 'r').readlines()
+    with open(settings_file, 'r') as f:
+        settings_lines = f.readlines()
     main_loc = None
     command_loc = None
     obs_loc = None
@@ -28,8 +39,8 @@ def get_fhd_history(settings_file, return_user=False):
             obs_loc = ind
         if line.startswith('User'):
             user_line = ind
-        if (main_loc is not None and command_loc is not None and
-                obs_loc is not None and user_line is not None):
+        if (main_loc is not None and command_loc is not None
+                and obs_loc is not None and user_line is not None):
             break
 
     main_lines = settings_lines[main_loc + 1:command_loc]
@@ -53,6 +64,23 @@ class FHD(UVData):
     method on the UVData class.
     """
 
+    def _latlonalt_close(self, latlonalt1, latlonalt2):
+        radian_tols = self._phase_center_ra.tols
+        loc_tols = self._telescope_location.tols
+        latlon_close = np.allclose(np.array(latlonalt1[0:2]),
+                                   np.array(latlonalt2[0:2]),
+                                   rtol=radian_tols[0], atol=radian_tols[1])
+        alt_close = np.isclose(latlonalt1[2], latlonalt2[2],
+                               rtol=loc_tols[0], atol=loc_tols[1])
+        if latlon_close and alt_close:
+            return True
+        else:
+            return False
+
+    def _xyz_close(self, xyz1, xyz2):
+        loc_tols = self._telescope_location.tols
+        return np.allclose(xyz1, xyz2, rtol=loc_tols[0], atol=loc_tols[1])
+
     def read_fhd(self, filelist, use_model=False, run_check=True, check_extra=True,
                  run_check_acceptability=True):
         """
@@ -73,6 +101,7 @@ class FHD(UVData):
         datafiles = {}
         params_file = None
         flags_file = None
+        layout_file = None
         settings_file = None
         if use_model:
             data_name = '_vis_model_'
@@ -80,36 +109,60 @@ class FHD(UVData):
             data_name = '_vis_'
         for file in filelist:
             if file.lower().endswith(data_name + 'xx.sav'):
-                datafiles['xx'] = xx_datafile = file
+                if 'xx' in list(datafiles.keys()):
+                    raise ValueError('multiple xx datafiles in filelist')
+                datafiles['xx'] = file
             elif file.lower().endswith(data_name + 'yy.sav'):
-                datafiles['yy'] = yy_datafile = file
+                if 'yy' in list(datafiles.keys()):
+                    raise ValueError('multiple yy datafiles in filelist')
+                datafiles['yy'] = file
             elif file.lower().endswith(data_name + 'xy.sav'):
-                datafiles['xy'] = xy_datafile = file
+                if 'xy' in list(datafiles.keys()):
+                    raise ValueError('multiple xy datafiles in filelist')
+                datafiles['xy'] = file
             elif file.lower().endswith(data_name + 'yx.sav'):
-                datafiles['yx'] = yx_datafile = file
+                if 'yx' in list(datafiles.keys()):
+                    raise ValueError('multiple yx datafiles in filelist')
+                datafiles['yx'] = file
             elif file.lower().endswith('_params.sav'):
+                if params_file is not None:
+                    raise ValueError('multiple params files in filelist')
                 params_file = file
             elif file.lower().endswith('_flags.sav'):
+                if flags_file is not None:
+                    raise ValueError('multiple flags files in filelist')
                 flags_file = file
+            elif file.lower().endswith('_layout.sav'):
+                if layout_file is not None:
+                    raise ValueError('multiple layout files in filelist')
+                layout_file = file
             elif file.lower().endswith('_settings.txt'):
+                if settings_file is not None:
+                    raise ValueError('multiple settings files in filelist')
                 settings_file = file
             else:
-                continue
+                # this is reached in tests but marked as uncovered because
+                # CPython's peephole optimizer replaces a jump to a continue
+                # with a jump to the top of the loop
+                continue  # pragma: no cover
 
         if len(datafiles) < 1:
-            raise StandardError('No data files included in file list')
+            raise Exception('No data files included in file list')
         if params_file is None:
-            raise StandardError('No params file included in file list')
+            raise Exception('No params file included in file list')
         if flags_file is None:
-            raise StandardError('No flags file included in file list')
+            raise Exception('No flags file included in file list')
+        if layout_file is None:
+            warnings.warn('No layout file included in file list. '
+                          'Support for FHD data without layout files will be '
+                          'deprecated in a future version.', PendingDeprecationWarning)
         if settings_file is None:
             warnings.warn('No settings file included in file list')
 
         # TODO: add checking to make sure params, flags and datafiles are
         # consistent with each other
-
         vis_data = {}
-        for pol, file in datafiles.iteritems():
+        for pol, file in datafiles.items():
             this_dict = readsav(file, python_dict=True)
             if use_model:
                 vis_data[pol] = this_dict['vis_model_ptr']
@@ -124,7 +177,7 @@ class FHD(UVData):
         astrometry = obs['ASTR'][0]
         fhd_pol_list = []
         for pol in obs['POL_NAMES'][0]:
-            fhd_pol_list.append(pol.decode("utf-8").lower())
+            fhd_pol_list.append(uvutils._bytes_to_str(pol).lower())
 
         params_dict = readsav(params_file, python_dict=True)
         params = params_dict['params']
@@ -145,7 +198,7 @@ class FHD(UVData):
         self.Nbls = int(obs['NBASELINES'][0])
         self.Nblts = data_shape[0]
         self.Nfreqs = int(obs['N_FREQ'][0])
-        self.Npols = len(vis_data.keys())
+        self.Npols = len(list(vis_data.keys()))
         self.Nspws = 1
         self.spw_array = np.array([0])
         self.vis_units = 'JY'
@@ -164,7 +217,7 @@ class FHD(UVData):
                                        self.Npols), dtype=np.float_)
         self.flag_array = np.zeros((self.Nblts, self.Nspws, self.Nfreqs,
                                     self.Npols), dtype=np.bool_)
-        for pol, vis in vis_data.iteritems():
+        for pol, vis in vis_data.items():
             pol_i = pol_list.index(linear_pol_dict[pol])
             self.data_array[:, 0, :, pol_i] = vis
             self.flag_array[:, 0, :, pol_i] = vis_weights_data[pol] <= 0
@@ -189,7 +242,7 @@ class FHD(UVData):
             warnings.warn('Ntimes does not match the number of unique times in the data')
         self.time_array = np.zeros(self.Nblts)
         if self.Ntimes == 1:
-            self.time_array.fill(int_times)
+            self.time_array.fill(int_times[0])
         else:
             for ii in range(0, len(int_times)):
                 if ii < (len(int_times) - 1):
@@ -204,18 +257,12 @@ class FHD(UVData):
 
         self.Nants_data = int(len(np.unique(self.ant_1_array.tolist() + self.ant_2_array.tolist())))
 
-        self.antenna_names = bl_info['TILE_NAMES'][0].tolist()
-        self.Nants_telescope = len(self.antenna_names)
-        self.antenna_numbers = np.arange(self.Nants_telescope)
-
         self.baseline_array = \
             self.antnums_to_baseline(self.ant_1_array,
                                      self.ant_2_array)
         if self.Nbls != len(np.unique(self.baseline_array)):
             warnings.warn('Nbls does not match the number of unique baselines in the data')
 
-        if len(bl_info['FREQ'][0]) != self.Nfreqs:
-            warnings.warn('Nfreqs does not match the number of frequencies in the data')
         self.freq_array = np.zeros((self.Nspws, len(bl_info['FREQ'][0])), dtype=np.float_)
         self.freq_array[0, :] = bl_info['FREQ'][0]
 
@@ -232,11 +279,14 @@ class FHD(UVData):
         # integrations. This can have limited accuracy, so it can be slightly
         # off the actual value.
         # (e.g. 1.999426... rather than 2)
-        self.integration_time = float(obs['TIME_RES'][0])
+        time_res = obs['TIME_RES']
+        # time_res is constrained to be a scalar currently
+        self.integration_time = (np.ones_like(self.time_array, dtype=np.float64)
+                                 * time_res[0])
         self.channel_width = float(obs['FREQ_RES'][0])
 
         # # --- observation information ---
-        self.telescope_name = str(obs['INSTRUMENT'][0].decode())
+        self.telescope_name = uvutils._bytes_to_str(obs['INSTRUMENT'][0])
 
         # This is a bit of a kludge because nothing like object_name exists
         # in FHD files.
@@ -252,11 +302,9 @@ class FHD(UVData):
                 object_name = 'EoR 0 Field'
 
         self.instrument = self.telescope_name
-        self.telescope_location_lat_lon_alt_degrees = (float(obs['LAT'][0]),
-                                                       float(obs['LON'][0]),
-                                                       float(obs['ALT'][0]))
-
-        self.set_lsts_from_time_array()
+        latitude = np.deg2rad(float(obs['LAT'][0]))
+        longitude = np.deg2rad(float(obs['LON'][0]))
+        altitude = float(obs['ALT'][0])
 
         # history: add the first few lines from the settings file
         if settings_file is not None:
@@ -264,29 +312,149 @@ class FHD(UVData):
         else:
             self.history = ''
 
-        if not uvutils.check_history_version(self.history, self.pyuvdata_version_str):
+        if not uvutils._check_history_version(self.history, self.pyuvdata_version_str):
             self.history += self.pyuvdata_version_str
 
         self.phase_center_epoch = astrometry['EQUINOX'][0]
 
-        # TODO Once FHD starts reading and saving the antenna table info from
-        #    uvfits, that information should be read into the following optional
-        #    parameters:
-        # 'xyz_telescope_frame'
-        # 'x_telescope'
-        # 'y_telescope'
-        # 'z_telescope'
-        # 'antenna_positions'
-        # 'GST0'
-        # 'RDate'
-        # 'earth_omega'
-        # 'DUT1'
-        # 'TIMESYS'
+        # get the stuff FHD read from the antenna table (in layout file)
+        if layout_file is not None:
+            layout_dict = readsav(layout_file, python_dict=True)
+            layout = layout_dict['layout']
+
+            layout_fields = [name.lower() for name in layout.dtype.names]
+            # Try to get the telescope location from the layout file &
+            # compare it to the position from the obs structure.
+            arr_center = layout['array_center'][0]
+            layout_fields.remove('array_center')
+
+            xyz_telescope_frame = uvutils._bytes_to_str(layout['coordinate_frame'][0]).lower()
+            layout_fields.remove('coordinate_frame')
+
+            if xyz_telescope_frame == 'itrf':
+                # compare to lat/lon/alt
+                location_latlonalt = uvutils.XYZ_from_LatLonAlt(latitude, longitude, altitude)
+                latlonalt_arr_center = uvutils.LatLonAlt_from_XYZ(arr_center)
+
+                # check both lat/lon/alt and xyz because of subtle differences in tolerances
+                if (self._xyz_close(location_latlonalt, arr_center)
+                        or self._latlonalt_close((latitude, longitude, altitude), latlonalt_arr_center)):
+                    self.telescope_location = arr_center
+                else:
+                    # values do not agree with each other to within the tolerances.
+                    # this is a known issue with FHD runs on cotter uvfits files for the MWA
+                    # compare with the known_telescopes values
+                    telescope_obj = uvtel.get_telescope(self.telescope_name)
+                    # start warning message
+                    message = ('Telescope location derived from obs lat/lon/alt '
+                               'values does not match the location in the layout file.')
+
+                    if telescope_obj is not False:
+                        if self._latlonalt_close((latitude, longitude, altitude),
+                                                 telescope_obj.telescope_location_lat_lon_alt):
+                            # obs lat/lon/alt matches known_telescopes
+                            message += (' Value from obs lat/lon/alt matches the '
+                                        'known_telescopes values, using them.')
+                            self.telescope_location = location_latlonalt
+                        elif self._xyz_close(arr_center, telescope_obj.telescope_location):
+                            # layout xyz matches known_telescopes
+                            message += (' Value from the layout file matches the '
+                                        'known_telescopes values, using them.')
+                            self.telescope_location = arr_center
+                        else:
+                            # None of the values match each other. Defaulting to known_telescopes value.
+                            message += (' Neither location matches the values '
+                                        'in known_telescopes. Defaulting to '
+                                        'using the known_telescopes values.')
+                            self.telescope_location = telescope_obj.telescope_location
+                    else:
+                        message += (' Telescope is not in known_telescopes. '
+                                    'Defaulting to using the obs derived values.')
+                        self.telescope_location = location_latlonalt
+                    # issue warning
+                    warnings.warn(message)
+            else:
+                self.telescope_location_lat_lon_alt = (latitude, longitude, altitude)
+
+            self.antenna_positions = layout['antenna_coords'][0]
+            layout_fields.remove('antenna_coords')
+
+            self.antenna_names = [uvutils._bytes_to_str(ant).strip() for ant in layout['antenna_names'][0].tolist()]
+            layout_fields.remove('antenna_names')
+
+            # make these 0-indexed (rather than one indexed)
+            self.antenna_numbers = layout['antenna_numbers'][0] - 1
+            layout_fields.remove('antenna_numbers')
+
+            self.Nants_telescope = int(layout['n_antenna'][0])
+            layout_fields.remove('n_antenna')
+
+            if self.telescope_name.lower() == 'mwa':
+                # check that obs.baseline_info.tile_names match the antenna names
+                # this only applies for MWA because the tile_names come from metafits files
+                obs_tile_names = [uvutils._bytes_to_str(ant).strip() for ant in bl_info['TILE_NAMES'][0].tolist()]
+                obs_tile_names = ['Tile' + '0' * (3 - len(ant)) + ant for ant in obs_tile_names]
+                # tile_names are assumed to be ordered: so their index gives the antenna number
+                # make an comparison array from self.antenna_names ordered this way.
+                ant_names = np.zeros((np.max(self.antenna_numbers) + 1), str).tolist()
+                for index, number in enumerate(self.antenna_numbers):
+                    ant_names[number] = self.antenna_names[index]
+                if obs_tile_names != ant_names:
+                    warnings.warn('tile_names from obs structure does not match antenna_names from layout')
+
+            self.gst0 = float(layout['gst0'][0])
+            layout_fields.remove('gst0')
+
+            self.rdate = uvutils._bytes_to_str(layout['ref_date'][0]).lower()
+            layout_fields.remove('ref_date')
+
+            self.earth_omega = float(layout['earth_degpd'][0])
+            layout_fields.remove('earth_degpd')
+
+            self.dut1 = float(layout['dut1'][0])
+            layout_fields.remove('dut1')
+
+            self.timesys = uvutils._bytes_to_str(layout['time_system'][0]).upper().strip()
+            layout_fields.remove('time_system')
+
+            if 'diameters' in layout_fields:
+                self.timesys = uvutils._bytes_to_str(layout['time_system'][0]).upper().strip()
+                layout_fields.remove('diameters')
+
+            # ignore some fields, put everything else in extra_keywords
+            layout_fields_ignore = ['diff_utc', 'pol_type', 'n_pol_cal_params',
+                                    'mount_type', 'axis_offset',
+                                    'pola', 'pola_orientation', 'pola_cal_params',
+                                    'polb', 'polb_orientation', 'polb_cal_params',
+                                    'beam_fwhm']
+            for field in layout_fields_ignore:
+                if field in layout_fields:
+                    layout_fields.remove(field)
+            for field in layout_fields:
+                keyword = field
+                if len(keyword) > 8:
+                    keyword = field.replace('_', '')
+
+                value = layout[field][0]
+                if isinstance(value, bytes):
+                    value = uvutils._bytes_to_str(value)
+
+                self.extra_keywords[keyword.upper()] = value
+        else:
+            self.telescope_location_lat_lon_alt = (latitude, longitude, altitude)
+            self.antenna_names = [uvutils._bytes_to_str(ant).strip() for ant in bl_info['TILE_NAMES'][0].tolist()]
+            if self.telescope_name.lower() == 'mwa':
+                self.antenna_names = ['Tile' + '0' * (3 - len(ant)) + ant for ant in self.antenna_names]
+            self.Nants_telescope = len(self.antenna_names)
+            self.antenna_numbers = np.arange(self.Nants_telescope)
 
         try:
             self.set_telescope_params()
-        except ValueError, ve:
+        except ValueError as ve:
             warnings.warn(str(ve))
+
+        # need to make sure telescope location is defined properly before this call
+        self.set_lsts_from_time_array()
 
         # check if object has all required uv_properties set
         if run_check:

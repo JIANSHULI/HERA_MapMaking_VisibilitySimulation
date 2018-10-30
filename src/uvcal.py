@@ -1,9 +1,16 @@
+# -*- mode: python; coding: utf-8 -*
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
 import warnings
 import copy
-from uvbase import UVBase
-import parameter as uvp
-import utils as uvutils
+
+from .uvbase import UVBase
+from . import parameter as uvp
+from . import utils as uvutils
 
 
 class UVCal(UVBase):
@@ -53,13 +60,13 @@ class UVCal(UVBase):
                                                form='str',
                                                expected_type=str)
 
-        desc = ('Number of antennas that have data associated with them ' +
-                '(i.e. length of ant_array), which may be smaller than the number' +
+        desc = ('Number of antennas that have data associated with them '
+                '(i.e. length of ant_array), which may be smaller than the number'
                 'of antennas in the telescope (i.e. length of antenna_numbers).')
         self._Nants_data = uvp.UVParameter('Nants_data', description=desc,
                                            expected_type=int)
 
-        desc = ('Number of antennas in the antenna_numbers array. May be larger ' +
+        desc = ('Number of antennas in the antenna_numbers array. May be larger '
                 'than the number of antennas with gains associated with them.')
         self._Nants_telescope = uvp.UVParameter('Nants_telescope',
                                                 description=desc,
@@ -70,7 +77,7 @@ class UVCal(UVBase):
         self._ant_array = uvp.UVParameter('ant_array', description=desc,
                                           expected_type=int, form=('Nants_data',))
 
-        desc = ('Array of antenna names with shape (Nants_telescope,). ' +
+        desc = ('Array of antenna names with shape (Nants_telescope,). '
                 'Ordering of elements matches ordering of antenna_numbers.')
         self._antenna_names = uvp.UVParameter('antenna_names',
                                               description=desc,
@@ -303,7 +310,7 @@ class UVCal(UVBase):
                               'to a calfits file format.'.format(key=key))
 
         # issue warning if extra_keywords values are lists, arrays or dicts
-        for key, value in self.extra_keywords.iteritems():
+        for key, value in self.extra_keywords.items():
             if isinstance(value, (list, dict, np.ndarray)):
                 warnings.warn('{key} in extra_keywords is a list, array or dict, '
                               'which will raise an error when writing calfits '
@@ -396,7 +403,7 @@ class UVCal(UVBase):
             if antenna_nums is not None:
                 raise ValueError('Only one of antenna_nums and antenna_names can be provided.')
 
-            antenna_names = uvutils.get_iterable(antenna_names)
+            antenna_names = uvutils._get_iterable(antenna_names)
             antenna_nums = []
             for s in antenna_names:
                 if s not in cal_object.antenna_names:
@@ -405,7 +412,7 @@ class UVCal(UVBase):
                 antenna_nums.append(cal_object.antenna_numbers[ind])
 
         if antenna_nums is not None:
-            antenna_nums = uvutils.get_iterable(antenna_nums)
+            antenna_nums = uvutils._get_iterable(antenna_nums)
             history_update_string += 'antennas'
             n_selects += 1
 
@@ -436,7 +443,7 @@ class UVCal(UVBase):
                 cal_object.total_quality_array = None
 
         if times is not None:
-            times = uvutils.get_iterable(times)
+            times = uvutils._get_iterable(times)
             if n_selects > 0:
                 history_update_string += ', times'
             else:
@@ -476,16 +483,16 @@ class UVCal(UVBase):
                 cal_object.total_quality_array = cal_object.total_quality_array[:, :, time_inds, :]
 
         if freq_chans is not None:
-            freq_chans = uvutils.get_iterable(freq_chans)
+            freq_chans = uvutils._get_iterable(freq_chans)
             if frequencies is None:
                 frequencies = cal_object.freq_array[0, freq_chans]
             else:
-                frequencies = uvutils.get_iterable(frequencies)
-                frequencies = np.sort(list(set(frequencies) |
-                                      set(cal_object.freq_array[0, freq_chans])))
+                frequencies = uvutils._get_iterable(frequencies)
+                frequencies = np.sort(list(set(frequencies)
+                                      | set(cal_object.freq_array[0, freq_chans])))
 
         if frequencies is not None:
-            frequencies = uvutils.get_iterable(frequencies)
+            frequencies = uvutils._get_iterable(frequencies)
             if n_selects > 0:
                 history_update_string += ', frequencies'
             else:
@@ -530,7 +537,7 @@ class UVCal(UVBase):
                     cal_object.total_quality_array = cal_object.total_quality_array[:, freq_inds, :, :]
 
         if jones is not None:
-            jones = uvutils.get_iterable(jones)
+            jones = uvutils._get_iterable(jones)
             if n_selects > 0:
                 history_update_string += ', jones polarization terms'
             else:
@@ -629,7 +636,7 @@ class UVCal(UVBase):
                 self.check(check_extra=check_extra,
                            run_check_acceptability=run_check_acceptability)
         else:
-            raise(ValueError, 'cal_type is unknown, cannot convert to gain')
+            raise ValueError('cal_type is unknown, cannot convert to gain')
 
     def _convert_from_filetype(self, other):
         for p in other:
@@ -638,7 +645,7 @@ class UVCal(UVBase):
 
     def _convert_to_filetype(self, filetype):
         if filetype is 'calfits':
-            import calfits
+            from . import calfits
             other_obj = calfits.CALFITS()
         else:
             raise ValueError('filetype must be calfits.')
@@ -669,7 +676,7 @@ class UVCal(UVBase):
                 calfits files that were missing many CRPIX and CRVAL keywords.
                 Default is False.
         """
-        import calfits
+        from . import calfits
         if isinstance(filename, (list, tuple)):
             self.read_calfits(filename[0], run_check=run_check,
                               check_extra=check_extra,
@@ -738,7 +745,7 @@ class UVCal(UVBase):
             run_check_acceptability: Option to check acceptable range of the values of
                 parameters after reading in the file. Default is True.
         """
-        import fhd_cal
+        from . import fhd_cal
         if isinstance(cal_file, (list, tuple)):
             if isinstance(obs_file, (list, tuple)):
                 if len(obs_file) != len(cal_file):
@@ -809,8 +816,10 @@ class UVCal(UVBase):
             this = copy.deepcopy(self)
         # Check that both objects are UVCal and valid
         this.check(check_extra=check_extra, run_check_acceptability=run_check_acceptability)
-        if not isinstance(other, this.__class__):
-            raise(ValueError('Only UVCal objects can be added to a UVCal object'))
+        if not issubclass(other.__class__, this.__class__):
+            if not issubclass(this.__class__, other.__class__):
+                raise ValueError('Only UVCal (or subclass) objects can be added to '
+                                 'a UVCal (or subclass) object')
         other.check(check_extra=check_extra, run_check_acceptability=run_check_acceptability)
 
         # Check objects are compatible
@@ -827,7 +836,7 @@ class UVCal(UVBase):
             if getattr(this, a) != getattr(other, a):
                 msg = 'UVParameter ' + \
                     a[1:] + ' does not match. Cannot combine objects.'
-                raise(ValueError(msg))
+                raise ValueError(msg)
         for a in warning_params:
             if getattr(this, a) != getattr(other, a):
                 msg = 'UVParameter ' + \
@@ -855,8 +864,8 @@ class UVCal(UVBase):
             if len(both_times) > 0:
                 if len(both_freq) > 0:
                     if len(both_ants) > 0:
-                        raise(ValueError('These objects have overlapping data and'
-                                         ' cannot be combined.'))
+                        raise ValueError('These objects have overlapping data and'
+                                         ' cannot be combined.')
 
         temp = np.nonzero(~np.in1d(other.ant_array, this.ant_array))[0]
         if len(temp) > 0:
@@ -1164,7 +1173,7 @@ class UVCal(UVBase):
             history_update_string += ' axis using pyuvdata.'
             this.history += history_update_string
 
-        this.history = uvutils.combine_histories(this.history, other.history)
+        this.history = uvutils._combine_histories(this.history, other.history)
 
         # Check final object is self-consistent
         if run_check:

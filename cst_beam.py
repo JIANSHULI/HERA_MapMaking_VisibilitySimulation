@@ -1,10 +1,17 @@
+# -*- mode: python; coding: utf-8 -*-
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
+from __future__ import absolute_import, division, print_function
+
 import os
 import sys
 import re
 import numpy as np
 import warnings
-from uvbeam import UVBeam
-import utils as uvutils
+
+from . import UVBeam
+from . import utils as uvutils
 
 
 class CSTBeam(UVBeam):
@@ -13,6 +20,28 @@ class CSTBeam(UVBeam):
     This class should not be interacted with directly, instead use the
     read_cst_beam method on the UVBeam class.
     """
+
+    def name2freq(self, fname):
+        """
+        Method to extract the frequency from the file name, assuming the file name
+        contains a substring with the frequency channel in MHz that the data represents.
+        e.g. "HERA_Sim_120.87MHz.txt" should yield 120.87e6
+
+        Args:
+            fname: filename (string)
+
+        Returns:
+            extracted frequency
+        """
+        fi = fname.rfind('Hz')
+        frequency = float(re.findall(r'\d*\.\d+|\d+', fname[:fi])[-1])
+
+        si_prefix = fname[fi - 1]
+        si_dict = {'k': 1e3, 'M': 1e6, 'G': 1e9}
+        if si_prefix in si_dict.keys():
+            frequency = frequency * si_dict[si_prefix]
+
+        return frequency
 
     def read_cst_beam(self, filename, beam_type='power', feed_pol='x',
                       rotate_pol=True, frequency=None, telescope_name=None,
@@ -51,7 +80,7 @@ class CSTBeam(UVBeam):
         self.model_name = model_name
         self.model_version = model_version
         self.history = history
-        if not uvutils.check_history_version(self.history, self.pyuvdata_version_str):
+        if not uvutils._check_history_version(self.history, self.pyuvdata_version_str):
             self.history += self.pyuvdata_version_str
 
         if beam_type is 'power':
@@ -74,6 +103,7 @@ class CSTBeam(UVBeam):
             self.set_power()
         else:
             self.Naxes_vec = 2
+            self.Ncomponents_vec = 2
             if rotate_pol:
                 if feed_pol is 'x':
                     self.feed_array = np.array(['x', 'y'])
@@ -185,7 +215,8 @@ class CSTBeam(UVBeam):
                 power_beam2 = np.roll(power_beam1, int((np.pi / 2) / delta_phi), axis=1)
                 self.data_array[0, 0, 1, 0, :, :] = power_beam2
         else:
-            self.basis_vector_array = np.zeros((self.Naxes_vec, 2, self.Naxes2, self.Naxes1))
+            self.basis_vector_array = np.zeros((self.Naxes_vec, self.Ncomponents_vec,
+                                                self.Naxes2, self.Naxes1))
             self.basis_vector_array[0, 0, :, :] = 1.0
             self.basis_vector_array[1, 1, :, :] = 1.0
 
@@ -205,7 +236,7 @@ class CSTBeam(UVBeam):
             else:
                 phi_phase = data[:, phi_phase_col]
             theta_phase = theta_phase.reshape((theta_axis.size, phi_axis.size), order='F')
-            phi_phase = theta_phase.reshape((theta_axis.size, phi_axis.size), order='F')
+            phi_phase = phi_phase.reshape((theta_axis.size, phi_axis.size), order='F')
 
             theta_beam = theta_mag * np.exp(1j * theta_phase)
             phi_beam = phi_mag * np.exp(1j * phi_phase)
@@ -229,25 +260,3 @@ class CSTBeam(UVBeam):
         if run_check:
             self.check(check_extra=check_extra,
                        run_check_acceptability=run_check_acceptability)
-
-    def name2freq(self, fname):
-        """
-        Method to extract the frequency from the file name, assuming the file name
-        contains a substring with the frequency channel in MHz that the data represents.
-        e.g. "HERA_Sim_120.87MHz.txt" should yield 120.87e6
-
-        Args:
-            fname: filename (string)
-
-        Returns:
-            extracted frequency
-        """
-        fi = fname.find('Hz')
-        frequency = float(re.findall('\d*\.\d+|\d+', fname[:fi])[-1])
-
-        si_prefix = fname[fi - 1]
-        si_dict = {'k': 1e3, 'M': 1e6, 'G': 1e9}
-        if si_prefix in si_dict.keys():
-            frequency = frequency * si_dict[si_prefix]
-
-        return frequency

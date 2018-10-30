@@ -1,15 +1,22 @@
+# -*- mode: python; coding: utf-8 -*
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
 """
 Base class for objects with UVParameter attributes.
 
 Subclassed by UVData and Telescope.
 """
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
 import warnings
-import parameter as uvp
-import version as uvversion
+
+from . import parameter as uvp
+from . import version as uvversion
 
 
-def _warning(msg, *a):
+def _warning(msg, *a, **kwargs):
     """Improve the printing of user warnings."""
     return str(msg) + '\n'
 
@@ -54,13 +61,13 @@ class UVBase(object):
                                  self.lat_lon_alt_degrees_prop_fset(p)))
 
         # String to add to history of any files written with this version of pyuvdata
-        self.pyuvdata_version_str = ('  Read/written with pyuvdata version: ' +
-                                     uvversion.version + '.')
+        self.pyuvdata_version_str = ('  Read/written with pyuvdata version: '
+                                     + uvversion.version + '.')
         if uvversion.git_hash is not '':
-            self.pyuvdata_version_str += ('  Git origin: ' + uvversion.git_origin +
-                                          '.  Git hash: ' + uvversion.git_hash +
-                                          '.  Git branch: ' + uvversion.git_branch +
-                                          '.  Git description: ' + uvversion.git_description + '.')
+            self.pyuvdata_version_str += ('  Git origin: ' + uvversion.git_origin
+                                          + '.  Git hash: ' + uvversion.git_hash
+                                          + '.  Git branch: ' + uvversion.git_branch
+                                          + '.  Git description: ' + uvversion.git_description + '.')
 
     def prop_fget(self, param_name):
         """Getter method for UVParameter properties."""
@@ -124,39 +131,54 @@ class UVBase(object):
 
     def __iter__(self):
         """Iterator for all UVParameter attributes."""
-        attribute_list = [a for a in dir(self) if not a.startswith('__') and
-                          not callable(getattr(self, a))]
-        param_list = []
-        for a in attribute_list:
-            attr = getattr(self, a)
-            if isinstance(attr, uvp.UVParameter):
-                param_list.append(a)
+        try:
+            attribute_list = [a for a in dir(self) if not a.startswith('__')
+                              and not callable(getattr(self, a))]
+            param_list = []
+            for a in attribute_list:
+                try:
+                    attr = getattr(self, a)
+                    if isinstance(attr, uvp.UVParameter):
+                        param_list.append(a)
+                except:
+                    pass
+        except:
+            pass
         for a in param_list:
             yield a
 
     def required(self):
         """Iterator for all required UVParameter attributes."""
-        attribute_list = [a for a in dir(self) if not a.startswith('__') and
-                          not callable(getattr(self, a))]
-        required_list = []
-        for a in attribute_list:
-            attr = getattr(self, a)
-            if isinstance(attr, uvp.UVParameter):
-                if attr.required:
-                    required_list.append(a)
+        try:
+            attribute_list = [a for a in dir(self) if not a.startswith('__')
+                              and not callable(getattr(self, a))]
+            required_list = []
+            for a in attribute_list:
+                try:
+                    attr = getattr(self, a)
+                    if isinstance(attr, uvp.UVParameter):
+                        if attr.required:
+                            required_list.append(a)
+                except:
+                    pass
+        except:
+            pass
         for a in required_list:
             yield a
 
     def extra(self):
         """Iterator for all non-required UVParameter attributes."""
-        attribute_list = [a for a in dir(self) if not a.startswith('__') and
-                          not callable(getattr(self, a))]
+        attribute_list = [a for a in dir(self) if not a.startswith('__')
+                          and not callable(getattr(self, a))]
         extra_list = []
         for a in attribute_list:
-            attr = getattr(self, a)
-            if isinstance(attr, uvp.UVParameter):
-                if not attr.required:
-                    extra_list.append(a)
+            try:
+                attr = getattr(self, a)
+                if isinstance(attr, uvp.UVParameter):
+                    if not attr.required:
+                        extra_list.append(a)
+            except:
+                pass
         for a in extra_list:
             yield a
 
@@ -203,6 +225,8 @@ class UVBase(object):
                 self_param = getattr(self, p)
                 other_param = getattr(other, p)
                 if self_param != other_param:
+                    print('parameter {} does not match. Left is {},'
+                          ' right is {}'.format(p, self_param.value, other_param.value))
                     p_equal = False
             return p_equal
         else:
@@ -230,12 +254,13 @@ class UVBase(object):
             p_check = [p for p in self.required()]
 
         for p in p_check:
+            print('{0} is being checked.'.format(p)),
             param = getattr(self, p)
             # Check required parameter exists
             if param.value is None:
                 if param.required is True:
-                    raise ValueError('Required UVParameter ' + p +
-                                     ' has not been set.')
+                    raise ValueError('Required UVParameter ' + p
+                                     + ' has not been set.')
             else:
                 # Check parameter shape
                 eshape = param.expected_shape(self)
@@ -258,8 +283,8 @@ class UVBase(object):
                         # Single element
                         if not isinstance(param.value, param.expected_type):
                             raise ValueError('UVParameter ' + p + ' is not the appropriate'
-                                             ' type. Is: ' + str(type(param.value)) +
-                                             '. Should be: ' + str(param.expected_type))
+                                             ' type. Is: ' + str(type(param.value))
+                                             + '. Should be: ' + str(param.expected_type))
                     else:
                         if isinstance(param.value, list):
                             # List needs to be handled differently than array
@@ -267,20 +292,20 @@ class UVBase(object):
                             for item in param.value:
                                 if not isinstance(item, param.expected_type):
                                     raise ValueError('UVParameter ' + p + ' is not the'
-                                                     ' appropriate type. Is: ' +
-                                                     str(type(param.value[0])) + '. Should'
+                                                     ' appropriate type. Is: '
+                                                     + str(type(param.value[0])) + '. Should'
                                                      ' be: ' + str(param.expected_type))
                         else:
                             # Array
                             if not isinstance(param.value.item(0), param.expected_type):
                                 raise ValueError('UVParameter ' + p + ' is not the appropriate'
-                                                 ' type. Is: ' + str(param.value.dtype) +
-                                                 '. Should be: ' + str(param.expected_type))
+                                                 ' type. Is: ' + str(param.value.dtype)
+                                                 + '. Should be: ' + str(param.expected_type))
 
                 if run_check_acceptability:
                     accept, message = param.check_acceptability()
                     if not accept:
-                        raise ValueError('UVParameter ' + p + ' has unacceptable values. ' +
-                                         message)
+                        raise ValueError('UVParameter ' + p + ' has unacceptable values. '
+                                         + message)
 
         return True

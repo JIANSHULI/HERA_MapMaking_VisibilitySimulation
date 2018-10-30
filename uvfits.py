@@ -1,13 +1,22 @@
-"""Class for reading and writing uvfits files."""
-from astropy import constants as const
-import astropy
-from astropy.time import Time
-from astropy.io import fits
+# -*- mode: python; coding: utf-8 -*
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
+"""Class for reading and writing uvfits files.
+
+"""
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
 import warnings
-from uvdata import UVData
-import parameter as uvp
-import utils as uvutils
+import astropy
+from astropy import constants as const
+from astropy.time import Time
+from astropy.io import fits
+
+from . import UVData
+from . import parameter as uvp
+from . import utils as uvutils
 
 
 class UVFITS(UVData):
@@ -24,75 +33,58 @@ class UVFITS(UVData):
     uvfits_required_extra = ['antenna_positions', 'gst0', 'rdate',
                              'earth_omega', 'dut1', 'timesys']
 
-    def read_uvfits(self, filename, run_check=True, check_extra=True,
-                    run_check_acceptability=True):
+    def _get_parameter_data(self, vis_hdu):
         """
-        Read in data from a uvfits file.
-
-        Args:
-            filename: The uvfits file to read from.
-            run_check: Option to check for the existence and proper shapes of
-                parameters after reading in the file. Default is True.
-            check_extra: Option to check optional parameters as well as required
-                ones. Default is True.
-            run_check_acceptability: Option to check acceptable range of the values of
-                parameters after reading in the file. Default is True.
+        Internal function to read just the random parameters portion of the
+        uvfits file (referred to as metadata).
+        Separated from full read so that header, metadata and data can be read independently.
         """
-        F = fits.open(filename)
-        D = F[0]  # assumes the visibilities are in the primary hdu
-        hdr = D.header.copy()
-        hdunames = uvutils.fits_indexhdus(F)  # find the rest of the tables
-
         # astropy.io fits reader scales date according to relevant PZER0 (?)
-        time0_array = D.data['DATE']
-        try:
-            # uvfits standard is to have 2 DATE parameters, both floats:
-            # DATE (full day) and _DATE (fractional day)
-            time1_array = D.data['_DATE']
-            self.time_array = (time0_array.astype(np.double) +
-                               time1_array.astype(np.double))
-        except(KeyError):
-            # cotter uvfits files have one DATE that is a double
-            self.time_array = time0_array
-            if np.finfo(time0_array[0]).precision < 5:
-                raise ValueError('JDs in this file are not precise to '
-                                 'better than a second.')
-            if (np.finfo(time0_array[0]).precision > 5 and
-                    np.finfo(time0_array[0]).precision < 8):
-                warnings.warn('The JDs in this file have sub-second '
-                              'precision, but not sub-millisecond. '
-                              'Use with caution.')
+        # uvfits standard is to have 2 DATE parameters, both floats:
+        # DATE (full day) and _DATE (fractional day)
+        # cotter uvfits files have one DATE that is a double
+        # using data.par('date') is general -- it will add them together if there are 2
+        self.time_array = vis_hdu.data.par('date')
+        if np.finfo(self.time_array[0]).precision < 5:
+            raise ValueError('JDs in this file are not precise to '
+                             'better than a second.')
+        if (np.finfo(self.time_array[0]).precision > 5
+                and np.finfo(self.time_array[0]).precision < 8):
+            warnings.warn('The JDs in this file have sub-second '
+                          'precision, but not sub-millisecond. '
+                          'Use with caution.')
 
         self.Ntimes = len(np.unique(self.time_array))
 
+        self.set_lsts_from_time_array()
+
         # if antenna arrays are present, use them. otherwise use baseline array
-        try:
+        if 'ANTENNA1' in vis_hdu.data.parnames and 'ANTENNA2' in vis_hdu.data.parnames:
             # Note: uvfits antennas are 1 indexed,
             # need to subtract one to get to 0-indexed
-            self.ant_1_array = np.int32(D.data.field('ANTENNA1')) - 1
-            self.ant_2_array = np.int32(D.data.field('ANTENNA2')) - 1
-            subarray = np.int32(D.data.field('SUBARRAY')) - 1
+            self.ant_1_array = np.int32(vis_hdu.data.par('ANTENNA1')) - 1
+            self.ant_2_array = np.int32(vis_hdu.data.par('ANTENNA2')) - 1
+            subarray = np.int32(vis_hdu.data.par('SUBARRAY')) - 1
             # error on files with multiple subarrays
             if len(set(subarray)) > 1:
                 raise ValueError('This file appears to have multiple subarray '
                                  'values; only files with one subarray are '
                                  'supported.')
-        except(KeyError):
+        else:
             # cannot set this to be the baseline array because it uses the
             # 256 convention, not our 2048 convention
-            bl_input_array = np.int64(D.data.field('BASELINE'))
+            bl_input_array = np.int64(vis_hdu.data.par('BASELINE'))
 
             # get antenna arrays based on uvfits baseline array
             self.ant_1_array, self.ant_2_array = \
                 self.baseline_to_antnums(bl_input_array)
+
         # check for multi source files
-        try:
-            source = D.data.field('SOURCE')
+        if 'SOURCE' in vis_hdu.data.parnames:
+            source = vis_hdu.data.par('SOURCE')
             if len(set(source)) > 1:
                 raise ValueError('This file has multiple sources. Only single '
                                  'source observations are supported.')
-        except(KeyError):
-            pass
 
         # get self.baseline_array using our convention
         self.baseline_array = \
@@ -104,199 +96,459 @@ class UVFITS(UVData):
         self.Nants_data = int(
             len(np.unique(self.ant_1_array.tolist() + self.ant_2_array.tolist())))
 
-        self.set_phased()
-        # check if we have an spw dimension
-        if hdr.pop('NAXIS') == 7:
-            if hdr['NAXIS5'] > 1:
-                raise ValueError('Sorry.  Files with more than one spectral' +
-                                 'window (spw) are not yet supported. A ' +
-                                 'great project for the interested student!')
-            self.data_array = (D.data.field('DATA')[:, 0, 0, :, :, :, 0] +
-                               1j * D.data.field('DATA')[:, 0, 0, :, :, :, 1])
-            self.flag_array = (D.data.field('DATA')[:, 0, 0, :, :, :, 2] <= 0)
-            self.nsample_array = np.abs(
-                D.data.field('DATA')[:, 0, 0, :, :, :, 2])
-            self.Nspws = hdr.pop('NAXIS5')
-            assert(self.Nspws == self.data_array.shape[1])
-
-            # the axis number for phase center depends on if the spw exists
-            # subtract 1 to be zero-indexed
-            self.spw_array = np.int32(uvutils.fits_gethduaxis(D, 5)) - 1
-
-            self.phase_center_ra_degrees = np.float(hdr.pop('CRVAL6'))
-            self.phase_center_dec_degrees = np.float(hdr.pop('CRVAL7'))
-        else:
-            # in many uvfits files the spw axis is left out,
-            # here we put it back in so the dimensionality stays the same
-            self.data_array = (D.data.field('DATA')[:, 0, 0, :, :, 0] +
-                               1j * D.data.field('DATA')[:, 0, 0, :, :, 1])
-            self.data_array = self.data_array[:, np.newaxis, :, :]
-            self.flag_array = (D.data.field('DATA')[:, 0, 0, :, :, 2] <= 0)
-            self.flag_array = self.flag_array[:, np.newaxis, :, :]
-            self.nsample_array = np.abs(D.data.field('DATA')[:, 0, 0, :, :, 2])
-            self.nsample_array = (self.nsample_array[:, np.newaxis, :, :])
-
-            # the axis number for phase center depends on if the spw exists
-            self.Nspws = 1
-            self.spw_array = np.array([0])
-
-            self.phase_center_ra_degrees = np.float(hdr.pop('CRVAL5'))
-            self.phase_center_dec_degrees = np.float(hdr.pop('CRVAL6'))
-
-        # get shapes
-        self.Nfreqs = hdr.pop('NAXIS4')
-        self.Npols = hdr.pop('NAXIS3')
-        self.Nblts = hdr.pop('GCOUNT')
-
         # read baseline vectors in units of seconds, return in meters
-        self.uvw_array = (np.array(np.stack((D.data.field('UU'),
-                                             D.data.field('VV'),
-                                             D.data.field('WW')))) *
-                          const.c.to('m/s').value).T
+        # FITS uvw direction convention is opposite ours and Miriad's.
+        # So conjugate the visibilities and flip the uvws:
+        self.uvw_array = (-1) * (np.array(np.stack((vis_hdu.data.par('UU'),
+                                                    vis_hdu.data.par('VV'),
+                                                    vis_hdu.data.par('WW'))))
+                                 * const.c.to('m/s').value).T
 
-        self.freq_array = uvutils.fits_gethduaxis(D, 4)
-        self.channel_width = hdr.pop('CDELT4')
-
-        try:
-            self.integration_time = float(D.data.field('INTTIM')[0])
-        except(KeyError):
+        if 'INTTIM' in vis_hdu.data.parnames:
+            self.integration_time = np.asarray(vis_hdu.data.par('INTTIM'), dtype=np.float64)
+        else:
             if self.Ntimes > 1:
-                self.integration_time = \
-                    float(np.diff(np.sort(list(set(self.time_array))))
-                          [0]) * 86400
+                # assume that all integration times in the file are the same
+                int_time = self._calc_single_integration_time()
+                self.integration_time = (np.ones_like(self.time_array, dtype=np.float64)
+                                         * int_time)
             else:
                 raise ValueError('integration time not specified and only '
                                  'one time present')
 
-        self.freq_array.shape = (self.Nspws,) + self.freq_array.shape
+    def _get_data(self, vis_hdu, antenna_nums, antenna_names, ant_str,
+                  bls, frequencies, freq_chans, times, polarizations,
+                  blt_inds, read_metadata, run_check, check_extra,
+                  run_check_acceptability):
+        """
+        Internal function to read just the visibility and flag data of the uvfits file.
+        Separated from full read so that header, metadata and data can be read independently.
+        """
 
-        self.polarization_array = np.int32(uvutils.fits_gethduaxis(D, 3))
+        if self.time_array is None or read_metadata:
+            # first read in random group parameters
+            self._get_parameter_data(vis_hdu)
 
-        # other info -- not required but frequently used
-        self.object_name = hdr.pop('OBJECT', None)
-        self.telescope_name = hdr.pop('TELESCOP', None)
-        self.instrument = hdr.pop('INSTRUME', None)
-        latitude_degrees = hdr.pop('LAT', None)
-        longitude_degrees = hdr.pop('LON', None)
-        altitude = hdr.pop('ALT', None)
-        self.x_orientation = hdr.pop('XORIENT', None)
-        self.history = str(hdr.get('HISTORY', ''))
-        if not uvutils.check_history_version(self.history, self.pyuvdata_version_str):
-            self.history += self.pyuvdata_version_str
+        # figure out what data to read in
+        blt_inds, freq_inds, pol_inds, history_update_string = \
+            self._select_preprocess(antenna_nums, antenna_names, ant_str, bls,
+                                    frequencies, freq_chans, times, polarizations, blt_inds)
 
-        while 'HISTORY' in hdr.keys():
-            hdr.remove('HISTORY')
-
-        # if 'CASAHIST' in hdr.keys():
-        #    self.casa_history=hdr.pop('CASAHIST',None)
-        self.vis_units = hdr.pop('BUNIT', 'UNCALIB')
-        self.phase_center_epoch = hdr.pop('EPOCH', None)
-
-        # remove standard FITS header items that are still around
-        std_fits_substrings = ['SIMPLE', 'BITPIX', 'EXTEND', 'BLOCKED',
-                               'GROUPS', 'PCOUNT', 'BSCALE', 'BZERO', 'NAXIS',
-                               'PTYPE', 'PSCAL', 'PZERO', 'CTYPE', 'CRVAL',
-                               'CRPIX', 'CDELT', 'CROTA', 'CUNIT', 'DATE-OBS']
-        for key in hdr.keys():
-            for sub in std_fits_substrings:
-                if key.find(sub) > -1:
-                    hdr.remove(key)
-
-        # find all the remaining header items and keep them as extra_keywords
-        for key in hdr:
-            if key == 'COMMENT':
-                self.extra_keywords[key] = str(hdr.get(key))
-            elif key != '':
-                self.extra_keywords[key] = hdr.get(key)
-
-        # READ the antenna table
-        ant_hdu = F[hdunames['AIPS AN']]
-
-        # stuff in the header
-        if self.telescope_name is None:
-            self.telescope_name = ant_hdu.header['ARRNAM']
-
-        self.gst0 = ant_hdu.header['GSTIA0']
-        self.rdate = ant_hdu.header['RDATE']
-        self.earth_omega = ant_hdu.header['DEGPDY']
-        self.dut1 = ant_hdu.header['UT1UTC']
-        try:
-            self.timesys = ant_hdu.header['TIMESYS']
-        except(KeyError):
-            # CASA misspells this one
-            self.timesys = ant_hdu.header['TIMSYS']
-
-        try:
-            xyz_telescope_frame = ant_hdu.header['FRAME']
-        except(KeyError):
-            warnings.warn('Required Antenna frame keyword not set, '
-                          'setting to ????')
-            xyz_telescope_frame = '????'
-
-        # get telescope location and antenna positions.
-        # VLA incorrectly sets ARRAYX/ARRAYY/ARRAYZ to 0, and puts array center
-        # in the antenna positions themselves
-        if (np.isclose(ant_hdu.header['ARRAYX'], 0) and
-                np.isclose(ant_hdu.header['ARRAYY'], 0) and
-                np.isclose(ant_hdu.header['ARRAYZ'], 0)):
-            x_telescope = np.mean(ant_hdu.data['STABXYZ'][:, 0])
-            y_telescope = np.mean(ant_hdu.data['STABXYZ'][:, 1])
-            z_telescope = np.mean(ant_hdu.data['STABXYZ'][:, 2])
-            self.antenna_positions = (ant_hdu.data.field('STABXYZ') -
-                                      np.array([x_telescope,
-                                                y_telescope,
-                                                z_telescope]))
-
+        if blt_inds is not None:
+            blt_frac = len(blt_inds) / float(self.Nblts)
         else:
-            x_telescope = ant_hdu.header['ARRAYX']
-            y_telescope = ant_hdu.header['ARRAYY']
-            z_telescope = ant_hdu.header['ARRAYZ']
-            # AIPS memo #117 says that antenna_positions should be relative to
-            # the array center, but in a rotated ECEF frame so that the x-axis
-            # goes through the local meridian.
-            rot_ecef_positions = ant_hdu.data.field('STABXYZ')
-            latitude, longitude, altitude = \
-                uvutils.LatLonAlt_from_XYZ(np.array([x_telescope, y_telescope, z_telescope]))
-            self.antenna_positions = uvutils.ECEF_from_rotECEF(rot_ecef_positions,
-                                                               longitude)
+            blt_frac = 1
 
-        if xyz_telescope_frame == 'ITRF':
-            self.telescope_location = np.array(
-                [x_telescope, y_telescope, z_telescope])
+        if freq_inds is not None:
+            freq_frac = len(freq_inds) / float(self.Nfreqs)
         else:
-            if latitude_degrees is not None and longitude_degrees is not None and altitude is not None:
-                self.telescope_location_lat_lon_alt_degrees = (
-                    latitude_degrees, longitude_degrees, altitude)
+            freq_frac = 1
 
-        # stuff in columns
-        ant_names = ant_hdu.data.field('ANNAME').tolist()
-        self.antenna_names = []
-        for name in ant_names:
-            self.antenna_names.append(name.replace('\x00!', ''))
+        if pol_inds is not None:
+            pol_frac = len(pol_inds) / float(self.Npols)
+        else:
+            pol_frac = 1
 
-        # subtract one to get to 0-indexed values rather than 1-indexed values
-        self.antenna_numbers = ant_hdu.data.field('NOSTA') - 1
+        min_frac = np.min([blt_frac, freq_frac, pol_frac])
 
-        self.Nants_telescope = len(self.antenna_numbers)
+        if min_frac == 1:
+            # no select, read in all the data
+            if vis_hdu.header['NAXIS'] == 7:
+                raw_data_array = vis_hdu.data.data[:, 0, 0, :, :, :, :]
+                assert(self.Nspws == raw_data_array.shape[1])
 
-        try:
-            self.antenna_diameters = ant_hdu.data.field('DIAMETER')
-        except(KeyError):
-            pass
+            else:
+                # in many uvfits files the spw axis is left out,
+                # here we put it back in so the dimensionality stays the same
+                raw_data_array = vis_hdu.data.data[:, 0, 0, :, :, :]
+                raw_data_array = raw_data_array[:, np.newaxis, :, :]
+        else:
+            # do select operations on everything except data_array, flag_array and nsample_array
+            self._select_metadata(blt_inds, freq_inds, pol_inds, history_update_string)
 
-        del(D)
+            # just read in the right portions of the data and flag arrays
+            if blt_frac == min_frac:
+                if vis_hdu.header['NAXIS'] == 7:
+                    raw_data_array = vis_hdu.data.data[blt_inds, :, :, :, :, :, :]
+                    raw_data_array = raw_data_array[:, 0, 0, :, :, :, :]
+                    assert(self.Nspws == raw_data_array.shape[1])
+                else:
+                    # in many uvfits files the spw axis is left out,
+                    # here we put it back in so the dimensionality stays the same
+                    raw_data_array = vis_hdu.data.data[blt_inds, :, :, :, :, :]
+                    raw_data_array = raw_data_array[:, 0, 0, :, :, :]
+                    raw_data_array = raw_data_array[:, np.newaxis, :, :, :]
+                if freq_frac < 1:
+                    raw_data_array = raw_data_array[:, :, freq_inds, :, :]
+                if pol_frac < 1:
+                    raw_data_array = raw_data_array[:, :, :, pol_inds, :]
+            elif freq_frac == min_frac:
+                if vis_hdu.header['NAXIS'] == 7:
+                    raw_data_array = vis_hdu.data.data[:, :, :, :, freq_inds, :, :]
+                    raw_data_array = raw_data_array[:, 0, 0, :, :, :, :]
+                    assert(self.Nspws == raw_data_array.shape[1])
+                else:
+                    # in many uvfits files the spw axis is left out,
+                    # here we put it back in so the dimensionality stays the same
+                    raw_data_array = vis_hdu.data.data[:, :, :, freq_inds, :, :]
+                    raw_data_array = raw_data_array[:, 0, 0, :, :, :]
+                    raw_data_array = raw_data_array[:, np.newaxis, :, :, :]
 
-        try:
-            self.set_telescope_params()
-        except ValueError, ve:
-            warnings.warn(str(ve))
+                if blt_frac < 1:
+                    raw_data_array = raw_data_array[blt_inds, :, :, :, :]
+                if pol_frac < 1:
+                    raw_data_array = raw_data_array[:, :, :, pol_inds, :]
+            else:
+                if vis_hdu.header['NAXIS'] == 7:
+                    raw_data_array = vis_hdu.data.data[:, :, :, :, :, pol_inds, :]
+                    raw_data_array = raw_data_array[:, 0, 0, :, :, :, :]
+                    assert(self.Nspws == raw_data_array.shape[1])
+                else:
+                    # in many uvfits files the spw axis is left out,
+                    # here we put it back in so the dimensionality stays the same
+                    raw_data_array = vis_hdu.data.data[:, :, :, :, pol_inds, :]
+                    raw_data_array = raw_data_array[:, 0, 0, :, :, :]
+                    raw_data_array = raw_data_array[:, np.newaxis, :, :, :]
 
-        self.set_lsts_from_time_array()
+                if blt_frac < 1:
+                    raw_data_array = raw_data_array[blt_inds, :, :, :, :]
+                if freq_frac < 1:
+                    raw_data_array = raw_data_array[:, :, freq_inds, :, :]
+
+        assert(len(raw_data_array.shape) == 5)
+        # FITS uvw direction convention is opposite ours and Miriad's.
+        # So conjugate the visibilities and flip the uvws:
+        self.data_array = (raw_data_array[:, :, :, :, 0] - 1j * raw_data_array[:, :, :, :, 1])
+        self.flag_array = (raw_data_array[:, :, :, :, 2] <= 0)
+        self.nsample_array = np.abs(raw_data_array[:, :, :, :, 2])
 
         # check if object has all required UVParameters set
         if run_check:
             self.check(check_extra=check_extra,
                        run_check_acceptability=run_check_acceptability)
+
+    def read_uvfits(self, filename, antenna_nums=None, antenna_names=None,
+                    ant_str=None, bls=None, frequencies=None,
+                    freq_chans=None, times=None, polarizations=None, blt_inds=None,
+                    read_data=True, read_metadata=True,
+                    run_check=True, check_extra=True, run_check_acceptability=True):
+        """
+        Read in header, metadata and data from a uvfits file. Supports reading
+        only selected portions of the data.
+
+        Args:
+            filename: The uvfits file to read from.
+            antenna_nums: The antennas numbers to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_names is
+                also provided. Ignored if read_data is False.
+            antenna_names: The antennas names to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_nums is
+                also provided. Ignored if read_data is False.
+            bls: A list of antenna number tuples (e.g. [(0,1), (3,2)]) or a list of
+                baseline 3-tuples (e.g. [(0,1,'xx'), (2,3,'yy')]) specifying baselines
+                to keep in the object. For length-2 tuples, the  ordering of the numbers
+                within the tuple does not matter. For length-3 tuples, the polarization
+                string is in the order of the two antennas. If length-3 tuples are provided,
+                the polarizations argument below must be None. Ignored if read_data is False.
+            ant_str: A string containing information about what antenna numbers
+                and polarizations to include when reading data into the object.
+                Can be 'auto', 'cross', 'all', or combinations of antenna numbers
+                and polarizations (e.g. '1', '1_2', '1x_2y').
+                See tutorial for more examples of valid strings and
+                the behavior of different forms for ant_str.
+                If '1x_2y,2y_3y' is passed, both polarizations 'xy' and 'yy' will
+                be kept for both baselines (1,2) and (2,3) to return a valid
+                pyuvdata object.
+                An ant_str cannot be passed in addition to any of the above antenna
+                args or the polarizations arg.
+                Ignored if read_data is False.
+            frequencies: The frequencies to include when reading data into the
+                object. Ignored if read_data is False.
+            freq_chans: The frequency channel numbers to include when reading
+                data into the object. Ignored if read_data is False.
+            times: The times to include when reading data into the object.
+                Ignored if read_data is False.
+            polarizations: The polarizations to include when reading data into
+                the object. Ignored if read_data is False.
+            blt_inds: The baseline-time indices to include when reading data into
+                the object. This is not commonly used. Ignored if read_data is False.
+            read_data: Read in the visibility and flag data. If set to false,
+                only the basic header info and metadata (if read_metadata is True)
+                will be read in. Results in an incompletely defined object
+                (check will not pass). Default True.
+            read_metadata: Read in metadata (times, baselines, uvws) as well as
+                basic header info. Only used if read_data is False
+                (metadata will be read if data is read). If both read_data and
+                read_metadata are false, only basic header info is read in. Default True.
+            run_check: Option to check for the existence and proper shapes of
+                parameters after reading in the file. Default is True.
+                Ignored if read_data is False.
+            check_extra: Option to check optional parameters as well as required
+                ones. Default is True. Ignored if read_data is False.
+            run_check_acceptability: Option to check acceptable range of the values of
+                parameters after reading in the file. Default is True.
+                Ignored if read_data is False.
+        """
+        if not read_data:
+            run_check = False
+
+        with fits.open(filename, memmap=True) as hdu_list:
+            vis_hdu = hdu_list[0]  # assumes the visibilities are in the primary hdu
+            vis_hdr = vis_hdu.header.copy()
+            hdunames = uvutils._fits_indexhdus(hdu_list)  # find the rest of the tables
+
+            # First get everything we can out of the header.
+            self.set_phased()
+            # check if we have an spw dimension
+            if vis_hdr['NAXIS'] == 7:
+                if vis_hdr['NAXIS5'] > 1:
+                    raise ValueError('Sorry.  Files with more than one spectral'
+                                     'window (spw) are not yet supported. A '
+                                     'great project for the interested student!')
+
+                self.Nspws = vis_hdr.pop('NAXIS5')
+
+                self.spw_array = np.int32(uvutils._fits_gethduaxis(vis_hdu, 5)) - 1
+
+                # the axis number for phase center depends on if the spw exists
+                self.phase_center_ra_degrees = np.float(vis_hdr.pop('CRVAL6'))
+                self.phase_center_dec_degrees = np.float(vis_hdr.pop('CRVAL7'))
+            else:
+                self.Nspws = 1
+                self.spw_array = np.array([0])
+
+                # the axis number for phase center depends on if the spw exists
+                self.phase_center_ra_degrees = np.float(vis_hdr.pop('CRVAL5'))
+                self.phase_center_dec_degrees = np.float(vis_hdr.pop('CRVAL6'))
+
+            # get shapes
+            self.Nfreqs = vis_hdr.pop('NAXIS4')
+            self.Npols = vis_hdr.pop('NAXIS3')
+            self.Nblts = vis_hdr.pop('GCOUNT')
+
+            self.freq_array = uvutils._fits_gethduaxis(vis_hdu, 4)
+            self.freq_array.shape = (self.Nspws,) + self.freq_array.shape
+            self.channel_width = vis_hdr.pop('CDELT4')
+            self.polarization_array = np.int32(uvutils._fits_gethduaxis(vis_hdu, 3))
+
+            # other info -- not required but frequently used
+            self.object_name = vis_hdr.pop('OBJECT', None)
+            self.telescope_name = vis_hdr.pop('TELESCOP', None)
+            self.instrument = vis_hdr.pop('INSTRUME', None)
+            latitude_degrees = vis_hdr.pop('LAT', None)
+            longitude_degrees = vis_hdr.pop('LON', None)
+            altitude = vis_hdr.pop('ALT', None)
+            self.x_orientation = vis_hdr.pop('XORIENT', None)
+            self.history = str(vis_hdr.get('HISTORY', ''))
+            if not uvutils._check_history_version(self.history, self.pyuvdata_version_str):
+                self.history += self.pyuvdata_version_str
+
+            while 'HISTORY' in vis_hdr.keys():
+                vis_hdr.remove('HISTORY')
+
+            self.vis_units = vis_hdr.pop('BUNIT', 'UNCALIB')
+            self.phase_center_epoch = vis_hdr.pop('EPOCH', None)
+            self.phase_center_frame = vis_hdr.pop('PHSFRAME', None)
+
+            # remove standard FITS header items that are still around
+            std_fits_substrings = ['SIMPLE', 'BITPIX', 'EXTEND', 'BLOCKED',
+                                   'GROUPS', 'PCOUNT', 'BSCALE', 'BZERO', 'NAXIS',
+                                   'PTYPE', 'PSCAL', 'PZERO', 'CTYPE', 'CRVAL',
+                                   'CRPIX', 'CDELT', 'CROTA', 'CUNIT', 'DATE-OBS']
+            for key in list(vis_hdr.keys()):
+                for sub in std_fits_substrings:
+                    if key.find(sub) > -1:
+                        vis_hdr.remove(key)
+
+            # find all the remaining header items and keep them as extra_keywords
+            for key in vis_hdr:
+                if key == 'COMMENT':
+                    self.extra_keywords[key] = str(vis_hdr.get(key))
+                elif key != '':
+                    self.extra_keywords[key] = vis_hdr.get(key)
+
+            # Next read the antenna table
+            ant_hdu = hdu_list[hdunames['AIPS AN']]
+
+            # stuff in the header
+            if self.telescope_name is None:
+                self.telescope_name = ant_hdu.header['ARRNAM']
+
+            self.gst0 = ant_hdu.header['GSTIA0']
+            self.rdate = ant_hdu.header['RDATE']
+            self.earth_omega = ant_hdu.header['DEGPDY']
+            self.dut1 = ant_hdu.header['UT1UTC']
+            if 'TIMESYS' in ant_hdu.header.keys():
+                self.timesys = ant_hdu.header['TIMESYS']
+            else:
+                # CASA misspells this one
+                self.timesys = ant_hdu.header['TIMSYS']
+
+            if 'FRAME' in ant_hdu.header.keys():
+                xyz_telescope_frame = ant_hdu.header['FRAME']
+            else:
+                warnings.warn('Required Antenna frame keyword not set, '
+                              'setting to ????')
+                xyz_telescope_frame = '????'
+
+            # get telescope location and antenna positions.
+            # VLA incorrectly sets ARRAYX/ARRAYY/ARRAYZ to 0, and puts array center
+            # in the antenna positions themselves
+            if (np.isclose(ant_hdu.header['ARRAYX'], 0)
+                    and np.isclose(ant_hdu.header['ARRAYY'], 0)
+                    and np.isclose(ant_hdu.header['ARRAYZ'], 0)):
+                x_telescope = np.mean(ant_hdu.data['STABXYZ'][:, 0])
+                y_telescope = np.mean(ant_hdu.data['STABXYZ'][:, 1])
+                z_telescope = np.mean(ant_hdu.data['STABXYZ'][:, 2])
+                self.antenna_positions = (ant_hdu.data.field('STABXYZ')
+                                          - np.array([x_telescope,
+                                                      y_telescope,
+                                                      z_telescope]))
+
+            else:
+                x_telescope = ant_hdu.header['ARRAYX']
+                y_telescope = ant_hdu.header['ARRAYY']
+                z_telescope = ant_hdu.header['ARRAYZ']
+                # AIPS memo #117 says that antenna_positions should be relative to
+                # the array center, but in a rotated ECEF frame so that the x-axis
+                # goes through the local meridian.
+                rot_ecef_positions = ant_hdu.data.field('STABXYZ')
+                latitude, longitude, altitude = \
+                    uvutils.LatLonAlt_from_XYZ(np.array([x_telescope, y_telescope, z_telescope]))
+                self.antenna_positions = uvutils.ECEF_from_rotECEF(rot_ecef_positions,
+                                                                   longitude)
+
+            if xyz_telescope_frame == 'ITRF':
+                self.telescope_location = np.array(
+                    [x_telescope, y_telescope, z_telescope])
+            else:
+                if latitude_degrees is not None and longitude_degrees is not None and altitude is not None:
+                    self.telescope_location_lat_lon_alt_degrees = (
+                        latitude_degrees, longitude_degrees, altitude)
+
+            # stuff in columns
+            ant_names = ant_hdu.data.field('ANNAME').tolist()
+            self.antenna_names = []
+            for name in ant_names:
+                self.antenna_names.append(name.replace('\x00!', ''))
+
+            # subtract one to get to 0-indexed values rather than 1-indexed values
+            self.antenna_numbers = ant_hdu.data.field('NOSTA') - 1
+
+            self.Nants_telescope = len(self.antenna_numbers)
+
+            if 'DIAMETER' in ant_hdu.columns.names:
+                self.antenna_diameters = ant_hdu.data.field('DIAMETER')
+
+            try:
+                self.set_telescope_params()
+            except ValueError as ve:
+                warnings.warn(str(ve))
+
+            if not read_data and not read_metadata:
+                # don't read in the data or metadata. This means the object is incomplete,
+                # but that may not matter for many purposes.
+                return
+
+            # Now read in the random parameter info
+            self._get_parameter_data(vis_hdu)
+
+            if not read_data:
+                # don't read in the data. This means the object is incomplete,
+                # but that may not matter for many purposes.
+                return
+
+            # Now read in the data
+            self._get_data(vis_hdu, antenna_nums, antenna_names, ant_str,
+                           bls, frequencies, freq_chans, times, polarizations,
+                           blt_inds, False, run_check, check_extra, run_check_acceptability)
+
+    def read_uvfits_metadata(self, filename):
+        """
+        Read in metadata (random parameter info) but not data from a uvfits file
+        (useful for an object that already has the associated header info and
+        full visibility data isn't needed).
+
+        Args:
+            filename: The uvfits file to read from.
+        """
+
+        if self.data_array is not None:
+            raise ValueError('data_array is already defined, cannot read metadata')
+
+        with fits.open(filename, memmap=True) as hdu_list:
+            vis_hdu = hdu_list[0]  # assumes the visibilities are in the primary hdu
+
+            self._get_parameter_data(vis_hdu)
+
+        del(vis_hdu)
+
+    def read_uvfits_data(self, filename, antenna_nums=None, antenna_names=None,
+                         ant_str=None, bls=None, frequencies=None,
+                         freq_chans=None, times=None, polarizations=None,
+                         blt_inds=None, read_metadata=True, run_check=True,
+                         check_extra=True, run_check_acceptability=True):
+        """
+        Read in data but not header info from a uvfits file
+        (useful for an object that already has the associated header info).
+
+        Args:
+            filename: The uvfits file to read from.
+            antenna_nums: The antennas numbers to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_names is
+                also provided.
+            antenna_names: The antennas names to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_nums is
+                also provided.
+            bls: A list of antenna number tuples (e.g. [(0,1), (3,2)]) or a list of
+                baseline 3-tuples (e.g. [(0,1,'xx'), (2,3,'yy')]) specifying baselines
+                to keep in the object. For length-2 tuples, the  ordering of the numbers
+                within the tuple does not matter. For length-3 tuples, the polarization
+                string is in the order of the two antennas. If length-3 tuples are provided,
+                the polarizations argument below must be None.
+            ant_str: A string containing information about what antenna numbers
+                and polarizations to include when reading data into the object.
+                Can be 'auto', 'cross', 'all', or combinations of antenna numbers
+                and polarizations (e.g. '1', '1_2', '1x_2y').
+                See tutorial for more examples of valid strings and
+                the behavior of different forms for ant_str.
+                If '1x_2y,2y_3y' is passed, both polarizations 'xy' and 'yy' will
+                be kept for both baselines (1,2) and (2,3) to return a valid
+                pyuvdata object.
+                An ant_str cannot be passed in addition to any of the above antenna
+                args or the polarizations arg.
+            frequencies: The frequencies to include when reading data into the
+                object.
+            freq_chans: The frequency channel numbers to include when reading
+                data into the object.
+            times: The times to include when reading data into the object.
+            polarizations: The polarizations to include when reading data into
+                the object.
+            blt_inds: The baseline-time indices to include when reading data into
+                the object. This is not commonly used.
+            read_metadata: Option to read metadata even if it already exists
+                (to ensure data and metadata match). Default is True.
+            run_check: Option to check for the existence and proper shapes of
+                parameters after reading in the file. Default is True.
+            check_extra: Option to check optional parameters as well as required
+                ones. Default is True.
+            run_check_acceptability: Option to check acceptable range of the values of
+                parameters after reading in the file. Default is True.
+        """
+
+        with fits.open(filename, memmap=True) as hdu_list:
+            vis_hdu = hdu_list[0]  # assumes the visibilities are in the primary hdu
+
+            self._get_data(vis_hdu, antenna_nums, antenna_names, ant_str,
+                           bls, frequencies, freq_chans, times, polarizations,
+                           blt_inds, read_metadata, run_check, check_extra,
+                           run_check_acceptability)
+
+        del(vis_hdu)
 
     def write_uvfits(self, filename, spoof_nonessential=False,
                      force_phase=False, run_check=True, check_extra=True,
@@ -329,11 +581,12 @@ class UVFITS(UVData):
                 print('The data are in drift mode and do not have a '
                       'defined phase center. Phasing to zenith of the first '
                       'timestamp.')
-                self.phase_to_time(self.time_array[0])
+                phase_time = Time(self.time_array[0], format='jd')
+                self.phase_to_time(phase_time)
             else:
-                raise ValueError('The data are in drift mode. ' +
-                                 'Set force_phase to true to phase the data ' +
-                                 'to zenith of the first timestamp before ' +
+                raise ValueError('The data are in drift mode. '
+                                 'Set force_phase to true to phase the data '
+                                 'to zenith of the first timestamp before '
                                  'writing a uvfits file.')
         else:
             raise ValueError('The phasing type of the data is unknown. '
@@ -355,7 +608,7 @@ class UVFITS(UVData):
                                  'that are spaced by more than their channel width.')
             freq_spacing = freq_spacing[0]
         else:
-            freq_spacing = 1
+            freq_spacing = self.channel_width
 
         if self.Npols > 1:
             pol_spacing = np.diff(self.polarization_array)
@@ -386,7 +639,7 @@ class UVFITS(UVData):
                                          .format(attribute=p))
 
         # check for unflagged data with nsample = 0. Warn if any found
-        wh_nsample0 = np.where(self.nsample_array == 0)[0]
+        wh_nsample0 = np.where(self.nsample_array == 0)
         if np.any(~self.flag_array[wh_nsample0]):
             warnings.warn('Some unflagged data has nsample = 0. Flags and '
                           'nsamples are combined in uvfits files such that '
@@ -394,8 +647,10 @@ class UVFITS(UVData):
 
         weights_array = self.nsample_array * \
             np.where(self.flag_array, -1, 1)
-        data_array = self.data_array[:, np.newaxis,
-                                     np.newaxis, :, :, :, np.newaxis]
+        # FITS uvw direction convention is opposite ours and Miriad's.
+        # So conjugate the visibilities and flip the uvws:
+        data_array = np.conj(self.data_array[:, np.newaxis,
+                                             np.newaxis, :, :, :, np.newaxis])
         weights_array = weights_array[:, np.newaxis, np.newaxis, :, :, :,
                                       np.newaxis]
         # uvfits_array_data shape will be  (Nblts,1,1,[Nspws],Nfreqs,Npols,3)
@@ -403,7 +658,9 @@ class UVFITS(UVData):
                                             data_array.imag,
                                             weights_array], axis=6)
 
-        uvw_array_sec = self.uvw_array / const.c.to('m/s').value
+        # FITS uvw direction convention is opposite ours and Miriad's.
+        # So conjugate the visibilities and flip the uvws:
+        uvw_array_sec = -1 * self.uvw_array / const.c.to('m/s').value
         # jd_midnight = np.floor(self.time_array[0] - 0.5) + 0.5
         tzero = np.float32(self.time_array[0])
 
@@ -411,8 +668,7 @@ class UVFITS(UVData):
         # We are setting PZERO4 = float32(first time of observation)
         time_array = np.float32(self.time_array - np.float64(tzero))
 
-        int_time_array = (np.zeros_like((time_array), dtype=np.float) +
-                          self.integration_time)
+        int_time_array = self.integration_time
 
         baselines_use = self.antnums_to_baseline(self.ant_1_array,
                                                  self.ant_2_array,
@@ -438,8 +694,8 @@ class UVFITS(UVData):
 
         # list contains arrays of [u,v,w,date,baseline];
         # each array has shape (Nblts)
-        if (np.max(self.ant_1_array) < 255 and
-                np.max(self.ant_2_array) < 255):
+        if (np.max(self.ant_1_array) < 255
+                and np.max(self.ant_2_array) < 255):
             # if the number of antennas is less than 256 then include both the
             # baseline array and the antenna arrays in the group parameters.
             # Otherwise just use the antenna arrays
@@ -469,6 +725,9 @@ class UVFITS(UVData):
         hdu.header['CRPIX2  '] = 1.0
         hdu.header['CDELT2  '] = 1.0
 
+        # Note: This axis is called STOKES to comply with the AIPS memo 117
+        # However, this confusing because it is NOT a true Stokes axis,
+        #   it is really the polarization axis.
         hdu.header['CTYPE3  '] = 'STOKES  '
         hdu.header['CRVAL3  '] = self.polarization_array[0]
         hdu.header['CRPIX3  '] = 1.0
@@ -501,6 +760,9 @@ class UVFITS(UVData):
         hdu.header['ALT     '] = self.telescope_location_lat_lon_alt[2]
         hdu.header['INSTRUME'] = self.instrument
         hdu.header['EPOCH   '] = float(self.phase_center_epoch)
+        if self.phase_center_frame is not None:
+            hdu.header['PHSFRAME'] = self.phase_center_frame
+
         if self.x_orientation is not None:
             hdu.header['XORIENT'] = self.x_orientation
 
@@ -508,7 +770,7 @@ class UVFITS(UVData):
             hdu.header.add_history(line)
 
         # end standard keywords; begin user-defined keywords
-        for key, value in self.extra_keywords.iteritems():
+        for key, value in self.extra_keywords.items():
             # header keywords have to be 8 characters or less
             if len(str(key)) > 8:
                 warnings.warn('key {key} in extra_keywords is longer than 8 '
@@ -620,7 +882,7 @@ class UVFITS(UVData):
 
         # write the file
         hdulist = fits.HDUList(hdus=[hdu, ant_hdu])
-        if float(astropy.__version__[0:3]) < 1.3:
+        if float(astropy.__version__[0:3]) < 1.3:  # pragma: no cover
             hdulist.writeto(filename, clobber=True)
         else:
             hdulist.writeto(filename, overwrite=True)

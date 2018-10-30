@@ -24,7 +24,26 @@ def read_miriad_fromUVData(filepath, correct_lat_lon=True, run_check=True,
                 run_check_acceptability=True, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
     uv2 = UVData()
     uv2.read_miriad(filepath=filepath, correct_lat_lon=correct_lat_lon, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability, phase_type=phase_type)
-    uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+    if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+        uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+    return uv2
+
+def read_uvh5_fromUVData(filename, antenna_nums=None, antenna_names=None,
+                         ant_str=None, bls=None, frequencies=None, freq_chans=None,
+                         times=None, polarizations=None, blt_inds=None, read_data=True,
+                         run_check=True, check_extra=True, run_check_acceptability=True,
+                         Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
+    
+    uv2 = UVData()
+    uv2.read_uvh5(filename, antenna_nums=antenna_nums,
+                   antenna_names=antenna_names, ant_str=ant_str, bls=bls,
+                   frequencies=frequencies, freq_chans=freq_chans, times=times,
+                   polarizations=polarizations, blt_inds=blt_inds,
+                   read_data=read_data, run_check=run_check,
+                   check_extra=check_extra,
+                   run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
+    if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+        uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
     return uv2
     
 class UVData(UVBase):
@@ -42,6 +61,337 @@ class UVData(UVBase):
     """
 
     def __init__(self):
+        # """Create a new UVData object."""
+        # # add the UVParameters to the class
+        #
+        # # standard angle tolerance: 10 mas in radians.
+        # # Should perhaps be decreased to 1 mas in the future
+        # radian_tol = 10 * 2 * np.pi * 1e-3 / (60.0 * 60.0 * 360.0)
+        #
+        # self._Ntimes = uvp.UVParameter('Ntimes', description='Number of times',
+        #                                expected_type=int)
+        # self._Nbls = uvp.UVParameter('Nbls', description='Number of baselines',
+        #                              expected_type=int)
+        # self._Nblts = uvp.UVParameter('Nblts', description='Number of baseline-times '
+        #                                                    '(i.e. number of spectra). Not necessarily '
+        #                                                    'equal to Nbls * Ntimes', expected_type=int)
+        # self._Nfreqs = uvp.UVParameter('Nfreqs', description='Number of frequency channels',
+        #                                expected_type=int)
+        # self._Npols = uvp.UVParameter('Npols', description='Number of polarizations',
+        #                               expected_type=int)
+        #
+        # desc = ('Array of the visibility data, shape: (Nblts, Nspws, Nfreqs, '
+        #         'Npols), type = complex float, in units of self.vis_units')
+        # self._data_array = uvp.UVParameter('data_array', description=desc,
+        #                                    form=('Nblts', 'Nspws',
+        #                                          'Nfreqs', 'Npols'),
+        #                                    expected_type=np.complex)
+        #
+        # desc = 'Visibility units, options are: "uncalib", "Jy" or "K str"'
+        # self._vis_units = uvp.UVParameter('vis_units', description=desc,
+        #                                   form='str', expected_type=str,
+        #                                   acceptable_vals=["uncalib", "Jy", "K str"])
+        #
+        # desc = ('Number of data points averaged into each data element, '
+        #         'NOT required to be an integer, type = float, same shape as data_array.'
+        #         'The product of the integration_time and the nsample_array '
+        #         'value for a visibility reflects the total amount of time '
+        #         'that went into the visibility. Best practice is for the '
+        #         'nsample_array to be used to track flagging within an integration_time '
+        #         '(leading to a decrease of the nsample array value below 1) and '
+        #         'LST averaging (leading to an increase in the nsample array '
+        #         'value). So datasets that have not been LST averaged should '
+        #         'have nsample array values less than or equal to 1.'
+        #         'Note that many files do not follow this convention, but it is '
+        #         'safe to assume that the product of the integration_time and '
+        #         'the nsample_array is the total amount of time included in a visibility.')
+        # self._nsample_array = uvp.UVParameter('nsample_array', description=desc,
+        #                                       form=('Nblts', 'Nspws',
+        #                                             'Nfreqs', 'Npols'),
+        #                                       expected_type=(np.float))
+        #
+        # desc = 'Boolean flag, True is flagged, same shape as data_array.'
+        # self._flag_array = uvp.UVParameter('flag_array', description=desc,
+        #                                    form=('Nblts', 'Nspws',
+        #                                          'Nfreqs', 'Npols'),
+        #                                    expected_type=np.bool)
+        #
+        # self._Nspws = uvp.UVParameter('Nspws', description='Number of spectral windows '
+        #                                                    '(ie non-contiguous spectral chunks). '
+        #                                                    'More than one spectral window is not '
+        #                                                    'currently supported.', expected_type=int)
+        #
+        # self._spw_array = uvp.UVParameter('spw_array',
+        #                                   description='Array of spectral window '
+        #                                               'Numbers, shape (Nspws)', form=('Nspws',),
+        #                                   expected_type=int)
+        #
+        # desc = ('Projected baseline vectors relative to phase center, '
+        #         'shape (Nblts, 3), units meters. Convention is: uvw = xyz(ant2) - xyz(ant1).'
+        #         'Note that this is the Miriad convention but it is different '
+        #         'from the AIPS/FITS convention (where uvw = xyz(ant1) - xyz(ant2)).')
+        # self._uvw_array = uvp.UVParameter('uvw_array', description=desc,
+        #                                   form=('Nblts', 3),
+        #                                   expected_type=np.float,
+        #                                   acceptable_range=(0, 1e8), tols=1e-3)
+        #
+        # desc = ('Array of times, center of integration, shape (Nblts), '
+        #         'units Julian Date')
+        # self._time_array = uvp.UVParameter('time_array', description=desc,
+        #                                    form=('Nblts',),
+        #                                    expected_type=np.float,
+        #                                    tols=1e-3 / (60.0 * 60.0 * 24.0))  # 1 ms in days
+        #
+        # desc = ('Array of lsts, center of integration, shape (Nblts), '
+        #         'units radians')
+        # self._lst_array = uvp.UVParameter('lst_array', description=desc,
+        #                                   form=('Nblts',),
+        #                                   expected_type=np.float,
+        #                                   tols=radian_tol)
+        #
+        # desc = ('Array of first antenna indices, shape (Nblts), '
+        #         'type = int, 0 indexed')
+        # self._ant_1_array = uvp.UVParameter('ant_1_array', description=desc,
+        #                                     expected_type=int, form=('Nblts',))
+        # desc = ('Array of second antenna indices, shape (Nblts), '
+        #         'type = int, 0 indexed')
+        # self._ant_2_array = uvp.UVParameter('ant_2_array', description=desc,
+        #                                     expected_type=int, form=('Nblts',))
+        #
+        # desc = ('Array of baseline indices, shape (Nblts), '
+        #         'type = int; baseline = 2048 * (ant1+1) + (ant2+1) + 2^16')
+        # self._baseline_array = uvp.UVParameter('baseline_array',
+        #                                        description=desc,
+        #                                        expected_type=int, form=('Nblts',))
+        #
+        # # this dimensionality of freq_array does not allow for different spws
+        # # to have different dimensions
+        # desc = 'Array of frequencies, shape (Nspws, Nfreqs), units Hz'
+        # self._freq_array = uvp.UVParameter('freq_array', description=desc,
+        #                                    form=('Nspws', 'Nfreqs'),
+        #                                    expected_type=np.float,
+        #                                    tols=1e-3)  # mHz
+        #
+        # desc = ('Array of polarization integers, shape (Npols). '
+        #         'AIPS Memo 117 says: pseudo-stokes 1:4 (pI, pQ, pU, pV);  '
+        #         'circular -1:-4 (RR, LL, RL, LR); linear -5:-8 (XX, YY, XY, YX). '
+        #         'NOTE: AIPS Memo 117 actually calls the pseudo-Stokes polarizations '
+        #         '"Stokes", but this is inaccurate as visibilities cannot be in '
+        #         'true Stokes polarizations for physical antennas. We adopt the '
+        #         'term pseudo-Stokes to refer to linear combinations of instrumental '
+        #         'visibility polarizations (e.g. pI = xx + yy).')
+        # self._polarization_array = uvp.UVParameter('polarization_array',
+        #                                            description=desc,
+        #                                            expected_type=int,
+        #                                            acceptable_vals=list(
+        #                                                np.arange(-8, 0)) + list(np.arange(1, 5)),
+        #                                            form=('Npols',))
+        #
+        # desc = ('Length of the integration in seconds, shape (NBlts). '
+        #         'The product of the integration_time and the nsample_array '
+        #         'value for a visibility reflects the total amount of time '
+        #         'that went into the visibility. Best practice is for the '
+        #         'integration_time to reflect the length of time a visibility '
+        #         'was integrated over (so it should vary in the case of '
+        #         'baseline-dependent averaging and be a way to do selections '
+        #         'for differently integrated baselines).'
+        #         'Note that many files do not follow this convention, but it is '
+        #         'safe to assume that the product of the integration_time and '
+        #         'the nsample_array is the total amount of time included in a visibility.')
+        # self._integration_time = uvp.UVParameter('integration_time',
+        #                                          description=desc,
+        #                                          form=('Nblts',),
+        #                                          expected_type=np.float, tols=1e-3)  # 1 ms
+        #
+        # # self._integration_time = uvp.UVParameter('integration_time',
+        # #                                          description='Length of the integration (s)',
+        # #                                          expected_type=np.float, tols=1e-3)  # 1 ms
+        #
+        # self._channel_width = uvp.UVParameter('channel_width',
+        #                                       description='Width of frequency channels (Hz)',
+        #                                       expected_type=np.float,
+        #                                       tols=1e-3)  # 1 mHz
+        #
+        # # --- observation information ---
+        # self._object_name = uvp.UVParameter('object_name',
+        #                                     description='Source or field '
+        #                                                 'observed (string)', form='str',
+        #                                     expected_type=str)
+        # self._telescope_name = uvp.UVParameter('telescope_name',
+        #                                        description='Name of telescope '
+        #                                                    '(string)', form='str',
+        #                                        expected_type=str)
+        # self._instrument = uvp.UVParameter('instrument', description='Receiver or backend. '
+        #                                                              'Sometimes identical to telescope_name',
+        #                                    form='str', expected_type=str)
+        #
+        # desc = ('Telescope location: xyz in ITRF (earth-centered frame). '
+        #         'Can also be accessed using telescope_location_lat_lon_alt or '
+        #         'telescope_location_lat_lon_alt_degrees properties')
+        # self._telescope_location = uvp.LocationParameter('telescope_location',
+        #                                                  description=desc,
+        #                                                  acceptable_range=(
+        #                                                      6.35e6, 6.39e6),
+        #                                                  tols=1e-3)
+        #
+        # self._history = uvp.UVParameter('history', description='String of history, units English',
+        #                                 form='str', expected_type=str)
+        #
+        # # --- phasing information ---
+        # desc = ('String indicating phasing type. Allowed values are "drift", '
+        #         '"phased" and "unknown"')
+        # self._phase_type = uvp.UVParameter('phase_type', form='str', expected_type=str,
+        #                                    description=desc, value='unknown',
+        #                                    acceptable_vals=['drift', 'phased', 'unknown'])
+        #
+        # desc = ('Required if phase_type = "phased". Epoch year of the phase '
+        #         'applied to the data (eg 2000.)')
+        # self._phase_center_epoch = uvp.UVParameter('phase_center_epoch',
+        #                                            required=False,
+        #                                            description=desc,
+        #                                            expected_type=np.float)
+        #
+        # desc = ('Required if phase_type = "phased". Right ascension of phase '
+        #         'center (see uvw_array), units radians. Can also be accessed using phase_center_ra_degrees.')
+        # self._phase_center_ra = uvp.AngleParameter('phase_center_ra',
+        #                                            required=False,
+        #                                            description=desc,
+        #                                            expected_type=np.float,
+        #                                            tols=radian_tol)
+        #
+        # desc = ('Required if phase_type = "phased". Declination of phase center '
+        #         '(see uvw_array), units radians. Can also be accessed using phase_center_dec_degrees.')
+        # self._phase_center_dec = uvp.AngleParameter('phase_center_dec',
+        #                                             required=False,
+        #                                             description=desc,
+        #                                             expected_type=np.float,
+        #                                             tols=radian_tol)
+        #
+        # desc = ('Only relevant if phase_type = "phased". Specifies the frame the'
+        #         ' data and uvw_array are phased to. Options are "gcrs" and "icrs",'
+        #         ' default is "icrs"')
+        # self._phase_center_frame = uvp.UVParameter('phase_center_frame',
+        #                                            required=False,
+        #                                            description=desc,
+        #                                            expected_type=str,
+        #                                            acceptable_vals=['icrs', 'gcrs'])
+        #
+        # # --- antenna information ----
+        # desc = ('Number of antennas with data present (i.e. number of unique '
+        #         'entries in ant_1_array and ant_2_array). May be smaller '
+        #         'than the number of antennas in the array')
+        # self._Nants_data = uvp.UVParameter('Nants_data', description=desc,
+        #                                    expected_type=int)
+        #
+        # desc = ('Number of antennas in the array. May be larger '
+        #         'than the number of antennas with data')
+        # self._Nants_telescope = uvp.UVParameter('Nants_telescope',
+        #                                         description=desc, expected_type=int)
+        #
+        # desc = ('List of antenna names, shape (Nants_telescope), '
+        #         'with numbers given by antenna_numbers (which can be matched '
+        #         'to ant_1_array and ant_2_array). There must be one entry '
+        #         'here for each unique entry in ant_1_array and '
+        #         'ant_2_array, but there may be extras as well.')
+        # self._antenna_names = uvp.UVParameter('antenna_names', description=desc,
+        #                                       form=('Nants_telescope',),
+        #                                       expected_type=str)
+        #
+        # desc = ('List of integer antenna numbers corresponding to antenna_names, '
+        #         'shape (Nants_telescope). There must be one '
+        #         'entry here for each unique entry in ant_1_array and '
+        #         'ant_2_array, but there may be extras as well.')
+        # self._antenna_numbers = uvp.UVParameter('antenna_numbers', description=desc,
+        #                                         form=('Nants_telescope',),
+        #                                         expected_type=int)
+        #
+        # # -------- extra, non-required parameters ----------
+        # desc = ('Orientation of the physical dipole corresponding to what is '
+        #         'labelled as the x polarization. Examples include "east" '
+        #         '(indicating east/west orientation) and "north" (indicating '
+        #         'north/south orientation)')
+        # self._x_orientation = uvp.UVParameter('x_orientation', description=desc,
+        #                                       required=False, expected_type=str)
+        #
+        # desc = ('Any user supplied extra keywords, type=dict. Keys should be '
+        #         '8 character or less strings if writing to uvfits or miriad files. '
+        #         'Use the special key "comment" for long multi-line string comments.')
+        # self._extra_keywords = uvp.UVParameter('extra_keywords', required=False,
+        #                                        description=desc, value={},
+        #                                        spoof_val={}, expected_type=dict)
+        #
+        # desc = ('Array giving coordinates of antennas relative to '
+        #         'telescope_location (ITRF frame), shape (Nants_telescope, 3), '
+        #         'units meters. See the tutorial page in the documentation '
+        #         'for an example of how to convert this to topocentric frame.'
+        #         'Will be a required parameter in a future version.')
+        # self._antenna_positions = uvp.AntPositionParameter('antenna_positions',
+        #                                                    required=False,
+        #                                                    description=desc,
+        #                                                    form=(
+        #                                                        'Nants_telescope', 3),
+        #                                                    expected_type=np.float,
+        #                                                    tols=1e-3)  # 1 mm
+        #
+        # desc = ('Array of antenna diameters in meters. Used by CASA to '
+        #         'construct a default beam if no beam is supplied.')
+        # self._antenna_diameters = uvp.UVParameter('antenna_diameters',
+        #                                           required=False,
+        #                                           description=desc,
+        #                                           form=('Nants_telescope',),
+        #                                           expected_type=np.float,
+        #                                           tols=1e-3)  # 1 mm
+        #
+        # # --- other stuff ---
+        # # the below are copied from AIPS memo 117, but could be revised to
+        # # merge with other sources of data.
+        # self._gst0 = uvp.UVParameter('gst0', required=False,
+        #                              description='Greenwich sidereal time at '
+        #                                          'midnight on reference date',
+        #                              spoof_val=0.0, expected_type=np.float)
+        # self._rdate = uvp.UVParameter('rdate', required=False,
+        #                               description='Date for which the GST0 or '
+        #                                           'whatever... applies',
+        #                               spoof_val='', form='str')
+        # self._earth_omega = uvp.UVParameter('earth_omega', required=False,
+        #                                     description='Earth\'s rotation rate '
+        #                                                 'in degrees per day',
+        #                                     spoof_val=360.985, expected_type=np.float)
+        # self._dut1 = uvp.UVParameter('dut1', required=False,
+        #                              description='DUT1 (google it) AIPS 117 '
+        #                                          'calls it UT1UTC',
+        #                              spoof_val=0.0, expected_type=np.float)
+        # self._timesys = uvp.UVParameter('timesys', required=False,
+        #                                 description='We only support UTC',
+        #                                 spoof_val='UTC', form='str')
+        #
+        # desc = ('FHD thing we do not understand, something about the time '
+        #         'at which the phase center is normal to the chosen UV plane '
+        #         'for phasing')
+        # self._uvplane_reference_time = uvp.UVParameter('uvplane_reference_time',
+        #                                                required=False,
+        #                                                description=desc,
+        #                                                spoof_val=0)
+        #
+        # # desc = ('Required if phase_type = "drift". Right ascension of zenith. '
+        # #         'units: radians, shape (Nblts). Can also be accessed using zenith_ra_degrees.')
+        # # self._zenith_ra = uvp.AngleParameter('zenith_ra', required=False,
+        # #                                      description=desc,
+        # #                                      expected_type=np.float,
+        # #                                      form=('Nblts',),
+        # #                                      tols=radian_tol)
+        # #
+        # # desc = ('Required if phase_type = "drift". Declination of zenith. '
+        # #         'units: radians, shape (Nblts). Can also be accessed using zenith_dec_degrees.')
+        # # # in practice, dec of zenith will never change; does not need to be shape Nblts
+        # # self._zenith_dec = uvp.AngleParameter('zenith_dec', required=False,
+        # #                                       description=desc,
+        # #                                       expected_type=np.float,
+        # #                                       form=('Nblts',),
+        # #                                       tols=radian_tol)
+        #
+        # super(UVData, self).__init__()
+
         """Create a new UVData object."""
         # add the UVParameters to the class
 
@@ -54,8 +404,8 @@ class UVData(UVBase):
         self._Nbls = uvp.UVParameter('Nbls', description='Number of baselines',
                                      expected_type=int)
         self._Nblts = uvp.UVParameter('Nblts', description='Number of baseline-times '
-                                      '(i.e. number of spectra). Not necessarily '
-                                      'equal to Nbls * Ntimes', expected_type=int)
+                                                           '(i.e. number of spectra). Not necessarily '
+                                                           'equal to Nbls * Ntimes', expected_type=int)
         self._Nfreqs = uvp.UVParameter('Nfreqs', description='Number of frequency channels',
                                        expected_type=int)
         self._Npols = uvp.UVParameter('Npols', description='Number of polarizations',
@@ -87,13 +437,13 @@ class UVData(UVBase):
                                            expected_type=np.bool)
 
         self._Nspws = uvp.UVParameter('Nspws', description='Number of spectral windows '
-                                      '(ie non-contiguous spectral chunks). '
-                                      'More than one spectral window is not '
-                                      'currently supported.', expected_type=int)
+                                                           '(ie non-contiguous spectral chunks). '
+                                                           'More than one spectral window is not '
+                                                           'currently supported.', expected_type=int)
 
         self._spw_array = uvp.UVParameter('spw_array',
                                           description='Array of spectral window '
-                                          'Numbers, shape (Nspws)', form=('Nspws',),
+                                                      'Numbers, shape (Nspws)', form=('Nspws',),
                                           expected_type=int)
 
         desc = ('Projected baseline vectors relative to phase center, ' +
@@ -161,14 +511,14 @@ class UVData(UVBase):
         # --- observation information ---
         self._object_name = uvp.UVParameter('object_name',
                                             description='Source or field '
-                                            'observed (string)', form='str',
+                                                        'observed (string)', form='str',
                                             expected_type=str)
         self._telescope_name = uvp.UVParameter('telescope_name',
                                                description='Name of telescope '
-                                               '(string)', form='str',
+                                                           '(string)', form='str',
                                                expected_type=str)
         self._instrument = uvp.UVParameter('instrument', description='Receiver or backend. '
-                                           'Sometimes identical to telescope_name',
+                                                                     'Sometimes identical to telescope_name',
                                            form='str', expected_type=str)
 
         desc = ('Telescope location: xyz in ITRF (earth-centered frame). '
@@ -342,50 +692,71 @@ class UVData(UVBase):
                 are acceptable. Default is True.
         """
         # first run the basic check from UVBase
-        if np.all(self.ant_1_array == self.ant_2_array):
-            # Special case of only containing auto correlations, adjust uvw acceptable_range
-            self._uvw_array.acceptable_range = (0.0, 0.0)
-
+        # set the phase type based on object's value
+        if self.phase_type == 'phased':
+            self.set_phased()
+        elif self.phase_type == 'drift':
+            self.set_drift()
+        else:
+            self.set_unknown_phase_type()
+    
         super(UVData, self).check(check_extra=check_extra,
                                   run_check_acceptability=run_check_acceptability)
-
+    
         # Check internal consistency of numbers which don't explicitly correspond
         # to the shape of another array.
-        nants_data_calc = int(len(np.unique(self.ant_1_array.tolist() +
-                                            self.ant_2_array.tolist())))
+        nants_data_calc = int(len(np.unique(self.ant_1_array.tolist()
+                                            + self.ant_2_array.tolist())))
         if self.Nants_data != nants_data_calc:
             raise ValueError('Nants_data must be equal to the number of unique '
                              'values in ant_1_array and ant_2_array')
-
+    
         if self.Nbls != len(np.unique(self.baseline_array)):
             raise ValueError('Nbls must be equal to the number of unique '
                              'baselines in the data_array')
-
+    
         if self.Ntimes != len(np.unique(self.time_array)):
             raise ValueError('Ntimes must be equal to the number of unique '
                              'times in the time_array')
-
+    
         # issue warning if extra_keywords keys are longer than 8 characters
         for key in self.extra_keywords.keys():
             if len(key) > 8:
                 warnings.warn('key {key} in extra_keywords is longer than 8 '
                               'characters. It will be truncated to 8 if written '
                               'to uvfits or miriad file formats.'.format(key=key))
-
+    
         # issue warning if extra_keywords values are lists, arrays or dicts
-        for key, value in self.extra_keywords.iteritems():
+        for key, value in self.extra_keywords.items():
             if isinstance(value, (list, dict, np.ndarray)):
                 warnings.warn('{key} in extra_keywords is a list, array or dict, '
                               'which will raise an error when writing uvfits or '
                               'miriad file types'.format(key=key))
-
+    
+        # issue deprecation warning if antenna positions are not set
+        if self.antenna_positions is None:
+            warnings.warn('antenna_positions are not defined. '
+                          'antenna_positions will be a required parameter in '
+                          'future versions.', PendingDeprecationWarning)
+    
+        # check auto and cross-corrs have sensible uvws
+        autos = np.isclose(self.ant_1_array - self.ant_2_array, 0.0)
+        if not np.all(np.isclose(self.uvw_array[autos], 0.0,
+                                 rtol=self._uvw_array.tols[0],
+                                 atol=self._uvw_array.tols[1])):
+            raise ValueError("Some auto-correlations have non-zero "
+                             "uvw_array coordinates.")
+        if np.any(np.isclose([np.linalg.norm(uvw) for uvw in self.uvw_array[~autos]], 0.0,
+                             rtol=self._uvw_array.tols[0],
+                             atol=self._uvw_array.tols[1])):
+            raise ValueError("Some cross-correlations have near-zero "
+                             "uvw_array magnitudes.")
+    
         return True
 
     def set_drift(self):
         """Set phase_type to 'drift' and adjust required parameters."""
         self.phase_type = 'drift'
-        self._zenith_ra.required = True
-        self._zenith_dec.required = True
         self._phase_center_epoch.required = False
         self._phase_center_ra.required = False
         self._phase_center_dec.required = False
@@ -393,8 +764,6 @@ class UVData(UVBase):
     def set_phased(self):
         """Set phase_type to 'phased' and adjust required parameters."""
         self.phase_type = 'phased'
-        self._zenith_ra.required = False
-        self._zenith_dec.required = False
         self._phase_center_epoch.required = True
         self._phase_center_ra.required = True
         self._phase_center_dec.required = True
@@ -402,8 +771,6 @@ class UVData(UVBase):
     def set_unknown_phase_type(self):
         """Set phase_type to 'unknown' and adjust required parameters."""
         self.phase_type = 'unknown'
-        self._zenith_ra.required = False
-        self._zenith_dec.required = False
         self._phase_center_epoch.required = False
         self._phase_center_ra.required = False
         self._phase_center_dec.required = False
@@ -435,8 +802,8 @@ class UVData(UVBase):
             for p in telescope_obj:
                 telescope_param = getattr(telescope_obj, p)
                 self_param = getattr(self, p)
-                if telescope_param.value is not None and (overwrite is True or
-                                                          self_param.value is None):
+                if telescope_param.value is not None and (overwrite is True
+                                                          or self_param.value is None):
                     telescope_shape = telescope_param.expected_shape(telescope_obj)
                     self_shape = self_param.expected_shape(self)
                     if telescope_shape == self_shape:
@@ -476,16 +843,7 @@ class UVData(UVBase):
         Returns:
             tuple with the two antenna numbers corresponding to the baseline.
         """
-        if self.Nants_telescope > 2048:
-            raise StandardError('error Nants={Nants}>2048 not '
-                                'supported'.format(Nants=self.Nants_telescope))
-        if np.min(baseline) > 2**16:
-            ant2 = (baseline - 2**16) % 2048 - 1
-            ant1 = (baseline - 2**16 - (ant2 + 1)) / 2048 - 1
-        else:
-            ant2 = (baseline) % 256 - 1
-            ant1 = (baseline - (ant2 + 1)) / 256 - 1
-        return np.int32(ant1), np.int32(ant2)
+        return uvutils.baseline_to_antnums(baseline, self.Nants_telescope)
 
     def antnums_to_baseline(self, ant1, ant2, attempt256=False):
         """
@@ -501,23 +859,7 @@ class UVData(UVBase):
         Returns:
             integer baseline number corresponding to the two antenna numbers.
         """
-        ant1, ant2 = np.int64((ant1, ant2))
-        if self.Nants_telescope > 2048:
-            raise StandardError('cannot convert ant1, ant2 to a baseline index '
-                                'with Nants={Nants}>2048.'
-                                .format(Nants=self.Nants_telescope))
-        if attempt256:
-            if (np.max(ant1) < 255 and np.max(ant2) < 255):
-                return 256 * (ant1 + 1) + (ant2 + 1)
-            else:
-                print('Max antnums are {} and {}'.format(
-                    np.max(ant1), np.max(ant2)))
-                message = 'antnums_to_baseline: found > 256 antennas, using ' \
-                          '2048 baseline indexing. Beware compatibility ' \
-                          'with CASA etc'
-                warnings.warn(message)
-
-        return np.int64(2048 * (ant1 + 1) + (ant2 + 1) + 2**16)
+        return uvutils.antnums_to_baseline(ant1, ant2, self.Nants_telescope, attempt256=attempt256)
 
     def order_pols(self, order='AIPS'):
         '''
@@ -538,139 +880,141 @@ class UVData(UVBase):
             pol_inds = np.argsort(pol_inds)
         else:
             warnings.warn('Invalid order supplied. No sorting performed.')
-            pol_inds = range(self.Npols)
+            pol_inds = list(range(self.Npols))
         # Generate a map from original indices to new indices
         if not np.array_equal(pol_inds, self.Npols):
             self.reorder_pols(order=pol_inds)
 
     def set_lsts_from_time_array(self):
         """Set the lst_array based from the time_array."""
-        lsts = []
-        curtime = self.time_array[0]
-        self.lst_array = np.zeros(self.Nblts)
         latitude, longitude, altitude = self.telescope_location_lat_lon_alt_degrees
-        for ind, jd in enumerate(np.unique(self.time_array)):
-            t = Time(jd, format='jd', location=(longitude, latitude))
-            self.lst_array[np.where(np.isclose(
-                jd, self.time_array, atol=1e-6, rtol=1e-12))] = t.sidereal_time('apparent').radian
+        self.lst_array = uvutils.get_lst_for_time(self.time_array, latitude, longitude, altitude)
 
-    def juldate2ephem(self, num):
+    def unphase_to_drift(self, phase_frame=None, use_ant_pos=False):
         """
-        Convert Julian date to ephem date, measured from noon, Dec. 31, 1899.
+        Convert from a phased dataset to a drift dataset.
+        See the phasing memo under docs/references for more documentation.
 
         Args:
-            num: Julian date
-
-        Returns:
-            ephem date, measured from noon, Dec. 31, 1899.
+            phase_frame: the astropy frame to phase from. Either 'icrs' or 'gcrs'.
+                'gcrs' accounts for precession & nutation, 'icrs' also includes abberation.
+                Defaults to using the 'phase_center_frame' attribute or 'icrs'
+                if that attribute is None
+            use_ant_pos: If True, calculate the uvws directly from the
+                antenna positions rather than from the existing uvws.
         """
-        return ephem.date(num - 2415020.)
-
-    def unphase_to_drift(self):
-        """Convert from a phased dataset to a drift dataset."""
         if self.phase_type == 'phased':
             pass
         elif self.phase_type == 'drift':
-            raise ValueError('The data is already drift scanning; can only ' +
+            raise ValueError('The data is already drift scanning; can only '
                              'unphase phased data.')
         else:
             raise ValueError('The phasing type of the data is unknown. '
                              'Set the phase_type to drift or phased to '
                              'reflect the phasing status of the data')
-
-        latitude, longitude, altitude = self.telescope_location_lat_lon_alt
-
-        obs = ephem.Observer()
-        # obs inits with default values for parameters -- be sure to replace them
-        obs.lat = latitude
-        obs.lon = longitude
-
-        phase_center = ephem.FixedBody()
-        epoch = (self.phase_center_epoch - 2000.) * 365.2422 + \
-            ephem.J2000  # convert years to ephemtime
-        phase_center._epoch = epoch
-        phase_center._ra = self.phase_center_ra
-        phase_center._dec = self.phase_center_dec
-
-        self.zenith_ra = np.zeros_like(self.time_array)
-        self.zenith_dec = np.zeros_like(self.time_array)
-
+    
+        if phase_frame is None:
+            if self.phase_center_frame is not None:
+                phase_frame = self.phase_center_frame
+            else:
+                phase_frame = 'icrs'
+    
+        icrs_coord = SkyCoord(ra=self.phase_center_ra, dec=self.phase_center_dec,
+                              unit='radian', frame='icrs')
+        if phase_frame == 'icrs':
+            frame_phase_center = icrs_coord
+        else:
+            # use center of observation for obstime for gcrs
+            center_time = np.mean([np.max(self.time_array), np.min(self.time_array)])
+            icrs_coord.obstime = Time(center_time, format='jd')
+            frame_phase_center = icrs_coord.transform_to('gcrs')
+    
+        # This promotion is REQUIRED to get the right answer when we
+        # add in the telescope location for ICRS
+        # In some cases, the uvws are already float64, but sometimes they're not
+        self.uvw_array = np.float64(self.uvw_array)
+    
         # apply -w phasor
-        w_lambda = (self.uvw_array[:, 2].reshape(self.Nblts, 1).astype(np.float64) /
-                    const.c.to('m/s').value * self.freq_array.reshape(1, self.Nfreqs))
+        w_lambda = (self.uvw_array[:, 2].reshape(self.Nblts, 1)
+                    / const.c.to('m/s').value * self.freq_array.reshape(1, self.Nfreqs))
         phs = np.exp(-1j * 2 * np.pi * (-1) * w_lambda[:, None, :, None])
         self.data_array *= phs
-
-        unique_times = np.unique(self.time_array)
-        for jd in unique_times:
+    
+        unique_times, unique_inds = np.unique(self.time_array, return_index=True)
+        for ind, jd in enumerate(unique_times):
             inds = np.where(self.time_array == jd)[0]
-            obs.date, obs.epoch = self.juldate2ephem(
-                jd), self.juldate2ephem(jd)
-            phase_center.compute(obs)
-            phase_center_ra, phase_center_dec = phase_center.a_ra, phase_center.a_dec
-            zenith_ra = obs.sidereal_time()
-            zenith_dec = latitude
-            self.zenith_ra[inds] = zenith_ra
-            self.zenith_dec[inds] = zenith_dec
-
-            # generate rotation matrices
-            m0 = uvutils.top2eq_m(0., phase_center_dec)
-            m1 = uvutils.eq2top_m(phase_center_ra - zenith_ra, zenith_dec)
-
-            # rotate and write uvws
-            uvw = self.uvw_array[inds, :]
-            uvw = np.dot(m0, uvw.T).T
-            uvw = np.dot(m1, uvw.T).T
-            self.uvw_array[inds, :] = uvw
-
+        
+            obs_time = Time(jd, format='jd')
+        
+            itrs_telescope_location = SkyCoord(x=self.telescope_location[0] * units.m,
+                                               y=self.telescope_location[1] * units.m,
+                                               z=self.telescope_location[2] * units.m,
+                                               representation='cartesian',
+                                               frame='itrs', obstime=obs_time)
+            frame_telescope_location = itrs_telescope_location.transform_to(phase_frame)
+            itrs_lat_lon_alt = self.telescope_location_lat_lon_alt
+        
+            if use_ant_pos:
+                ant_uvw = uvutils.phase_uvw(self.telescope_location_lat_lon_alt[1],
+                                            self.telescope_location_lat_lon_alt[0],
+                                            self.antenna_positions)
+            
+                for bl_ind in inds:
+                    ant1_index = np.where(self.antenna_numbers == self.ant_1_array[bl_ind])[0][0]
+                    ant2_index = np.where(self.antenna_numbers == self.ant_2_array[bl_ind])[0][0]
+                    self.uvw_array[bl_ind, :] = ant_uvw[ant2_index, :] - ant_uvw[ant1_index, :]
+        
+            else:
+                uvws_use = self.uvw_array[inds, :]
+            
+                uvw_rel_positions = uvutils.unphase_uvw(frame_phase_center.ra.rad,
+                                                        frame_phase_center.dec.rad,
+                                                        uvws_use)
+            
+                frame_telescope_location.representation = 'cartesian'
+            
+                frame_uvw_coord = SkyCoord(x=uvw_rel_positions[:, 0] * units.m + frame_telescope_location.x,
+                                           y=uvw_rel_positions[:, 1] * units.m + frame_telescope_location.y,
+                                           z=uvw_rel_positions[:, 2] * units.m + frame_telescope_location.z,
+                                           representation='cartesian',
+                                           frame=phase_frame, obstime=obs_time)
+            
+                itrs_uvw_coord = frame_uvw_coord.transform_to('itrs')
+            
+                # now convert them to ENU, which is the space uvws are in
+                self.uvw_array[inds, :] = uvutils.ENU_from_ECEF(itrs_uvw_coord.cartesian.get_xyz().value.T,
+                                                                *itrs_lat_lon_alt)
+    
         # remove phase center
+        self.phase_center_frame = None
         self.phase_center_ra = None
         self.phase_center_dec = None
         self.phase_center_epoch = None
         self.set_drift()
 
-    def phase_to_time(self, time):
-        """
-        Phase a drift scan dataset to the ra/dec of zenith at a particular time.
-
-        Args:
-            time: The time to phase to.
-        """
-        if self.phase_type == 'drift':
-            pass
-        elif self.phase_type == 'phased':
-            raise ValueError('The data is already phased; can only phase ' +
-                             'drift scanning data.')
-        else:
-            raise ValueError('The phasing type of the data is unknown. '
-                             'Set the phase_type to drift or phased to '
-                             'reflect the phasing status of the data')
-
-        obs = ephem.Observer()
-        # obs inits with default values for parameters -- be sure to replace them
-        latitude, longitude, altitude = self.telescope_location_lat_lon_alt
-        obs.lat = latitude
-        obs.lon = longitude
-
-        obs.date, obs.epoch = self.juldate2ephem(
-            time), self.juldate2ephem(time)
-
-        ra = obs.sidereal_time()
-        dec = latitude
-        epoch = self.juldate2ephem(time)
-        self.phase(ra, dec, epoch)
-
-    def phase(self, ra, dec, epoch):
-        """
+    def phase(self, ra, dec, epoch='J2000', phase_frame='icrs', use_ant_pos=False):
+        """"
         Phase a drift scan dataset to a single ra/dec at a particular epoch.
+        See the phasing memo under docs/references for more documentation.
 
+        Tested against MWA_Tools/CONV2UVFITS/convutils.
         Will not phase already phased data.
 
         Args:
             ra: The ra to phase to in radians.
             dec: The dec to phase to in radians.
-            epoch: The epoch to use for phasing. Should be an ephem date,
-                measured from noon Dec. 31, 1899.
+            epoch: The epoch to use for phasing.
+                Either an astropy Time object or the string "J2000" (which is the default).
+                Note that the epoch is only used to evaluate the ra & dec values,
+                if the epoch is not J2000, the ra & dec values are interpreted
+                as FK5 ra/dec values and translated to J2000, the data are then
+                phased to the J2000 ra/dec values.
+            phase_frame: the astropy frame to phase to. Either 'icrs' or 'gcrs'.
+                'gcrs' accounts for precession & nutation,
+                'icrs' accounts for precession, nutation & abberation.
+                Default is 'icrs'.
+            use_ant_pos: If True, calculate the uvws directly from the
+                antenna positions rather than from the existing uvws.
         """
         if self.phase_type == 'drift':
             pass
@@ -682,64 +1026,211 @@ class UVData(UVBase):
             raise ValueError('The phasing type of the data is unknown. '
                              'Set the phase_type to "drift" or "phased" to '
                              'reflect the phasing status of the data')
-
-        obs = ephem.Observer()
-        # obs inits with default values for parameters -- be sure to replace them
-        latitude, longitude, altitude = self.telescope_location_lat_lon_alt
-        obs.lat = latitude
-        obs.lon = longitude
-
-        # create a pyephem object for the phasing position
-        precess_pos = ephem.FixedBody()
-        precess_pos._ra = ra
-        precess_pos._dec = dec
-        precess_pos._epoch = epoch
-
-        # calculate RA/DEC in J2000 and write to object
-        obs.date, obs.epoch = ephem.J2000, ephem.J2000
-        precess_pos.compute(obs)
-
-        self.phase_center_ra = precess_pos.a_ra + \
-            0.0  # force to be a float not ephem.Angle
-        self.phase_center_dec = precess_pos.a_dec + \
-            0.0  # force to be a float not ephem.Angle
-        # explicitly set epoch to J2000
+    
+        if phase_frame not in ['icrs', 'gcrs']:
+            raise ValueError('phase_frame can only be set to icrs or gcrs.')
+    
+        if epoch == "J2000" or epoch == 2000:
+            icrs_coord = SkyCoord(ra=ra, dec=dec, unit='radian', frame='icrs')
+        else:
+            assert(isinstance(epoch, Time))
+            phase_center_coord = SkyCoord(ra=ra, dec=dec, unit='radian',
+                                          equinox=epoch, frame=FK5)
+            # convert to icrs (i.e. J2000) to write to object
+            icrs_coord = phase_center_coord.transform_to('icrs')
+    
+        self.phase_center_ra = icrs_coord.ra.radian
+        self.phase_center_dec = icrs_coord.dec.radian
         self.phase_center_epoch = 2000.0
-
-        unique_times, unique_inds = np.unique(
-            self.time_array, return_index=True)
-        uvws = np.zeros(self.uvw_array.shape, dtype=np.float64)
+    
+        if phase_frame == 'icrs':
+            frame_phase_center = icrs_coord
+        else:
+            # use center of observation for obstime for gcrs
+            center_time = np.mean([np.max(self.time_array), np.min(self.time_array)])
+            icrs_coord.obstime = Time(center_time, format='jd')
+            frame_phase_center = icrs_coord.transform_to('gcrs')
+    
+        # This promotion is REQUIRED to get the right answer when we
+        # add in the telescope location for ICRS
+        self.uvw_array = np.float64(self.uvw_array)
+    
+        unique_times, unique_inds = np.unique(self.time_array, return_index=True)
         for ind, jd in enumerate(unique_times):
             inds = np.where(self.time_array == jd)[0]
-            lst = self.lst_array[unique_inds[ind]]
-            # calculate ra/dec of phase center in current epoch
-            obs.date, obs.epoch = self.juldate2ephem(
-                jd), self.juldate2ephem(jd)
-            precess_pos.compute(obs)
-            ra, dec = precess_pos.a_ra, precess_pos.a_dec
-
-            # generate rotation matrices
-            m0 = uvutils.top2eq_m(lst - obs.sidereal_time(), latitude)
-            m1 = uvutils.eq2top_m(lst - ra, dec)
-
-            # rotate and write uvws
-            uvw = self.uvw_array[inds, :]
-            uvw = np.dot(m0, uvw.T).T
-            uvw = np.dot(m1, uvw.T).T
-            self.uvw_array[inds, :] = uvw
-            uvws[inds, :] = uvw
-
+        
+            obs_time = Time(jd, format='jd')
+        
+            itrs_telescope_location = SkyCoord(x=self.telescope_location[0] * units.m,
+                                               y=self.telescope_location[1] * units.m,
+                                               z=self.telescope_location[2] * units.m,
+                                               representation='cartesian',
+                                               frame='itrs', obstime=obs_time)
+            itrs_lat_lon_alt = self.telescope_location_lat_lon_alt
+        
+            frame_telescope_location = itrs_telescope_location.transform_to(phase_frame)
+        
+            frame_telescope_location.representation = 'cartesian'
+        
+            if use_ant_pos:
+                # This promotion is REQUIRED to get the right answer when we
+                # add in the telescope location for ICRS
+                ecef_ant_pos = np.float64(self.antenna_positions) + self.telescope_location
+            
+                itrs_ant_coord = SkyCoord(x=ecef_ant_pos[:, 0] * units.m,
+                                          y=ecef_ant_pos[:, 1] * units.m,
+                                          z=ecef_ant_pos[:, 2] * units.m,
+                                          representation='cartesian',
+                                          frame='itrs', obstime=obs_time)
+            
+                frame_ant_coord = itrs_ant_coord.transform_to(phase_frame)
+            
+                frame_ant_rel = (frame_ant_coord.cartesian
+                                 - frame_telescope_location.cartesian).get_xyz().T.value
+            
+                frame_ant_uvw = uvutils.phase_uvw(frame_phase_center.ra.rad,
+                                                  frame_phase_center.dec.rad,
+                                                  frame_ant_rel)
+            
+                for bl_ind in inds:
+                    ant1_index = np.where(self.antenna_numbers == self.ant_1_array[bl_ind])[0][0]
+                    ant2_index = np.where(self.antenna_numbers == self.ant_2_array[bl_ind])[0][0]
+                    self.uvw_array[bl_ind, :] = frame_ant_uvw[ant2_index, :] - frame_ant_uvw[ant1_index, :]
+            else:
+                # Also, uvws should be thought of like ENU, not ECEF (or rotated ECEF)
+                # convert them to ECEF to transform between frames
+                uvws_use = self.uvw_array[inds, :]
+            
+                uvw_ecef = uvutils.ECEF_from_ENU(uvws_use, *itrs_lat_lon_alt)
+            
+                itrs_uvw_coord = SkyCoord(x=uvw_ecef[:, 0] * units.m,
+                                          y=uvw_ecef[:, 1] * units.m,
+                                          z=uvw_ecef[:, 2] * units.m,
+                                          representation='cartesian',
+                                          frame='itrs', obstime=obs_time)
+                frame_uvw_coord = itrs_uvw_coord.transform_to(phase_frame)
+            
+                # this takes out the telescope location in the new frame,
+                # so these are vectors again
+                frame_rel_uvw = (frame_uvw_coord.cartesian.get_xyz().value.T
+                                 - frame_telescope_location.cartesian.get_xyz().value)
+            
+                self.uvw_array[inds, :] = uvutils.phase_uvw(frame_phase_center.ra.rad,
+                                                            frame_phase_center.dec.rad,
+                                                            frame_rel_uvw)
+    
         # calculate data and apply phasor
-        w_lambda = (uvws[:, 2].reshape(self.Nblts, 1) /
-                    const.c.to('m/s').value * self.freq_array.reshape(1, self.Nfreqs))
+        w_lambda = (self.uvw_array[:, 2].reshape(self.Nblts, 1)
+                    / const.c.to('m/s').value * self.freq_array.reshape(1, self.Nfreqs))
         phs = np.exp(-1j * 2 * np.pi * w_lambda[:, None, :, None])
         self.data_array *= phs
-
-        del(obs)
+    
+        self.phase_center_frame = phase_frame
         self.set_phased()
 
-    def __add__(self, other, run_check=True, check_extra=True,
-                run_check_acceptability=True, inplace=False):
+    def phase_to_time(self, time, phase_frame='icrs', use_ant_pos=False):
+        """
+        Phase a drift scan dataset to the ra/dec of zenith at a particular time.
+        See the phasing memo under docs/references for more documentation.
+
+        Args:
+            time: The time to phase to, an astropy Time object.
+            phase_frame: the astropy frame to phase to. Either 'icrs' or 'gcrs'.
+                'gcrs' accounts for precession & nutation,
+                'icrs' accounts for precession, nutation & abberation.
+                Default is 'icrs'.
+            use_ant_pos: If True, calculate the uvws directly from the
+                antenna positions rather than from the existing uvws.
+        """
+        if self.phase_type == 'drift':
+            pass
+        elif self.phase_type == 'phased':
+            raise ValueError('The data is already phased; can only phase '
+                             'drift scanning data.')
+        else:
+            raise ValueError('The phasing type of the data is unknown. '
+                             'Set the phase_type to drift or phased to '
+                             'reflect the phasing status of the data')
+    
+        if not isinstance(time, Time):
+            raise(TypeError, "time must be an astropy.time.Time object")
+    
+        # Generate ra/dec of zenith at time in the phase_frame coordinate system
+        # to use for phasing
+        telescope_location = EarthLocation.from_geocentric(self.telescope_location[0],
+                                                           self.telescope_location[1],
+                                                           self.telescope_location[2],
+                                                           unit='m')
+    
+        zenith_coord = SkyCoord(alt=Angle(90 * units.deg), az=Angle(0 * units.deg),
+                                obstime=time, frame='altaz', location=telescope_location)
+    
+        obs_zenith_coord = zenith_coord.transform_to(phase_frame)
+        zenith_ra = obs_zenith_coord.ra
+        zenith_dec = obs_zenith_coord.dec
+    
+        self.phase(zenith_ra, zenith_dec, epoch='J2000', phase_frame=phase_frame,
+                   use_ant_pos=use_ant_pos)
+
+    def set_uvws_from_antenna_positions(self, allow_phasing=False,
+                                        orig_phase_frame=None,
+                                        output_phase_frame='icrs'):
+        """
+        Calculate UVWs based on antenna_positions
+
+        Args:
+            allow_phasing: Option for phased data. If data is phased and
+                allow_phasing is set, data will be unphased, UVWs will be
+                calculated, and then data will be rephased. Script will error
+                if data is phased and allow_phasing is not set. Default is
+                False.
+            orig_phase_frame: The astropy frame to phase from. Either 'icrs' or
+                'gcrs'. Defaults to using the 'phase_center_frame' attribute
+                or 'icrs' if that attribute is None. Applied only if
+                allow_phasing=True.
+            output_phase_frame: The astropy frame to phase to. Either 'icrs' or
+                'gcrs'. Default is 'icrs'. Applied only if allow_phasing=True.
+        """
+        phase_type = self.phase_type
+        if phase_type == 'phased':
+            if allow_phasing:
+                warnings.warn('Warning: Data will be unphased and rephased '
+                              'to calculate UVWs.'
+                              )
+                if orig_phase_frame not in [None, 'icrs', 'gcrs']:
+                    raise ValueError('Invalid parameter orig_phase_frame. '
+                                     'Options are "icrs", "gcrs", or None.')
+                if output_phase_frame not in ['icrs', 'gcrs']:
+                    raise ValueError('Invalid parameter output_phase_frame. '
+                                     'Options are "icrs" or "gcrs".')
+                phase_center_ra = self.phase_center_ra
+                phase_center_dec = self.phase_center_dec
+                phase_center_epoch = self.phase_center_epoch
+                self.unphase_to_drift(phase_frame=orig_phase_frame)
+            else:
+                raise ValueError('UVW calculation requires unphased data. '
+                                 'Use unphase_to_drift or set '
+                                 'allow_phasing=True.'
+                                 )
+        antenna_locs_ENU = uvutils.ENU_from_ECEF(
+            (self.antenna_positions + self.telescope_location),
+            *self.telescope_location_lat_lon_alt)
+        uvw_array = np.zeros((self.baseline_array.size, 3))
+        for baseline in list(set(self.baseline_array)):
+            baseline_inds = np.where(self.baseline_array == baseline)[0]
+            ant1_index = np.where(self.antenna_numbers
+                                  == self.ant_1_array[baseline_inds[0]])[0][0]
+            ant2_index = np.where(self.antenna_numbers
+                                  == self.ant_2_array[baseline_inds[0]])[0][0]
+            uvw_array[baseline_inds, :] = (antenna_locs_ENU[ant2_index, :]
+                                           - antenna_locs_ENU[ant1_index, :])
+        self.uvw_array = uvw_array
+        if phase_type == 'phased':
+            self.phase(phase_center_ra, phase_center_dec, phase_center_epoch,
+                       phase_frame=output_phase_frame)
+
+    def __add__(self, other, run_check=False, check_extra=False,
+                run_check_acceptability=False, inplace=False):
         """
         Combine two UVData objects. Objects can be added along frequency,
         polarization, and/or baseline-time axis.
@@ -760,34 +1251,31 @@ class UVData(UVBase):
         else:
             this = copy.deepcopy(self)
         # Check that both objects are UVData and valid
-        this.check(check_extra=check_extra, run_check_acceptability=run_check_acceptability)
-        if not isinstance(other, this.__class__):
-            raise(ValueError('Only UVData objects can be added to a UVData object'))
-        other.check(check_extra=check_extra, run_check_acceptability=run_check_acceptability)
-
-        # Check objects are compatible
-        # Note zenith_ra will not necessarily be the same if times are different.
+        if run_check:
+            this.check(check_extra=check_extra, run_check_acceptability=run_check_acceptability)
+            if not issubclass(other.__class__, this.__class__):
+                if not issubclass(this.__class__, other.__class__):
+                    raise ValueError('Only UVData (or subclass) objects can be '
+                                     'added to a UVData (or subclass) object')
+            other.check(check_extra=check_extra, run_check_acceptability=run_check_acceptability)
+    
+        # Define parameters that must be the same to add objects
         # But phase_center should be the same, even if in drift (empty parameters)
-        compatibility_params = ['_vis_units', '_integration_time', '_channel_width',
-                                '_object_name', '_telescope_name', '_instrument',
+        compatibility_params = ['_vis_units', '_channel_width', '_object_name',
+                                '_telescope_name', '_instrument',
                                 '_telescope_location', '_phase_type',
                                 '_Nants_telescope', '_antenna_names',
                                 '_antenna_numbers', '_antenna_positions',
                                 '_phase_center_ra', '_phase_center_dec',
                                 '_phase_center_epoch']
-        for a in compatibility_params:
-            if getattr(this, a) != getattr(other, a):
-                msg = 'UVParameter ' + \
-                    a[1:] + ' does not match. Cannot combine objects.'
-                raise(ValueError(msg))
-
+    
         # Build up history string
         history_update_string = ' Combined data along '
         n_axes = 0
-
+    
         # Create blt arrays for convenience
         prec_t = - 2 * \
-            np.floor(np.log10(this._time_array.tols[-1])).astype(int)
+                 np.floor(np.log10(this._time_array.tols[-1])).astype(int)
         prec_b = 8
         this_blts = np.array(["_".join(["{1:.{0}f}".format(prec_t, blt[0]),
                                         str(blt[1]).zfill(prec_b)]) for blt in
@@ -804,9 +1292,9 @@ class UVData(UVBase):
         if len(both_pol) > 0:
             if len(both_freq) > 0:
                 if len(both_blts) > 0:
-                    raise(ValueError('These objects have overlapping data and'
-                                     ' cannot be combined.'))
-
+                    raise ValueError('These objects have overlapping data and'
+                                     ' cannot be combined.')
+    
         temp = np.nonzero(~np.in1d(other_blts, this_blts))[0]
         if len(temp) > 0:
             bnew_inds = temp
@@ -815,7 +1303,10 @@ class UVData(UVBase):
             n_axes += 1
         else:
             bnew_inds, new_blts = ([], [])
-
+            # add metadata to be checked to compatibility params
+            extra_params = ['_integration_time', '_uvw_array', '_lst_array']
+            compatibility_params.extend(extra_params)
+    
         temp = np.nonzero(
             ~np.in1d(other.freq_array[0, :], this.freq_array[0, :]))[0]
         if len(temp) > 0:
@@ -828,7 +1319,7 @@ class UVData(UVBase):
             n_axes += 1
         else:
             fnew_inds, new_freqs = ([], [])
-
+    
         temp = np.nonzero(~np.in1d(other.polarization_array,
                                    this.polarization_array))[0]
         if len(temp) > 0:
@@ -841,6 +1332,14 @@ class UVData(UVBase):
             n_axes += 1
         else:
             pnew_inds, new_pols = ([], [])
+    
+        # Actually check compatibility parameters
+        for a in compatibility_params:
+            if getattr(this, a) != getattr(other, a):
+                msg = 'UVParameter ' + \
+                      a[1:] + ' does not match. Cannot combine objects.'
+                raise ValueError(msg)
+    
         # Pad out self to accommodate new data
         if len(bnew_inds) > 0:
             this_blts = np.concatenate((this_blts, new_blts))
@@ -855,6 +1354,8 @@ class UVData(UVBase):
                                              other.uvw_array[bnew_inds, :]], axis=0)[blt_order, :]
             this.time_array = np.concatenate([this.time_array,
                                               other.time_array[bnew_inds]])[blt_order]
+            this.integration_time = np.concatenate([this.integration_time,
+                                                    other.integration_time[bnew_inds]])[blt_order]
             this.lst_array = np.concatenate(
                 [this.lst_array, other.lst_array[bnew_inds]])[blt_order]
             this.ant_1_array = np.concatenate([this.ant_1_array,
@@ -863,18 +1364,13 @@ class UVData(UVBase):
                                                other.ant_2_array[bnew_inds]])[blt_order]
             this.baseline_array = np.concatenate([this.baseline_array,
                                                   other.baseline_array[bnew_inds]])[blt_order]
-            if this.phase_type == 'drift':
-                this.zenith_ra = np.concatenate([this.zenith_ra,
-                                                 other.zenith_ra[bnew_inds]])[blt_order]
-                this.zenith_dec = np.concatenate([this.zenith_dec,
-                                                 other.zenith_dec[bnew_inds]])[blt_order]
+    
         if len(fnew_inds) > 0:
             zero_pad = np.zeros((this.data_array.shape[0], this.Nspws, len(fnew_inds),
                                  this.Npols))
             this.freq_array = np.concatenate([this.freq_array,
                                               other.freq_array[:, fnew_inds]], axis=1)
             f_order = np.argsort(this.freq_array[0, :])
-            this.freq_array = this.freq_array[:, f_order]
             this.data_array = np.concatenate([this.data_array, zero_pad], axis=2)
             this.nsample_array = np.concatenate([this.nsample_array, zero_pad], axis=2)
             this.flag_array = np.concatenate([this.flag_array, 1 - zero_pad],
@@ -885,12 +1381,11 @@ class UVData(UVBase):
             this.polarization_array = np.concatenate([this.polarization_array,
                                                       other.polarization_array[pnew_inds]])
             p_order = np.argsort(np.abs(this.polarization_array))
-            this.polarization_array = this.polarization_array[p_order]
             this.data_array = np.concatenate([this.data_array, zero_pad], axis=3)
             this.nsample_array = np.concatenate([this.nsample_array, zero_pad], axis=3)
             this.flag_array = np.concatenate([this.flag_array, 1 - zero_pad],
                                              axis=3).astype(np.bool)
-
+    
         # Now populate the data
         pol_t2o = np.nonzero(
             np.in1d(this.polarization_array, other.polarization_array))[0]
@@ -908,14 +1403,16 @@ class UVData(UVBase):
             this.nsample_array = this.nsample_array[blt_order, :, :, :]
             this.flag_array = this.flag_array[blt_order, :, :, :]
         if len(fnew_inds) > 0:
+            this.freq_array = this.freq_array[:, f_order]
             this.data_array = this.data_array[:, :, f_order, :]
             this.nsample_array = this.nsample_array[:, :, f_order, :]
             this.flag_array = this.flag_array[:, :, f_order, :]
         if len(pnew_inds) > 0:
+            this.polarization_array = this.polarization_array[p_order]
             this.data_array = this.data_array[:, :, :, p_order]
             this.nsample_array = this.nsample_array[:, :, :, p_order]
             this.flag_array = this.flag_array[:, :, :, p_order]
-
+    
         # Update N parameters (e.g. Npols)
         this.Ntimes = len(np.unique(this.time_array))
         this.Nbls = len(np.unique(this.baseline_array))
@@ -924,7 +1421,7 @@ class UVData(UVBase):
         this.Npols = this.polarization_array.shape[0]
         this.Nants_data = len(
             np.unique(this.ant_1_array.tolist() + this.ant_2_array.tolist()))
-
+    
         # Check specific requirements
         if this.Nfreqs > 1:
             freq_separation = np.diff(this.freq_array[0, :])
@@ -935,24 +1432,24 @@ class UVData(UVBase):
             elif np.max(freq_separation) > this.channel_width:
                 warnings.warn('Combined frequencies are not contiguous. This will make '
                               'it impossible to write this data out to some file types.')
-
+    
         if this.Npols > 2:
             pol_separation = np.diff(this.polarization_array)
             if np.min(pol_separation) < np.max(pol_separation):
                 warnings.warn('Combined polarizations are not evenly spaced. This will '
                               'make it impossible to write this data out to some file types.')
-
+    
         if n_axes > 0:
             history_update_string += ' axis using pyuvdata.'
             this.history += history_update_string
-
-        this.history = uvutils.combine_histories(this.history, other.history)
-
+    
+        this.history = uvutils._combine_histories(this.history, other.history)
+    
         # Check final object is self-consistent
         if run_check:
             this.check(check_extra=check_extra,
                        run_check_acceptability=run_check_acceptability)
-
+    
         if not inplace:
             return this
 
@@ -966,6 +1463,305 @@ class UVData(UVBase):
         self.__add__(other, inplace=True)
         return self
 
+    def _select_preprocess(self, antenna_nums, antenna_names, ant_str, bls,
+                           frequencies, freq_chans, times, polarizations, blt_inds):
+        """
+        Internal function to build up blt_inds, freq_inds, pol_inds
+        and history_update_string for select.
+        """
+        # build up history string as we go
+        history_update_string = '  Downselected to specific '
+        n_selects = 0
+    
+        if ant_str is not None:
+            if not (antenna_nums is None and antenna_names is None
+                    and bls is None and polarizations is None):
+                raise ValueError(
+                    'Cannot provide ant_str with antenna_nums, antenna_names, '
+                    'bls, or polarizations.')
+            else:
+                bls, polarizations = self.parse_ants(ant_str)
+    
+        # Antennas, times and blt_inds all need to be combined into a set of
+        # blts indices to keep.
+    
+        # test for blt_inds presence before adding inds from antennas & times
+        if blt_inds is not None:
+            blt_inds = uvutils._get_iterable(blt_inds)
+            if np.array(blt_inds).ndim > 1:
+                blt_inds = np.array(blt_inds).flatten()
+            history_update_string += 'baseline-times'
+            n_selects += 1
+    
+        if antenna_names is not None:
+            if antenna_nums is not None:
+                raise ValueError(
+                    'Only one of antenna_nums and antenna_names can be provided.')
+        
+            if not isinstance(antenna_names, (list, tuple, np.ndarray)):
+                antenna_names = (antenna_names,)
+            if np.array(antenna_names).ndim > 1:
+                antenna_names = np.array(antenna_names).flatten()
+            antenna_nums = []
+            for s in antenna_names:
+                if s not in self.antenna_names:
+                    raise ValueError(
+                        'Antenna name {a} is not present in the antenna_names array'.format(a=s))
+                antenna_nums.append(self.antenna_numbers[np.where(
+                    np.array(self.antenna_names) == s)][0])
+    
+        if antenna_nums is not None:
+            antenna_nums = uvutils._get_iterable(antenna_nums)
+            if np.array(antenna_nums).ndim > 1:
+                antenna_nums = np.array(antenna_nums).flatten()
+            if n_selects > 0:
+                history_update_string += ', antennas'
+            else:
+                history_update_string += 'antennas'
+            n_selects += 1
+            inds1 = np.zeros(0, dtype=np.int)
+            inds2 = np.zeros(0, dtype=np.int)
+            for ant in antenna_nums:
+                if ant in self.ant_1_array or ant in self.ant_2_array:
+                    wh1 = np.where(self.ant_1_array == ant)[0]
+                    wh2 = np.where(self.ant_2_array == ant)[0]
+                    if len(wh1) > 0:
+                        inds1 = np.append(inds1, list(wh1))
+                    if len(wh2) > 0:
+                        inds2 = np.append(inds2, list(wh2))
+                else:
+                    raise ValueError('Antenna number {a} is not present in the '
+                                     'ant_1_array or ant_2_array'.format(a=ant))
+        
+            ant_blt_inds = np.array(
+                list(set(inds1).intersection(inds2)), dtype=np.int)
+        else:
+            ant_blt_inds = None
+    
+        if bls is not None:
+            if isinstance(bls, tuple) and (len(bls) == 2 or len(bls) == 3):
+                bls = [bls]
+            if not all(isinstance(item, tuple) for item in bls):
+                raise ValueError(
+                    'bls must be a list of tuples of antenna numbers (optionally with polarization).')
+            if not all([isinstance(item[0], six.integer_types + (np.integer,)) for item in bls]
+                       + [isinstance(item[1], six.integer_types + (np.integer,)) for item in bls]):
+                raise ValueError(
+                    'bls must be a list of tuples of antenna numbers (optionally with polarization).')
+            if all([len(item) == 3 for item in bls]):
+                if polarizations is not None:
+                    raise ValueError('Cannot provide length-3 tuples and also specify polarizations.')
+                if not all([isinstance(item[2], str) for item in bls]):
+                    raise ValueError('The third element in each bl must be a polarization string')
+        
+            if ant_str is None:
+                if n_selects > 0:
+                    history_update_string += ', baselines'
+                else:
+                    history_update_string += 'baselines'
+            else:
+                history_update_string += 'antenna pairs'
+            n_selects += 1
+            bls_blt_inds = np.zeros(0, dtype=np.int)
+            bl_pols = set()
+            for bl in bls:
+                if not (bl[0] in self.ant_1_array or bl[0] in self.ant_2_array):
+                    raise ValueError('Antenna number {a} is not present in the '
+                                     'ant_1_array or ant_2_array'.format(a=bl[0]))
+                if not (bl[1] in self.ant_1_array or bl[1] in self.ant_2_array):
+                    raise ValueError('Antenna number {a} is not present in the '
+                                     'ant_1_array or ant_2_array'.format(a=bl[1]))
+                wh1 = np.where(np.logical_and(
+                    self.ant_1_array == bl[0], self.ant_2_array == bl[1]))[0]
+                wh2 = np.where(np.logical_and(
+                    self.ant_1_array == bl[1], self.ant_2_array == bl[0]))[0]
+                if len(wh1) > 0:
+                    bls_blt_inds = np.append(bls_blt_inds, list(wh1))
+                    if len(bl) == 3:
+                        bl_pols.add(bl[2])
+                elif len(wh2) > 0:
+                    bls_blt_inds = np.append(bls_blt_inds, list(wh2))
+                    if len(bl) == 3:
+                        bl_pols.add(bl[2][::-1])  # reverse polarization string
+                else:
+                    raise ValueError('Antenna pair {p} does not have any data '
+                                     'associated with it.'.format(p=bl))
+            if len(bl_pols) > 0:
+                polarizations = list(bl_pols)
+        
+            if ant_blt_inds is not None:
+                # Use union (or) to join antenna_names/nums & ant_pairs_nums
+                ant_blt_inds = np.array(list(set(ant_blt_inds).union(bls_blt_inds)))
+            else:
+                ant_blt_inds = bls_blt_inds
+    
+        if ant_blt_inds is not None:
+            if blt_inds is not None:
+                # Use intesection (and) to join antenna_names/nums/ant_pairs_nums with blt_inds
+                # handled differently because of the time aspect (which is anded with antennas below)
+                blt_inds = np.array(
+                    list(set(blt_inds).intersection(ant_blt_inds)), dtype=np.int)
+            else:
+                blt_inds = ant_blt_inds
+    
+        if times is not None:
+            times = uvutils._get_iterable(times)
+            if np.array(times).ndim > 1:
+                times = np.array(times).flatten()
+            if n_selects > 0:
+                history_update_string += ', times'
+            else:
+                history_update_string += 'times'
+            n_selects += 1
+        
+            time_blt_inds = np.zeros(0, dtype=np.int)
+            for jd in times:
+                if jd in self.time_array:
+                    time_blt_inds = np.append(
+                        time_blt_inds, np.where(self.time_array == jd)[0])
+                else:
+                    raise ValueError(
+                        'Time {t} is not present in the time_array'.format(t=jd))
+        
+            if blt_inds is not None:
+                # Use intesection (and) to join antenna_names/nums/ant_pairs_nums/blt_inds with times
+                blt_inds = np.array(
+                    list(set(blt_inds).intersection(time_blt_inds)), dtype=np.int)
+            else:
+                blt_inds = time_blt_inds
+    
+        if blt_inds is not None:
+        
+            if len(blt_inds) == 0:
+                raise ValueError(
+                    'No baseline-times were found that match criteria')
+            if max(blt_inds) >= self.Nblts:
+                raise ValueError(
+                    'blt_inds contains indices that are too large')
+            if min(blt_inds) < 0:
+                print(blt_inds)
+                raise ValueError('blt_inds contains indices that are negative')
+        
+            blt_inds = list(sorted(set(list(blt_inds))))
+    
+        if freq_chans is not None:
+            freq_chans = uvutils._get_iterable(freq_chans)
+            if np.array(freq_chans).ndim > 1:
+                freq_chans = np.array(freq_chans).flatten()
+            if frequencies is None:
+                frequencies = self.freq_array[0, freq_chans]
+            else:
+                frequencies = uvutils._get_iterable(frequencies)
+                frequencies = np.sort(list(set(frequencies)
+                                           | set(self.freq_array[0, freq_chans])))
+    
+        if frequencies is not None:
+            frequencies = uvutils._get_iterable(frequencies)
+            if np.array(frequencies).ndim > 1:
+                frequencies = np.array(frequencies).flatten()
+            if n_selects > 0:
+                history_update_string += ', frequencies'
+            else:
+                history_update_string += 'frequencies'
+            n_selects += 1
+        
+            freq_inds = np.zeros(0, dtype=np.int)
+            # this works because we only allow one SPW. This will have to be reworked when we support more.
+            freq_arr_use = self.freq_array[0, :]
+            for f in frequencies:
+                if f in freq_arr_use:
+                    freq_inds = np.append(
+                        freq_inds, np.where(freq_arr_use == f)[0])
+                else:
+                    raise ValueError(
+                        'Frequency {f} is not present in the freq_array'.format(f=f))
+        
+            if len(frequencies) > 1:
+                freq_ind_separation = freq_inds[1:] - freq_inds[:-1]
+                if np.min(freq_ind_separation) < np.max(freq_ind_separation):
+                    warnings.warn('Selected frequencies are not evenly spaced. This '
+                                  'will make it impossible to write this data out to '
+                                  'some file types')
+                elif np.max(freq_ind_separation) > 1:
+                    warnings.warn('Selected frequencies are not contiguous. This '
+                                  'will make it impossible to write this data out to '
+                                  'some file types.')
+        
+            freq_inds = list(sorted(set(list(freq_inds))))
+        else:
+            freq_inds = None
+    
+        if polarizations is not None:
+            polarizations = uvutils._get_iterable(polarizations)
+            if np.array(polarizations).ndim > 1:
+                polarizations = np.array(polarizations).flatten()
+            if n_selects > 0:
+                history_update_string += ', polarizations'
+            else:
+                history_update_string += 'polarizations'
+            n_selects += 1
+        
+            pol_inds = np.zeros(0, dtype=np.int)
+            for p in polarizations:
+                if isinstance(p, str):
+                    p_num = uvutils.polstr2num(p)
+                else:
+                    p_num = p
+                if p_num in self.polarization_array:
+                    pol_inds = np.append(pol_inds, np.where(
+                        self.polarization_array == p_num)[0])
+                else:
+                    raise ValueError(
+                        'Polarization {p} is not present in the polarization_array'.format(p=p))
+        
+            if len(pol_inds) > 2:
+                pol_ind_separation = pol_inds[1:] - pol_inds[:-1]
+                if np.min(pol_ind_separation) < np.max(pol_ind_separation):
+                    warnings.warn('Selected polarization values are not evenly spaced. This '
+                                  'will make it impossible to write this data out to '
+                                  'some file types')
+        
+            pol_inds = list(sorted(set(list(pol_inds))))
+        else:
+            pol_inds = None
+    
+        history_update_string += ' using pyuvdata.'
+    
+        return blt_inds, freq_inds, pol_inds, history_update_string
+
+    def _select_metadata(self, blt_inds, freq_inds, pol_inds, history_update_string):
+        """
+        Internal function to perform select on everything except the data_array,
+        flag_array and nsample_array to allow for re-use in uvfits reading
+        """
+        if blt_inds is not None:
+            self.Nblts = len(blt_inds)
+            self.baseline_array = self.baseline_array[blt_inds]
+            self.Nbls = len(np.unique(self.baseline_array))
+            self.time_array = self.time_array[blt_inds]
+            self.integration_time = self.integration_time[blt_inds]
+            self.lst_array = self.lst_array[blt_inds]
+            self.uvw_array = self.uvw_array[blt_inds, :]
+        
+            self.ant_1_array = self.ant_1_array[blt_inds]
+            self.ant_2_array = self.ant_2_array[blt_inds]
+            self.Nants_data = int(
+                len(set(self.ant_1_array.tolist() + self.ant_2_array.tolist())))
+        
+            self.Ntimes = len(np.unique(self.time_array))
+    
+        if freq_inds is not None:
+            self.Nfreqs = len(freq_inds)
+            self.freq_array = self.freq_array[:, freq_inds]
+    
+        if pol_inds is not None:
+            self.Npols = len(pol_inds)
+            self.polarization_array = self.polarization_array[pol_inds]
+    
+        self.history = self.history + history_update_string
+
+    
+    
     def select(self, antenna_nums=None, antenna_names=None, ant_str=None,
                ant_pairs_nums=None, frequencies=None, freq_chans=None,
                times=None, polarizations=None, blt_inds=None, run_check=True,
@@ -1272,7 +2068,7 @@ class UVData(UVBase):
 
     def select_average(self, antenna_nums=None, antenna_names=None, ant_str=None,
                ant_pairs_nums=None, frequencies=None, freq_chans=None,
-               times=None, polarizations=None, blt_inds=None, run_check=True,
+               times=None, polarizations=None, blt_inds=None, run_check=False,
                check_extra=True, run_check_acceptability=True, inplace=False, pick_data_ants=True, Average_Freq=True, Average_Time=True, Dred=True, Frequency_Average=1, Time_Average=1, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
         """
         Select specific antennas, antenna pairs, frequencies, times and
@@ -1467,8 +2263,11 @@ class UVData(UVBase):
             uv_object.ant_2_array = np.zeros(0, dtype=np.int)
             uv_object.Nants_data = 0
             
-            uv_object.zenith_ra = np.zeros(0, dtype=np.int)
-            uv_object.zenith_dec = np.zeros(0, dtype=np.int)
+            try:
+                uv_object.zenith_ra = np.zeros(0, dtype=np.int)
+                uv_object.zenith_dec = np.zeros(0, dtype=np.int)
+            except:
+                pass
             
             uv_object.redundancy = np.zeros(0, dtype=np.int)
             uv_object.Nubls = 0
@@ -1541,10 +2340,14 @@ class UVData(UVBase):
                         uv_object.ant_2_array = np.append(uv_object.ant_2_array, self.ant_2_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
                         # uv_object.Nants_data = uv_object.Nants_data + int(
                         #     len(set(uv_object.ant_1_array.tolist() + uv_object.ant_2_array.tolist())))
-        
-                        if uv_object.phase_type == 'drift':
-                            uv_object.zenith_ra = np.append(uv_object.zenith_ra, np.mean(self.zenith_ra[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
-                            uv_object.zenith_dec = np.append(uv_object.zenith_dec, np.mean(self.zenith_dec[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
+                        try:
+                            if uv_object.phase_type == 'drift':
+                                if self.zenith_ra is not None:
+                                    uv_object.zenith_ra = np.append(uv_object.zenith_ra, np.mean(self.zenith_ra[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
+                                if self.zenith_dec is not None:
+                                    uv_object.zenith_dec = np.append(uv_object.zenith_dec, np.mean(self.zenith_dec[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
+                        except:
+                            pass
                         
                         uv_object.redundancy = np.append(uv_object.redundancy, nred)
             
@@ -1563,8 +2366,11 @@ class UVData(UVBase):
             uv_object.ant_1_array = uv_object.ant_1_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
             uv_object.ant_2_array = uv_object.ant_2_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
             if uv_object.phase_type == 'drift':
-                uv_object.zenith_ra = uv_object.zenith_ra.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
-                uv_object.zenith_dec = uv_object.zenith_dec.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
+                try:
+                    uv_object.zenith_ra = uv_object.zenith_ra.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
+                    uv_object.zenith_dec = uv_object.zenith_dec.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
+                except:
+                    print('uv_object.zenith_ra,dec not calculated.')
             
             uv_object.Nants_data = uv_object.Nants_data + int(
                 len(set(uv_object.ant_1_array.tolist() + uv_object.ant_2_array.tolist())))
@@ -1631,8 +2437,11 @@ class UVData(UVBase):
             uv_object.Ntimes = len(np.unique(uv_object.time_array))
 
             if uv_object.phase_type == 'drift':
-                uv_object.zenith_ra = uv_object.zenith_ra[blt_inds]
-                uv_object.zenith_dec = uv_object.zenith_dec[blt_inds]
+                try:
+                    uv_object.zenith_ra = uv_object.zenith_ra[blt_inds]
+                    uv_object.zenith_dec = uv_object.zenith_dec[blt_inds]
+                except:
+                    print('uv_object.zenith_ra,dec not calculated.')
 
 
         if times is not None:
@@ -1750,9 +2559,12 @@ class UVData(UVBase):
                 uv_object_time.ant_1_array = np.zeros(0, dtype=np.int)
                 uv_object_time.ant_2_array = np.zeros(0, dtype=np.int)
                 # uv_object_time.Nants_data = 0
-
-                uv_object_time.zenith_ra = np.zeros(0, dtype=np.int)
-                uv_object_time.zenith_dec = np.zeros(0, dtype=np.int)
+                
+                try:
+                    uv_object_time.zenith_ra = np.zeros(0, dtype=np.int)
+                    uv_object_time.zenith_dec = np.zeros(0, dtype=np.int)
+                except:
+                    pass
 
                 # uv_object_time.redundancy = np.zeros(0, dtype=np.int)
                 uv_object_time.Nubls = uv_object.Nubls
@@ -1827,14 +2639,16 @@ class UVData(UVBase):
                         uv_object_time.ant_1_array = np.append(uv_object_time.ant_1_array, uv_object.ant_1_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         uv_object_time.ant_2_array = np.append(uv_object_time.ant_2_array, uv_object.ant_2_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         # uv_object.Nants_data = uv_object_time.Nants_data + int(len(set(uv_object_time.ant_1_array.tolist() + uv_object_time.ant_2_array.tolist())))
-
-                        if uv_object_time.phase_type == 'drift':
-                            if not Select_time:
-                                uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, np.mean(uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
-                                uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, np.mean(uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
-                            else:
-                                uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
-                                uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                        try:
+                            if uv_object_time.phase_type == 'drift':
+                                if not Select_time:
+                                    uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, np.mean(uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                                    uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, np.mean(uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                                else:
+                                    uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                                    uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                        except:
+                            print('uv_object.zenith_ra,dec not calculated.')
 
                         # uv_object_time.redundancy = np.append(uv_object_time.redundancy, nred)
                 if uv_object_time.Ntimes != Ntbin:
@@ -1872,8 +2686,11 @@ class UVData(UVBase):
                 uv_object.ant_2_array = uv_object_time.ant_2_array
 
                 if uv_object_time.phase_type == 'drift':
-                    uv_object.zenith_ra = uv_object_time.zenith_ra
-                    uv_object.zenith_dec = uv_object_time.zenith_dec
+                    try:
+                        uv_object.zenith_ra = uv_object_time.zenith_ra
+                        uv_object.zenith_dec = uv_object_time.zenith_dec
+                    except:
+                        print('uv_object.zenith_ra,dec not calculated.')
                 
                 try:
                     if uv_object.Ntimes != self.Ntimes:
@@ -1996,10 +2813,31 @@ class UVData(UVBase):
             self.ant_1_array = uv_object.ant_1_array
             self.ant_2_array = uv_object.ant_2_array
             self.Nants_data = uv_object.Nants_data
-            self.zenith_ra = uv_object.zenith_ra
-            self.zenith_dec = uv_object.zenith_dec
+            try:
+                self.zenith_ra = uv_object.zenith_ra
+                self.zenith_dec = uv_object.zenith_dec
+                self._zenith_ra = uv_object.zenith_ra
+                self._zenith_dec = uv_object.zenith_dec
+            except:
+                pass
             self.redundancy = uv_object.redundancy
-            self.history = uv_object.history
+            # self._integration_time = uv_object.lst_array
+            # self._Nfreqs = uv_object.Nfreqs
+            # self._freq_array = uv_object.freq_array
+            # self._Nubls = uv_object.Nubls
+            # self._Ntimes = uv_object.Ntimes
+            # self._data_array = uv_object.data_array
+            # self._flag_array = uv_object.flag_array
+            # self._Nblts = uv_object.Nblts
+            # self._baseline_array = uv_object.baseline_array
+            # self._Nbls = uv_object.Nbls
+            # self._time_array = uv_object.time_array
+            # self._lst_array = uv_object.lst_array
+            # self._nsample_array = uv_object.nsample_array
+            # self._uvw_array = uv_object.uvw_array
+            # self._ant_1_array = uv_object.ant_1_array
+            # self._ant_2_array = uv_object.ant_2_array
+            # self._Nants_data = uv_object.Nants_data
             # print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             # print('Number of Unique baselines after Dred: %s'%self.Nubls)
             # print('Number of Times after Averaging: %s'%self.Ntimes)
@@ -2176,9 +3014,9 @@ class UVData(UVBase):
             self._convert_from_filetype(fhd_obj)
             del(fhd_obj)
 
-    def read_miriad(self, filepath, correct_lat_lon=True, run_check=True,
-                    check_extra=True,
-                    run_check_acceptability=True, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], antenna_nums=None, ant_str=None, ant_pairs_nums=None,
+    def read_miriad(self, filepath, correct_lat_lon=True, run_check=False,
+                    check_extra=False,
+                    run_check_acceptability=False, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], antenna_nums=None, ant_str=None, ant_pairs_nums=None,
                     polarizations=None, time_range=None):
         """
         Read in data from a miriad file.
@@ -2198,7 +3036,8 @@ class UVData(UVBase):
                              run_check=run_check, check_extra=check_extra,
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
-            self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+            if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             print('Number of Unique baselines after Dred: %s'%self.Nubls)
@@ -2219,6 +3058,7 @@ class UVData(UVBase):
                         # uv2[id_f] = FilesData_Process[id_f].get()
                         # uv2[id_f].select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
                         self += uv2[id_f]
+                        # self.__add__(uv2[id_f], run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
 
                         print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
                         print('Number of Unique baselines after Dred: %s' % self.Nubls)
@@ -2232,8 +3072,10 @@ class UVData(UVBase):
                                         run_check=run_check, check_extra=check_extra,
                                         run_check_acceptability=run_check_acceptability,
                                         phase_type=phase_type)
-                        uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+                        if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
                         self += uv2
+                        # self.__add__(uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
                         
                         print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
                         print('Number of Unique baselines after Dred: %s' % self.Nubls)
@@ -2282,7 +3124,554 @@ class UVData(UVBase):
                                 run_check_acceptability=run_check_acceptability,
                                 clobber=clobber, no_antnums=no_antnums)
         del(miriad_obj)
+        
+    def read_uvh5(self, filename, antenna_nums=None, antenna_names=None,
+                  ant_str=None, bls=None, frequencies=None, freq_chans=None,
+                  times=None, polarizations=None, blt_inds=None, read_data=True,
+                  run_check=False, check_extra=False, run_check_acceptability=False, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
+        """
+        Read a UVH5 file.
 
+        Args:
+            filename: The UVH5 file or list of files to read from.
+            antenna_nums: The antennas numbers to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_names is
+                also provided. Ignored if read_data is False.
+            antenna_names: The antennas names to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_nums is
+                also provided. Ignored if read_data is False.
+            bls: A list of antenna number tuples (e.g. [(0,1), (3,2)]) or a list of
+                baseline 3-tuples (e.g. [(0,1,'xx'), (2,3,'yy')]) specifying baselines
+                to keep in the object. For length-2 tuples, the  ordering of the numbers
+                within the tuple does not matter. For length-3 tuples, the polarization
+                string is in the order of the two antennas. If length-3 tuples are provided,
+                the polarizations argument below must be None. Ignored if read_data is False.
+            ant_str: A string containing information about what antenna numbers
+                and polarizations to include when reading data into the object.
+                Can be 'auto', 'cross', 'all', or combinations of antenna numbers
+                and polarizations (e.g. '1', '1_2', '1x_2y').
+                See tutorial for more examples of valid strings and
+                the behavior of different forms for ant_str.
+                If '1x_2y,2y_3y' is passed, both polarizations 'xy' and 'yy' will
+                be kept for both baselines (1,2) and (2,3) to return a valid
+                pyuvdata object.
+                An ant_str cannot be passed in addition to any of the above antenna
+                args or the polarizations arg.
+                Ignored if read_data is False.
+            frequencies: The frequencies to include when reading data into the
+                object.  Ignored if read_data is False.
+            freq_chans: The frequency channel numbers to include when reading
+                data into the object. Ignored if read_data is False.
+            times: The times to include when reading data into the object.
+                Ignored if read_data is False.
+            polarizations: The polarizations to include when reading data into
+                the object.  Ignored if read_data is False.
+            blt_inds: The baseline-time indices to include when reading data into
+                the object. This is not commonly used. Ignored if read_data is False.
+            read_data: Read in the visibility and flag data. If set to false,
+                only the basic metadata will be read in. Setting read_data to
+                False results in an incompletely defined object (check will not
+                pass). Default True.
+            run_check: Option to check for the existence and proper shapes of
+                parameters after reading in the file. Default is True.
+            check_extra: Option to check optional parameters as well as required
+                ones. Default is True.
+            run_check_acceptability: Option to check acceptable range of the values of
+                parameters after reading in the file. Default is True.
+
+        Returns:
+            None
+        """
+        from . import uvh5
+        filepath = filename
+        if isinstance(filename, (list, tuple)):
+            if not read_data and len(filename) > 1:
+                raise ValueError('read_data cannot be False for a list of uvh5 files')
+        
+            self.read_uvh5(filename[0], antenna_nums=antenna_nums,
+                           antenna_names=antenna_names, ant_str=ant_str, bls=bls,
+                           frequencies=frequencies, freq_chans=freq_chans, times=times,
+                           polarizations=polarizations, blt_inds=blt_inds,
+                           read_data=read_data, run_check=run_check,
+                           check_extra=check_extra,
+                           run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
+            if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+
+            print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
+            # print('Number of Unique baselines after Dred: %s' % self.Nubls)
+            print('Number of Times after Averaging: %s' % self.Ntimes)
+            print('File Loaded: %s' % (filepath[0]))
+            
+            if len(filename) > 1:
+                # for f in filename[1:]:
+                #     uv2 = UVData()
+                #     uv2.read_uvh5(f, antenna_nums=antenna_nums,
+                #                   antenna_names=antenna_names, ant_str=ant_str, bls=bls,
+                #                   frequencies=frequencies, freq_chans=freq_chans,
+                #                   times=times, polarizations=polarizations,
+                #                   blt_inds=blt_inds, read_data=read_data,
+                #                   run_check=run_check, check_extra=check_extra,
+                #                   run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
+                #     self += uv2
+
+                if Parallel_Files:
+                    from multiprocessing import Pool
+                    pool = Pool()
+                    uv2 = {}
+    
+                    FilesData_Process = [pool.apply_async(read_uvh5_fromUVData, args=(f, antenna_nums, antenna_names, ant_str, bls, frequencies, freq_chans, times, polarizations, blt_inds, read_data, run_check, check_extra, run_check_acceptability, Parallel_Files, Time_Average, Frequency_Average, Dred, inplace, tol, Select_freq, Select_time, Badants)) for id_f, f in enumerate(filepath[1:])]
+                    uv2 = [filedata.get() for filedata in FilesData_Process]
+                    pool.close()
+                    for id_f, f in enumerate(filepath[1:]):
+                        # uv2[id_f] = UVData()
+                        # uv2[id_f] = FilesData_Process[id_f].get()
+                        # uv2[id_f].select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
+                        self += uv2[id_f]
+                        # self.__add__(other=uv2[id_f], run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
+        
+                        print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
+                        # print('Number of Unique baselines after Dred: %s' % self.Nubls)
+                        print('Number of Times after Averaging: %s' % self.Ntimes)
+                        print('File Loaded %s : %s' % (id_f + 1, f))
+                else:
+                    for id_f, f in enumerate(filepath[1:]):
+                        uv2 = UVData()
+                        uv2.read_uvh5(f, antenna_nums=antenna_nums,
+                                      antenna_names=antenna_names, ant_str=ant_str, bls=bls,
+                                      frequencies=frequencies, freq_chans=freq_chans,
+                                      times=times, polarizations=polarizations,
+                                      blt_inds=blt_inds, read_data=read_data,
+                                      run_check=run_check, check_extra=check_extra,
+                                      run_check_acceptability=run_check_acceptability)
+                        if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+                        self += uv2
+                        # self.__add__(other=uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
+        
+                        print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
+                        # print('Number of Unique baselines after Dred: %s' % self.Nubls)
+                        print('Number of Times after Averaging: %s' % self.Ntimes)
+                        print('File Loaded %s : %s' % (id_f + 1, f))
+                    
+                del(uv2)
+        else:
+            uvh5_obj = uvh5.UVH5()
+            uvh5_obj.read_uvh5(filename, antenna_nums=antenna_nums,
+                               antenna_names=antenna_names, ant_str=ant_str, bls=bls,
+                               frequencies=frequencies, freq_chans=freq_chans, times=times,
+                               polarizations=polarizations, blt_inds=blt_inds,
+                               read_data=read_data, run_check=run_check, check_extra=check_extra,
+                               run_check_acceptability=run_check_acceptability)
+            self._convert_from_filetype(uvh5_obj)
+            print(filepath)
+            del(uvh5_obj)
+
+    def write_uvh5(self, filename, run_check=True, check_extra=True,
+                   run_check_acceptability=True, clobber=False,
+                   data_compression=None, flags_compression="lzf",
+                   nsample_compression="lzf"):
+        """
+        Write a completely in-memory UVData object to a UVH5 file.
+
+        Args:
+            filename: The UVH5 file to write to.
+            run_check: Option to check for the existence and proper shapes of
+                parameters before writing the file. Default is True.
+            check_extra: Option to check optional parameters as well as required
+                ones. Default is True.
+            run_check_acceptability: Option to check acceptable range of the values of
+                parameters before writing the file. Default is True.
+            clobber: Option to overwrite the file if it already exists. Default is False.
+            data_compression: HDF5 filter to apply when writing the data_array. Default is
+                None (no filter/compression).
+            flags_compression: HDF5 filter to apply when writing the flags_array. Default is
+                the LZF filter.
+            nsample_compression: HDF5 filter to apply when writing the nsample_array. Deafult is
+                the LZF filter.
+
+        Returns:
+            None
+        """
+        uvh5_obj = self._convert_to_filetype('uvh5')
+        uvh5_obj.write_uvh5(filename, run_check=run_check,
+                            check_extra=check_extra,
+                            run_check_acceptability=run_check_acceptability,
+                            clobber=clobber, data_compression=data_compression,
+                            flags_compression=flags_compression,
+                            nsample_compression=nsample_compression)
+        del(uvh5_obj)
+
+    def initialize_uvh5_file(self, filename, clobber=False, data_compression=None,
+                             flags_compression="lzf", nsample_compression="lzf"):
+        """
+        Initialize a UVH5 file on disk with the header metadata and empty data arrays.
+
+        Args:
+            filename: The UVH5 file to write to.
+            clobber: Option to overwrite the file if it already exists. Default is False.
+            data_compression: HDF5 filter to apply when writing the data_array. Default is
+                None (no filter/compression).
+            flags_compression: HDF5 filter to apply when writing the flags_array. Default is
+                the LZF filter.
+            nsample_compression: HDF5 filter to apply when writing the nsample_array. Default is
+                the LZF filter.
+
+        Returns:
+            None
+
+        Notes:
+            When partially writing out data, this function should be called first to initialize the
+            file on disk. The data is then actually written by calling the write_uvh5_part method,
+            with the same filename as the one specified in this function. See the tutorial for a
+            worked example.
+        """
+        uvh5_obj = self._convert_to_filetype('uvh5')
+        uvh5_obj.initialize_uvh5_file(filename, clobber=clobber,
+                                      data_compression=data_compression,
+                                      flags_compression=flags_compression,
+                                      nsample_compression=nsample_compression)
+        del(uvh5_obj)
+
+    def write_uvh5_part(self, filename, data_array, flags_array, nsample_array, check_header=True,
+                        antenna_nums=None, antenna_names=None, ant_str=None, bls=None,
+                        frequencies=None, freq_chans=None, times=None, polarizations=None,
+                        blt_inds=None):
+        """
+        Write data to a UVH5 file that has already been initialized.
+
+        Args:
+            filename: the file on disk to write data to. It must already exist,
+                and is assumed to have been initialized with initialize_uvh5_file.
+            data_array: the data to write to disk. A check is done to ensure that
+                the dimensions of the data passed in conform to the ones specified by
+                the "selection" arguments.
+            flags_array: the flags array to write to disk. A check is done to ensure
+                that the dimensions of the data passed in conform to the ones specified
+                by the "selection" arguments.
+            nsample_array: the nsample array to write to disk. A check is done to ensure
+                that the dimensions fo the data passed in conform to the ones specified
+                by the "selection" arguments.
+            check_header: option to check that the metadata present in the header
+                on disk matches that in the object. Default is True.
+            antenna_nums: The antennas numbers to include when writing data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_names is
+                also provided.
+            antenna_names: The antennas names to include when writing data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_nums is
+                also provided.
+            bls: A list of antenna number tuples (e.g. [(0,1), (3,2)]) or a list of
+                baseline 3-tuples (e.g. [(0,1,'xx'), (2,3,'yy')]) specifying baselines
+                to write to the file. For length-2 tuples, the ordering of the numbers
+                within the tuple does not matter. For length-3 tuples, the polarization
+                string is in the order of the two antennas. If length-3 tuples are provided,
+                the polarizations argument below must be None.
+            ant_str: A string containing information about what antenna numbers
+                and polarizations to include when writing data into the object.
+                Can be 'auto', 'cross', 'all', or combinations of antenna numbers
+                and polarizations (e.g. '1', '1_2', '1x_2y').
+                See tutorial for more examples of valid strings and
+                the behavior of different forms for ant_str.
+                If '1x_2y,2y_3y' is passed, both polarizations 'xy' and 'yy' will
+                be written for both baselines (1,2) and (2,3) to reflect a valid
+                pyuvdata object.
+                An ant_str cannot be passed in addition to any of the above antenna
+                args or the polarizations arg.
+            frequencies: The frequencies to include when writing data to the file.
+            freq_chans: The frequency channel numbers to include when writing data to the file.
+            times: The times to include when writing data to the file.
+            polarizations: The polarizations to include when writing data to the file.
+            blt_inds: The baseline-time indices to include when writing data to the file.
+                This is not commonly used.
+
+        Returns:
+            None
+        """
+        uvh5_obj = self._convert_to_filetype('uvh5')
+        uvh5_obj.write_uvh5_part(filename, data_array, flags_array, nsample_array,
+                                 check_header=check_header, antenna_nums=antenna_nums,
+                                 antenna_names=antenna_names, bls=bls, ant_str=ant_str,
+                                 frequencies=frequencies, freq_chans=freq_chans,
+                                 times=times, polarizations=polarizations,
+                                 blt_inds=blt_inds)
+        del(uvh5_obj)
+
+
+    def read(self, filename, file_type=None, antenna_nums=None, antenna_names=None,
+             ant_str=None, bls=None, frequencies=None, freq_chans=None,
+             times=None, polarizations=None, blt_inds=None, time_range=None,
+             read_metadata=True, read_data=True, phase_type=None,
+             correct_lat_lon=True, use_model=False, data_column='DATA',
+             pol_order='AIPS', run_check=True, check_extra=True,
+             run_check_acceptability=True):
+        """
+        Read a generic file into a UVData object.
+
+        Args:
+            filename: The file(s) or list(s) of files to read from.
+            file_type: One of ['uvfits', 'miriad', 'fhd', 'ms', 'uvh5'] or None.
+                If None, the code attempts to guess what the file type is.
+                For miriad and ms types, this is based on the standard directory
+                structure. For FHD, uvfits and uvh5 files it's based on file
+                extensions (FHD: .sav, .txt; uvfits: .uvfits; uvh5: .uvh5).
+                Note that if a list of datasets is passed, the file type is
+                determined from the first dataset.
+            antenna_nums: The antennas numbers to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_names is
+                also provided. Ignored if read_data is False.
+            antenna_names: The antennas names to include when reading data into
+                the object (antenna positions and names for the excluded antennas
+                will be retained). This cannot be provided if antenna_nums is
+                also provided. Ignored if read_data is False.
+            bls: A list of antenna number tuples (e.g. [(0,1), (3,2)]) or a list
+                of baseline 3-tuples (e.g. [(0,1,'xx'), (2,3,'yy')]) specifying
+                baselines to keep in the object. For length-2 tuples, the
+                ordering of the numbers within the tuple does not matter. For
+                length-3 tuples, the polarization string is in the order of the
+                two antennas. If length-3 tuples are provided, the polarizations
+                argument below must be None. Ignored if read_data is False.
+            ant_str: A string containing information about what antenna numbers
+                and polarizations to include when reading data into the object.
+                Can be 'auto', 'cross', 'all', or combinations of antenna numbers
+                and polarizations (e.g. '1', '1_2', '1x_2y'). See tutorial for
+                more examples of valid strings and the behavior of different
+                forms for ant_str. If '1x_2y,2y_3y' is passed, both polarizations
+                'xy' and 'yy' will be kept for both baselines (1,2) and (2,3)
+                to return a valid pyuvdata object. An ant_str cannot be passed
+                in addition to any of the above antenna keywords or the
+                polarizations keyword. Ignored if read_data is False.
+            frequencies: The frequencies to include when reading data into the
+                object.  Ignored if read_data is False.
+            freq_chans: The frequency channel numbers to include when reading
+                data into the object. Ignored if read_data is False.
+            times: The times to include when reading data into the object.
+                Ignored if read_data is False.
+            polarizations: The polarizations to include when reading data into
+                the object.  Ignored if read_data is False.
+            time_range: len-2 list containing min and max range of times (Julian Date) to read-in.
+                Ex: [2458115.20, 2458115.40]. Cannot be set with times.
+            blt_inds: The baseline-time indices to include when reading data into
+                the object. This is not commonly used. Ignored if read_data is False.
+            read_metadata: Read in metadata (times, baselines, uvws) as well as
+                basic header info. Only used if file_type is 'uvfits' and read_data is False
+                (metadata will be read if data is read). If file_type is 'uvfits'
+                and both read_data and read_metadata are false, only basic header
+                info is read in. Default True.
+            read_data: Read in the data. Only used if file_type is 'uvfits',
+                'miriad' or 'uvh5'. If set to False, only the metadata will be
+                read in (for uvfits, this can be further restricted to just the
+                header if read_metadata is False). Setting read_data to False
+                results in an incompletely defined object (check will not pass).
+                Default True.
+            phase_type: Either 'drift' meaning zenith drift, 'phased' meaning
+                the data are phased to a single RA/Dec or None and it will be
+                guessed at based on the file. Only used if file_type is 'miriad'.
+                Default None.
+            correct_lat_lon: flag -- that only matters if altitude is missing --
+                to update the latitude and longitude from the known_telescopes list.
+                Only used if file_type is 'miriad'. Default True.
+            use_model: Option to read in the model visibilities rather than the
+                dirty visibilities. Only used if file_type is 'fhd'. Default is False.
+            data_column: name of CASA data column to read into data_array.
+                'DATA', 'MODEL', or 'CORRECTED_DATA'. Only used if file_type is 'ms'.
+            pol_order: specify whether you want polarizations ordered by
+                'CASA' or 'AIPS' conventions. Only used if file_type is 'ms'.
+            run_check: Option to check for the existence and proper shapes of
+                parameters after reading in the file. Default is True.
+            check_extra: Option to check optional parameters as well as required
+                ones. Default is True.
+            run_check_acceptability: Option to check acceptable range of the values of
+                parameters after reading in the file. Default is True.
+
+        Returns:
+            None
+        """
+        if isinstance(filename, (list, tuple)):
+            # this is either a list of separate files to read or a list of FHD files
+            if isinstance(filename[0], (list, tuple)):
+                # this must be a list of lists for FHD
+                file_type = 'fhd'
+                multi = True
+            else:
+                basename, extension = os.path.splitext(filename[0])
+                if extension == '.sav' or extension == '.txt':
+                    file_type = 'fhd'
+                    multi = False
+                else:
+                    multi = True
+        else:
+            multi = False
+    
+        if file_type is None:
+            if multi:
+                file_test = filename[0]
+            else:
+                file_test = filename
+        
+            if os.path.isdir(file_test):
+                # it's a directory, so it's either miriad or ms file type
+                if os.path.exists(os.path.join(file_test, 'vartable')):
+                    # It's miriad.
+                    file_type = 'miriad'
+                elif os.path.exists(os.path.join(file_test, 'OBSERVATION')):
+                    # It's a measurement set.
+                    file_type = 'ms'
+            else:
+                basename, extension = os.path.splitext(file_test)
+                if extension == '.uvfits':
+                    file_type = 'uvfits'
+                elif extension == '.uvh5':
+                    file_type = 'uvh5'
+    
+        if file_type is None:
+            raise ValueError('File type could not be determined.')
+    
+        if (time_range is not None):
+            if times is not None:
+                raise ValueError(
+                    'Only one of times and time_range can be provided.')
+    
+        if antenna_names is not None and antenna_nums is not None:
+            raise ValueError('Only one of antenna_nums and antenna_names can be provided.')
+    
+        if file_type == 'uvfits':
+            if (time_range is not None):
+                select = True
+                warnings.warn('Warning: "time_range" keyword is set which is not '
+                              'supported by read_uvfits. This select will be '
+                              'done after reading the file.')
+            else:
+                select = False
+        
+            self.read_uvfits(filename, antenna_nums=antenna_nums,
+                             antenna_names=antenna_names, ant_str=ant_str,
+                             bls=bls, frequencies=frequencies,
+                             freq_chans=freq_chans, times=times,
+                             polarizations=polarizations, blt_inds=blt_inds,
+                             read_data=read_data, read_metadata=read_metadata,
+                             run_check=run_check, check_extra=check_extra,
+                             run_check_acceptability=run_check_acceptability)
+        
+            if select:
+                unique_times = np.unique(self.time_array)
+                times_to_keep = unique_times[np.where((unique_times >= np.min(time_range))
+                                                      & (unique_times <= np.max(time_range)))]
+                self.select(times=times_to_keep, run_check=run_check, check_extra=check_extra,
+                            run_check_acceptability=run_check_acceptability)
+    
+        elif file_type == 'miriad':
+            if (antenna_names is not None or frequencies is not None or freq_chans is not None
+                    or times is not None or blt_inds is not None):
+            
+                if blt_inds is not None:
+                    if (antenna_nums is not None or ant_str is not None
+                            or bls is not None or time_range is not None):
+                        warnings.warn('Warning: blt_inds is set along with select '
+                                      'on read keywords that are supported by '
+                                      'read_miriad and may downselect blts. '
+                                      'This may result in incorrect results '
+                                      'because the select on read will happen '
+                                      'before the blt_inds selection so the '
+                                      'indices may not match the expected locations.')
+                else:
+                    warnings.warn('Warning: a select on read keyword is set that is not '
+                                  'supported by read_miriad. This select will be '
+                                  'done after reading the file.')
+                select = True
+            else:
+                select = False
+        
+            self.read_miriad(filename, antenna_nums=antenna_nums, ant_str=ant_str,
+                             bls=bls, polarizations=polarizations,
+                             time_range=time_range, read_data=read_data,
+                             phase_type=phase_type, correct_lat_lon=correct_lat_lon,
+                             run_check=run_check, check_extra=check_extra,
+                             run_check_acceptability=run_check_acceptability)
+        
+            if select:
+                self.select(antenna_names=antenna_names, frequencies=frequencies,
+                            freq_chans=freq_chans, times=times,
+                            blt_inds=blt_inds, run_check=run_check, check_extra=check_extra,
+                            run_check_acceptability=run_check_acceptability)
+    
+        elif file_type == 'fhd':
+            if (antenna_nums is not None or antenna_names is not None
+                    or ant_str is not None or bls is not None
+                    or frequencies is not None or freq_chans is not None
+                    or times is not None or polarizations is not None
+                    or blt_inds is not None):
+                select = True
+                warnings.warn('Warning: select on read keyword set, but '
+                              'file_type is "fhd" which does not support select '
+                              'on read. Entire file will be read and then select '
+                              'will be performed')
+            else:
+                select = False
+        
+            self.read_fhd(filename, use_model=use_model, run_check=run_check,
+                          check_extra=check_extra,
+                          run_check_acceptability=run_check_acceptability)
+        
+            if select:
+                self.select(antenna_nums=antenna_nums, antenna_names=antenna_names,
+                            ant_str=ant_str, bls=bls, frequencies=frequencies,
+                            freq_chans=freq_chans, times=times,
+                            polarizations=polarizations, blt_inds=blt_inds,
+                            run_check=run_check, check_extra=check_extra,
+                            run_check_acceptability=run_check_acceptability)
+        elif file_type == 'ms':
+            if (antenna_nums is not None or antenna_names is not None
+                    or ant_str is not None or bls is not None
+                    or frequencies is not None or freq_chans is not None
+                    or times is not None or polarizations is not None
+                    or blt_inds is not None):
+                select = True
+                warnings.warn('Warning: select on read keyword set, but '
+                              'file_type is "fhd" which does not support select '
+                              'on read. Entire file will be read and then select '
+                              'will be performed')
+            else:
+                select = False
+        
+            self.read_ms(filename, run_check=run_check, check_extra=check_extra,
+                         run_check_acceptability=run_check_acceptability,
+                         data_column=data_column, pol_order=pol_order)
+        
+            if select:
+                self.select(antenna_nums=antenna_nums, antenna_names=antenna_names,
+                            ant_str=ant_str, bls=bls, frequencies=frequencies,
+                            freq_chans=freq_chans, times=times,
+                            polarizations=polarizations, blt_inds=blt_inds,
+                            run_check=run_check, check_extra=check_extra,
+                            run_check_acceptability=run_check_acceptability)
+        elif file_type == 'uvh5':
+            if (time_range is not None):
+                select = True
+                warnings.warn('Warning: "time_range" keyword is set which is not '
+                              'supported by read_uvh5. This select will be '
+                              'done after reading the file.')
+            else:
+                select = False
+        
+            self.read_uvh5(filename, antenna_nums=antenna_nums,
+                           antenna_names=antenna_names, ant_str=ant_str, bls=bls,
+                           frequencies=frequencies, freq_chans=freq_chans, times=times,
+                           polarizations=polarizations, blt_inds=blt_inds,
+                           read_data=read_data, run_check=run_check, check_extra=check_extra,
+                           run_check_acceptability=run_check_acceptability)
+        
+            if select:
+                unique_times = np.unique(self.time_array)
+                times_to_keep = unique_times[np.where((unique_times >= np.min(time_range))
+                                                      & (unique_times <= np.max(time_range)))]
+                self.select(times=times_to_keep, run_check=run_check, check_extra=check_extra,
+                            run_check_acceptability=run_check_acceptability)
+        
     def reorder_pols(self, order=None, run_check=True, check_extra=True,
                      run_check_acceptability=True):
         """

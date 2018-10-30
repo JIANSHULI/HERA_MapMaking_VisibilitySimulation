@@ -26,6 +26,7 @@ from .uvcal import *
 from .calfits import *
 from .uvbeam import *
 import version
+from .uvh5 import *
 
 ####### Import HERA_MapMaking_VisibilitySimulation_Functions ##########
 import HERA_MapMaking_VisibilitySimulation_Functions

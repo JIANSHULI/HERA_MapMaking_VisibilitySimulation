@@ -1,3 +1,7 @@
+# -*- mode: python; coding: utf-8 -*
+# Copyright (c) 2018 Radio Astronomy Software Group
+# Licensed under the 2-clause BSD License
+
 """
 Define UVParameters: data and metadata objects for interferometric data sets.
 
@@ -5,9 +9,14 @@ UVParameters are objects to hold specific data and metadata associated with
 interferometric data sets. They are used as attributes for classes based on
 UVBase. This module also includes specialized sublasses for particular types
 of metadata.
+
 """
+from __future__ import absolute_import, division, print_function
+
 import numpy as np
-import utils
+import six
+
+from . import utils
 
 
 class UVParameter(object):
@@ -82,7 +91,7 @@ class UVParameter(object):
                                                            lclass=self.value.__class__,
                                                            rclass=other.value.__class__))
                 return False
-            if isinstance(self.value, np.ndarray) and not isinstance(self.value[0], (str, unicode)):
+            if isinstance(self.value, np.ndarray) and not isinstance(self.value[0], six.string_types):
                 if self.value.shape != other.value.shape:
                     print('{name} parameter value is array, shapes are '
                           'different'.format(name=self.name))
@@ -94,7 +103,7 @@ class UVParameter(object):
                     return False
             else:
                 str_type = False
-                if isinstance(self.value, (str, unicode)):
+                if isinstance(self.value, six.string_types):
                     str_type = True
                 if isinstance(self.value, (list, np.ndarray)):
                     if isinstance(self.value[0], str):
@@ -155,10 +164,10 @@ class UVParameter(object):
                             return False
                     else:
                         if self.value.strip() != other.value.strip():
-                            if (self.value.replace('\n', '').replace(' ', '') !=
-                                    other.value.replace('\n', '').replace(' ', '')):
-                                print('{name} parameter value is a string (not '
-                                      'a list), values are different'.format(name=self.name))
+                            if (self.value.replace('\n', '').replace(' ', '')
+                                    != other.value.replace('\n', '').replace(' ', '')):
+                                print('{name} parameter value is a string, '
+                                      'values are different'.format(name=self.name))
                                 return False
 
             return True
