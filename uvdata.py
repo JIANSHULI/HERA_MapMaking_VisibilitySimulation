@@ -500,9 +500,9 @@ class UVData(UVBase):
                                                        np.arange(-8, 0)) + list(np.arange(1, 5)),
                                                    form=('Npols',))
 
-        self._integration_time = uvp.UVParameter('integration_time',
-                                                 description='Length of the integration (s)',
-                                                 expected_type=np.float, tols=1e-3)  # 1 ms
+        # self._integration_time = uvp.UVParameter('integration_time',
+        #                                          description='Length of the integration (s)',
+        #                                          expected_type=np.float, tols=1e-3)  # 1 ms
         self._channel_width = uvp.UVParameter('channel_width',
                                               description='Width of frequency channels (Hz)',
                                               expected_type=np.float,
@@ -540,22 +540,22 @@ class UVData(UVBase):
                                            description=desc, value='unknown',
                                            acceptable_vals=['drift', 'phased', 'unknown'])
 
-        desc = ('Required if phase_type = "drift". Right ascension of zenith. '
-                'units: radians, shape (Nblts). Can also be accessed using zenith_ra_degrees.')
-        self._zenith_ra = uvp.AngleParameter('zenith_ra', required=False,
-                                             description=desc,
-                                             expected_type=np.float,
-                                             form=('Nblts',),
-                                             tols=radian_tol)
-
-        desc = ('Required if phase_type = "drift". Declination of zenith. '
-                'units: radians, shape (Nblts). Can also be accessed using zenith_dec_degrees.')
-        # in practice, dec of zenith will never change; does not need to be shape Nblts
-        self._zenith_dec = uvp.AngleParameter('zenith_dec', required=False,
-                                              description=desc,
-                                              expected_type=np.float,
-                                              form=('Nblts',),
-                                              tols=radian_tol)
+        # desc = ('Required if phase_type = "drift". Right ascension of zenith. '
+        #         'units: radians, shape (Nblts). Can also be accessed using zenith_ra_degrees.')
+        # self._zenith_ra = uvp.AngleParameter('zenith_ra', required=False,
+        #                                      description=desc,
+        #                                      expected_type=np.float,
+        #                                      form=('Nblts',),
+        #                                      tols=radian_tol)
+        #
+        # desc = ('Required if phase_type = "drift". Declination of zenith. '
+        #         'units: radians, shape (Nblts). Can also be accessed using zenith_dec_degrees.')
+        # # in practice, dec of zenith will never change; does not need to be shape Nblts
+        # self._zenith_dec = uvp.AngleParameter('zenith_dec', required=False,
+        #                                       description=desc,
+        #                                       expected_type=np.float,
+        #                                       form=('Nblts',),
+        #                                       tols=radian_tol)
 
         desc = ('Required if phase_type = "phased". Epoch year of the phase '
                 'applied to the data (eg 2000.)')
@@ -1304,7 +1304,7 @@ class UVData(UVBase):
         else:
             bnew_inds, new_blts = ([], [])
             # add metadata to be checked to compatibility params
-            extra_params = ['_integration_time', '_uvw_array', '_lst_array']
+            extra_params = ['_uvw_array', '_lst_array'] # ['_integration_time', '_uvw_array', '_lst_array']
             compatibility_params.extend(extra_params)
     
         temp = np.nonzero(
@@ -1354,8 +1354,8 @@ class UVData(UVBase):
                                              other.uvw_array[bnew_inds, :]], axis=0)[blt_order, :]
             this.time_array = np.concatenate([this.time_array,
                                               other.time_array[bnew_inds]])[blt_order]
-            this.integration_time = np.concatenate([this.integration_time,
-                                                    other.integration_time[bnew_inds]])[blt_order]
+            # this.integration_time = np.concatenate([this.integration_time,
+            #                                         other.integration_time[bnew_inds]])[blt_order]
             this.lst_array = np.concatenate(
                 [this.lst_array, other.lst_array[bnew_inds]])[blt_order]
             this.ant_1_array = np.concatenate([this.ant_1_array,
@@ -1616,12 +1616,13 @@ class UVData(UVBase):
         
             time_blt_inds = np.zeros(0, dtype=np.int)
             for jd in times:
+                print('_select_preprocess', jd)
                 if jd in self.time_array:
                     time_blt_inds = np.append(
                         time_blt_inds, np.where(self.time_array == jd)[0])
                 else:
                     raise ValueError(
-                        'Time {t} is not present in the time_array'.format(t=jd))
+                        'Time {0:.10f} is not present in the time_array, time_array[0]={1:.10f}'.format(jd, self.time_array[0]))
         
             if blt_inds is not None:
                 # Use intesection (and) to join antenna_names/nums/ant_pairs_nums/blt_inds with times
@@ -1739,7 +1740,7 @@ class UVData(UVBase):
             self.baseline_array = self.baseline_array[blt_inds]
             self.Nbls = len(np.unique(self.baseline_array))
             self.time_array = self.time_array[blt_inds]
-            self.integration_time = self.integration_time[blt_inds]
+            # self.integration_time = self.integration_time[blt_inds]
             self.lst_array = self.lst_array[blt_inds]
             self.uvw_array = self.uvw_array[blt_inds, :]
         
@@ -1958,6 +1959,7 @@ class UVData(UVBase):
             uv_object.baseline_array = uv_object.baseline_array[blt_inds]
             uv_object.Nbls = len(np.unique(uv_object.baseline_array))
             uv_object.time_array = uv_object.time_array[blt_inds]
+            # uv_object.integration_time = uv_object.integration_time[blt_inds]
             uv_object.lst_array = uv_object.lst_array[blt_inds]
             uv_object.data_array = uv_object.data_array[blt_inds, :, :, :]
             uv_object.flag_array = uv_object.flag_array[blt_inds, :, :, :]
@@ -1971,9 +1973,9 @@ class UVData(UVBase):
 
             uv_object.Ntimes = len(np.unique(uv_object.time_array))
 
-            if uv_object.phase_type == 'drift':
-                uv_object.zenith_ra = uv_object.zenith_ra[blt_inds]
-                uv_object.zenith_dec = uv_object.zenith_dec[blt_inds]
+            # if uv_object.phase_type == 'drift':
+            #     uv_object.zenith_ra = uv_object.zenith_ra[blt_inds]
+            #     uv_object.zenith_dec = uv_object.zenith_dec[blt_inds]
 
         if freq_chans is not None:
             freq_chans = uvutils.get_iterable(freq_chans)
@@ -2252,22 +2254,23 @@ class UVData(UVBase):
             uv_object.baseline_array = np.zeros(0, dtype=np.int)
             uv_object.Nbls = 0
             uv_object.Ntimes = len(np.unique(self.time_array))
-            uv_object.time_array = np.zeros(0, dtype=np.int)
-            uv_object.lst_array = np.zeros(0, dtype=np.int)
-            uv_object.data_array = np.zeros(0, dtype=np.int)
+            uv_object.time_array = np.zeros(0, dtype=np.float)
+            # uv_object.integration_time = np.zeros(0, dtype=np.float)
+            uv_object.lst_array = np.zeros(0, dtype=np.float)
+            uv_object.data_array = np.zeros(0, dtype=np.complex)
             uv_object.flag_array = np.zeros(0, dtype=np.int)
             uv_object.nsample_array = np.zeros(0, dtype=np.int)
-            uv_object.uvw_array =np.zeros(0, dtype=np.int)
+            uv_object.uvw_array =np.zeros(0, dtype=np.float)
 
             uv_object.ant_1_array = np.zeros(0, dtype=np.int)
             uv_object.ant_2_array = np.zeros(0, dtype=np.int)
             uv_object.Nants_data = 0
             
-            try:
-                uv_object.zenith_ra = np.zeros(0, dtype=np.int)
-                uv_object.zenith_dec = np.zeros(0, dtype=np.int)
-            except:
-                pass
+            # try:
+            #     uv_object.zenith_ra = np.zeros(0, dtype=np.float)
+            #     uv_object.zenith_dec = np.zeros(0, dtype=np.float)
+            # except:
+            #     pass
             
             uv_object.redundancy = np.zeros(0, dtype=np.int)
             uv_object.Nubls = 0
@@ -2330,6 +2333,7 @@ class UVData(UVBase):
                         uv_object.baseline_array = np.append(uv_object.baseline_array, self.baseline_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
                         uv_object.Nbls += 1
                         uv_object.time_array = np.append(uv_object.time_array, self.time_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
+                        # uv_object.integration_time = np.append(uv_object.integration_time, self.integration_time[blt_inds_red].reshape(uv_object.Ntimes, nred)[:, 0])
                         uv_object.lst_array = np.append(uv_object.lst_array, self.lst_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
                         uv_object.data_array = np.append(uv_object.data_array, np.mean(self.data_array[blt_inds_red, :, :, :].reshape(uv_object.Ntimes, nred, self.data_array.shape[1], self.data_array.shape[2], self.data_array.shape[3]), axis=1))
                         uv_object.flag_array = np.append(uv_object.flag_array, np.mean(self.flag_array[blt_inds_red, :, :, :].reshape(uv_object.Ntimes, nred, self.flag_array.shape[1], self.flag_array.shape[2], self.flag_array.shape[3]), axis=1)) != 0
@@ -2340,14 +2344,14 @@ class UVData(UVBase):
                         uv_object.ant_2_array = np.append(uv_object.ant_2_array, self.ant_2_array[blt_inds_red].reshape(uv_object.Ntimes, nred)[:,0])
                         # uv_object.Nants_data = uv_object.Nants_data + int(
                         #     len(set(uv_object.ant_1_array.tolist() + uv_object.ant_2_array.tolist())))
-                        try:
-                            if uv_object.phase_type == 'drift':
-                                if self.zenith_ra is not None:
-                                    uv_object.zenith_ra = np.append(uv_object.zenith_ra, np.mean(self.zenith_ra[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
-                                if self.zenith_dec is not None:
-                                    uv_object.zenith_dec = np.append(uv_object.zenith_dec, np.mean(self.zenith_dec[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
-                        except:
-                            pass
+                        # try:
+                        #     if uv_object.phase_type == 'drift':
+                        #         if self.zenith_ra is not None:
+                        #             uv_object.zenith_ra = np.append(uv_object.zenith_ra, np.mean(self.zenith_ra[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
+                        #         if self.zenith_dec is not None:
+                        #             uv_object.zenith_dec = np.append(uv_object.zenith_dec, np.mean(self.zenith_dec[blt_inds_red].reshape(uv_object.Ntimes, nred), axis=1))
+                        # except:
+                        #     pass
                         
                         uv_object.redundancy = np.append(uv_object.redundancy, nred)
             
@@ -2358,6 +2362,7 @@ class UVData(UVBase):
             
             uv_object.baseline_array = uv_object.baseline_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
             uv_object.time_array = uv_object.time_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
+            # uv_object.integration_time = uv_object.integration_time.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
             uv_object.lst_array = uv_object.lst_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
             uv_object.data_array = uv_object.data_array.reshape(uv_object.Nubls, uv_object.Ntimes, self.data_array.shape[1], self.data_array.shape[2], self.data_array.shape[3]).transpose(1, 0, 2, 3, 4).reshape(uv_object.Ntimes * uv_object.Nubls, self.data_array.shape[1], self.data_array.shape[2], self.data_array.shape[3])
             uv_object.flag_array = uv_object.flag_array.reshape(uv_object.Nubls, uv_object.Ntimes, self.flag_array.shape[1], self.flag_array.shape[2], self.flag_array.shape[3]).transpose(1, 0, 2, 3, 4).reshape(uv_object.Ntimes * uv_object.Nubls, self.flag_array.shape[1], self.flag_array.shape[2], self.flag_array.shape[3])
@@ -2365,12 +2370,12 @@ class UVData(UVBase):
             uv_object.uvw_array = uv_object.uvw_array.reshape(uv_object.Nubls, uv_object.Ntimes, self.uvw_array.shape[1]).transpose(1, 0, 2).reshape(uv_object.Ntimes * uv_object.Nubls, self.uvw_array.shape[1])
             uv_object.ant_1_array = uv_object.ant_1_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
             uv_object.ant_2_array = uv_object.ant_2_array.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
-            if uv_object.phase_type == 'drift':
-                try:
-                    uv_object.zenith_ra = uv_object.zenith_ra.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
-                    uv_object.zenith_dec = uv_object.zenith_dec.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
-                except:
-                    print('uv_object.zenith_ra,dec not calculated.')
+            # if uv_object.phase_type == 'drift':
+            #     try:
+            #         uv_object.zenith_ra = uv_object.zenith_ra.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
+            #         uv_object.zenith_dec = uv_object.zenith_dec.reshape(uv_object.Nubls, uv_object.Ntimes).transpose().flatten()
+            #     except:
+            #         print('uv_object.zenith_ra,dec not calculated.')
             
             uv_object.Nants_data = uv_object.Nants_data + int(
                 len(set(uv_object.ant_1_array.tolist() + uv_object.ant_2_array.tolist())))
@@ -2423,6 +2428,7 @@ class UVData(UVBase):
             uv_object.baseline_array = uv_object.baseline_array[blt_inds]
             uv_object.Nbls = len(np.unique(uv_object.baseline_array))
             uv_object.time_array = uv_object.time_array[blt_inds]
+            # uv_object.integration_time = uv_object.integration_time[blt_inds]
             uv_object.lst_array = uv_object.lst_array[blt_inds]
             uv_object.data_array = uv_object.data_array[blt_inds, :, :, :]
             uv_object.flag_array = uv_object.flag_array[blt_inds, :, :, :]
@@ -2436,12 +2442,12 @@ class UVData(UVBase):
 
             uv_object.Ntimes = len(np.unique(uv_object.time_array))
 
-            if uv_object.phase_type == 'drift':
-                try:
-                    uv_object.zenith_ra = uv_object.zenith_ra[blt_inds]
-                    uv_object.zenith_dec = uv_object.zenith_dec[blt_inds]
-                except:
-                    print('uv_object.zenith_ra,dec not calculated.')
+            # if uv_object.phase_type == 'drift':
+            #     try:
+            #         uv_object.zenith_ra = uv_object.zenith_ra[blt_inds]
+            #         uv_object.zenith_dec = uv_object.zenith_dec[blt_inds]
+            #     except:
+            #         print('uv_object.zenith_ra,dec not calculated.')
 
 
         if times is not None:
@@ -2549,22 +2555,23 @@ class UVData(UVBase):
                 uv_object_time.baseline_array = np.zeros(0, dtype=np.int)
                 uv_object_time.Nbls = uv_object.Nbls
                 uv_object_time.Ntimes = 0
-                uv_object_time.time_array = np.zeros(0, dtype=np.int)
-                uv_object_time.lst_array = np.zeros(0, dtype=np.int)
-                uv_object_time.data_array = np.zeros(0, dtype=np.int)
+                uv_object_time.time_array = np.zeros(0, dtype=np.float)
+                # uv_object_time.integration_time = np.zeros(0, dtype=np.float)
+                uv_object_time.lst_array = np.zeros(0, dtype=np.float)
+                uv_object_time.data_array = np.zeros(0, dtype=np.complex)
                 uv_object_time.flag_array = np.zeros(0, dtype=np.int)
                 uv_object_time.nsample_array = np.zeros(0, dtype=np.int)
-                uv_object_time.uvw_array = np.zeros(0, dtype=np.int)
+                uv_object_time.uvw_array = np.zeros(0, dtype=np.float)
 
                 uv_object_time.ant_1_array = np.zeros(0, dtype=np.int)
                 uv_object_time.ant_2_array = np.zeros(0, dtype=np.int)
                 # uv_object_time.Nants_data = 0
                 
-                try:
-                    uv_object_time.zenith_ra = np.zeros(0, dtype=np.int)
-                    uv_object_time.zenith_dec = np.zeros(0, dtype=np.int)
-                except:
-                    pass
+                # try:
+                #     uv_object_time.zenith_ra = np.zeros(0, dtype=np.float)
+                #     uv_object_time.zenith_dec = np.zeros(0, dtype=np.float)
+                # except:
+                #     pass
 
                 # uv_object_time.redundancy = np.zeros(0, dtype=np.int)
                 uv_object_time.Nubls = uv_object.Nubls
@@ -2623,6 +2630,7 @@ class UVData(UVBase):
                         # uv_object_time.lst_array = np.append(uv_object_time.lst_array, uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         if not Select_time:
                             uv_object_time.time_array = np.append(uv_object_time.time_array, np.mean(uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                            # uv_object_time.integration_time = np.append(uv_object_time.integration_time, np.mean(uv_object.integration_time[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
                             uv_object_time.lst_array = np.append(uv_object_time.lst_array, np.mean(uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
                             uv_object_time.data_array = np.append(uv_object_time.data_array, np.mean(uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3]), axis=0))
                             uv_object_time.flag_array = np.append(uv_object_time.flag_array, np.mean(uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3]), axis=0)) != 0
@@ -2630,6 +2638,7 @@ class UVData(UVBase):
                             uv_object_time.uvw_array = np.append(uv_object_time.uvw_array, np.mean(uv_object.uvw_array[blt_inds_tbin, :].reshape(tbin_width, uv_object.Nbls, uv_object.uvw_array.shape[1]), axis=0))
                         else:
                             uv_object_time.time_array = np.append(uv_object_time.time_array, uv_object.time_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                            # uv_object_time.integration_time = np.append(uv_object_time.integration_time, uv_object.integration_time[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                             uv_object_time.lst_array = np.append(uv_object_time.lst_array, uv_object.lst_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                             uv_object_time.data_array = np.append(uv_object_time.data_array, uv_object.data_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.data_array.shape[1], uv_object.data_array.shape[2], uv_object.data_array.shape[3])[0, :, :, :, :])
                             uv_object_time.flag_array = np.append(uv_object_time.flag_array, uv_object.flag_array[blt_inds_tbin, :, :, :].reshape(tbin_width, uv_object.Nbls, uv_object.flag_array.shape[1], uv_object.flag_array.shape[2], uv_object.flag_array.shape[3])[0, :, :, :, :]) != 0
@@ -2639,16 +2648,16 @@ class UVData(UVBase):
                         uv_object_time.ant_1_array = np.append(uv_object_time.ant_1_array, uv_object.ant_1_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         uv_object_time.ant_2_array = np.append(uv_object_time.ant_2_array, uv_object.ant_2_array[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
                         # uv_object.Nants_data = uv_object_time.Nants_data + int(len(set(uv_object_time.ant_1_array.tolist() + uv_object_time.ant_2_array.tolist())))
-                        try:
-                            if uv_object_time.phase_type == 'drift':
-                                if not Select_time:
-                                    uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, np.mean(uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
-                                    uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, np.mean(uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
-                                else:
-                                    uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
-                                    uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
-                        except:
-                            print('uv_object.zenith_ra,dec not calculated.')
+                        # try:
+                        #     if uv_object_time.phase_type == 'drift':
+                        #         if not Select_time:
+                        #             uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, np.mean(uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                        #             uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, np.mean(uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls), axis=0))
+                        #         else:
+                        #             uv_object_time.zenith_ra = np.append(uv_object_time.zenith_ra, uv_object.zenith_ra[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                        #             uv_object_time.zenith_dec = np.append(uv_object_time.zenith_dec, uv_object.zenith_dec[blt_inds_tbin].reshape(tbin_width, uv_object.Nbls)[0, :])
+                        # except:
+                        #     print('uv_object.zenith_ra,dec not calculated.')
 
                         # uv_object_time.redundancy = np.append(uv_object_time.redundancy, nred)
                 if uv_object_time.Ntimes != Ntbin:
@@ -2676,6 +2685,7 @@ class UVData(UVBase):
                 uv_object.Nblts = uv_object_time.Nblts
                 uv_object.baseline_array = uv_object_time.baseline_array
                 uv_object.time_array = uv_object_time.time_array
+                # uv_object.integration_time = uv_object_time.integration_time
                 uv_object.lst_array = uv_object_time.lst_array
                 uv_object.data_array = uv_object_time.data_array
                 uv_object.flag_array = uv_object_time.flag_array
@@ -2685,12 +2695,12 @@ class UVData(UVBase):
                 uv_object.ant_1_array = uv_object_time.ant_1_array
                 uv_object.ant_2_array = uv_object_time.ant_2_array
 
-                if uv_object_time.phase_type == 'drift':
-                    try:
-                        uv_object.zenith_ra = uv_object_time.zenith_ra
-                        uv_object.zenith_dec = uv_object_time.zenith_dec
-                    except:
-                        print('uv_object.zenith_ra,dec not calculated.')
+                # if uv_object_time.phase_type == 'drift':
+                #     try:
+                #         uv_object.zenith_ra = uv_object_time.zenith_ra
+                #         uv_object.zenith_dec = uv_object_time.zenith_dec
+                #     except:
+                #         print('uv_object.zenith_ra,dec not calculated.')
                 
                 try:
                     if uv_object.Ntimes != self.Ntimes:
@@ -2807,19 +2817,20 @@ class UVData(UVBase):
             self.baseline_array = uv_object.baseline_array
             self.Nbls = uv_object.Nbls
             self.time_array = uv_object.time_array
+            # self.integration_time = uv_object.integration_time
             self.lst_array = uv_object.lst_array
             self.nsample_array = uv_object.nsample_array
             self.uvw_array = uv_object.uvw_array
             self.ant_1_array = uv_object.ant_1_array
             self.ant_2_array = uv_object.ant_2_array
             self.Nants_data = uv_object.Nants_data
-            try:
-                self.zenith_ra = uv_object.zenith_ra
-                self.zenith_dec = uv_object.zenith_dec
-                self._zenith_ra = uv_object.zenith_ra
-                self._zenith_dec = uv_object.zenith_dec
-            except:
-                pass
+            # try:
+            #     self.zenith_ra = uv_object.zenith_ra
+            #     self.zenith_dec = uv_object.zenith_dec
+            #     self._zenith_ra = uv_object.zenith_ra
+            #     self._zenith_dec = uv_object.zenith_dec
+            # except:
+            #     pass
             self.redundancy = uv_object.redundancy
             # self._integration_time = uv_object.lst_array
             # self._Nfreqs = uv_object.Nfreqs
@@ -3040,7 +3051,7 @@ class UVData(UVBase):
                 self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
-            print('Number of Unique baselines after Dred: %s'%self.Nubls)
+            # print('Number of Unique baselines after Dred: %s'%self.Nubls)
             print('Number of Times after Averaging: %s'%self.Ntimes)
             print('File Loaded: %s' % (filepath[0]))
             
@@ -3052,16 +3063,19 @@ class UVData(UVBase):
                     
                     FilesData_Process = [pool.apply_async(read_miriad_fromUVData, args=(f, correct_lat_lon, run_check, check_extra, run_check_acceptability, phase_type, Parallel_Files, Time_Average, Frequency_Average, Dred, inplace, tol, Select_freq, Select_time, Badants)) for id_f, f in enumerate(filepath[1:])]
                     uv2 = [filedata.get() for filedata in FilesData_Process]
-                    pool.close()
+                    pool.terminate()
+                    pool.join()
+                    # pool.close()
                     for id_f, f in enumerate(filepath[1:]):
                         # uv2[id_f] = UVData()
                         # uv2[id_f] = FilesData_Process[id_f].get()
+                        
                         # uv2[id_f].select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants)
                         self += uv2[id_f]
                         # self.__add__(uv2[id_f], run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
 
                         print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
-                        print('Number of Unique baselines after Dred: %s' % self.Nubls)
+                        # print('Number of Unique baselines after Dred: %s' % self.Nubls)
                         print('Number of Times after Averaging: %s' % self.Ntimes)
                         print('File Loaded %s : %s' % (id_f + 1, f))
                 else:
@@ -3078,7 +3092,7 @@ class UVData(UVBase):
                         # self.__add__(uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
                         
                         print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
-                        print('Number of Unique baselines after Dred: %s' % self.Nubls)
+                        # print('Number of Unique baselines after Dred: %s' % self.Nubls)
                         print('Number of Times after Averaging: %s' % self.Ntimes)
                         print('File Loaded %s : %s' % (id_f + 1, f))
                     
@@ -3186,6 +3200,8 @@ class UVData(UVBase):
         """
         from . import uvh5
         filepath = filename
+        if times is not None:
+            print('read_uvh5', times[0])
         if isinstance(filename, (list, tuple)):
             if not read_data and len(filename) > 1:
                 raise ValueError('read_data cannot be False for a list of uvh5 files')
@@ -3224,7 +3240,9 @@ class UVData(UVBase):
     
                     FilesData_Process = [pool.apply_async(read_uvh5_fromUVData, args=(f, antenna_nums, antenna_names, ant_str, bls, frequencies, freq_chans, times, polarizations, blt_inds, read_data, run_check, check_extra, run_check_acceptability, Parallel_Files, Time_Average, Frequency_Average, Dred, inplace, tol, Select_freq, Select_time, Badants)) for id_f, f in enumerate(filepath[1:])]
                     uv2 = [filedata.get() for filedata in FilesData_Process]
-                    pool.close()
+                    pool.terminate()
+                    pool.join()
+                    # pool.close()
                     for id_f, f in enumerate(filepath[1:]):
                         # uv2[id_f] = UVData()
                         # uv2[id_f] = FilesData_Process[id_f].get()

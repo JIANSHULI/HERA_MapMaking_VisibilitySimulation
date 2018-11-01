@@ -170,6 +170,8 @@ class UVH5(UVData):
         Separated from full read so that header/metadata and data can be read independently.
         """
         # figure out what data to read in
+        if times is not None:
+            print('_get_data', times[0])
         blt_inds, freq_inds, pol_inds, history_update_string = \
             self._select_preprocess(antenna_nums, antenna_names, ant_str, bls,
                                     frequencies, freq_chans, times, polarizations, blt_inds)

@@ -239,6 +239,11 @@ class InverseCholeskyMatrix:#for a positive definite matrix, Cholesky decomposit
             raise IOError("%s file exists!"%filename)
         self.L.tofile(filename)
 
+    def save(self, filename, overwrite = False):
+        if os.path.isfile(filename) and not overwrite:
+            raise IOError("%s file exists!"%filename)
+        self.L.save(filename)
+    
 def plot_jones(beam_heal_equ):
     import matplotlib.pyplot as plt
     for i, ibeam_heal_equ in enumerate(beam_heal_equ):
