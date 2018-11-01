@@ -29,7 +29,7 @@ import version
 from .uvh5 import *
 
 ####### Import HERA_MapMaking_VisibilitySimulation_Functions ##########
-import HERA_MapMaking_VisibilitySimulation_Functions
+# import HERA_MapMaking_VisibilitySimulation_Functions
 
 __version__ = version.version
 try:
