@@ -4436,7 +4436,7 @@ INSTRUMENT = ''
 # else:
 # 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 Num_Pol = int(2)
-INSTRUMENT = 'hera-vivaldi'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; '-vivaldi'
+INSTRUMENT = 'hera'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; '-vivaldi'
 INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol)
 filetype = 'miriad' # 'miriad', 'uvh5'
 print (INSTRUMENT)
@@ -4751,9 +4751,9 @@ elif 'hera' in INSTRUMENT:
 	if Simulation_For_All:
 		INSTRUMENT = INSTRUMENT + ('-ExBPh%s' % (BadBaseline_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Phase) else '') + ('-ExBAm%s' % (BadBaseline_Amp_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Amplitude) else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
-	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
+	LST_binned_Data = False  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
+	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
 	Specific_Files = True  # Choose a list of Specific Data Sets.
@@ -4761,9 +4761,9 @@ elif 'hera' in INSTRUMENT:
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
-		Specific_FileIndex_start = [8, 8]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-		Specific_FileIndex_end = [9, 9]  # Ending point of selected data sets. [51, 51], [26, 27]
-	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[0], Specific_FileIndex_end[1], 1)]
+		Specific_FileIndex_start = [6, 6] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+		Specific_FileIndex_end = [42, 42] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if (Specific_Files and not Simulation_For_All) else False
 	Assigned_File = False # Use Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]] no matter what calculated.
@@ -4899,14 +4899,14 @@ elif 'hera' in INSTRUMENT:
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 7  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 12  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
 	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
 	
-	ChunkbyChunk_all = False # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not.
+	ChunkbyChunk_all = True # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not.
 	save_chunk = True # Whether to save each chunk (in first loop) to disc and load later to avoid repeated calculation. If disc data writing loading not fast enough, better to turn this off especially with sufficient cores to parallel calculate chunk again.
 	Use_h5py = False # Data format for each chunk of A
 	Use_npy = True # Data format for each chunk of A
@@ -4998,7 +4998,7 @@ elif 'hera' in INSTRUMENT:
 	if not Simulation_For_All:
 		Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
 	else:
-		Integration_Time = 10.7375 * 1.  # seconds; * 3.
+		Integration_Time = 10.7375 * 6.  # seconds; * 3.
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	
 	###################################################################################################################################################################
@@ -5014,8 +5014,8 @@ elif 'hera' in INSTRUMENT:
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = -12.
-			lsts_end = 12.
+			lsts_start = 2.3
+			lsts_end = 4.3
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -5183,6 +5183,7 @@ elif 'hera' in INSTRUMENT:
 			
 		Nfiles = min(Nfiles_temp, len(data_fnames_full[0]), len(data_fnames_full[1]))
 		
+		# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
 		redundancy = [[], []]
 		model_redundancy = [[], []]
 		
@@ -5198,11 +5199,14 @@ elif 'hera' in INSTRUMENT:
 					data_fnames[1] = yyfiles = data_fnames_full[1][:Nfiles]
 					
 				else:
+					# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
 					# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
 					# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
-					data_fnames[0] = xxfiles = data_fnames_full[0][:Nfiles]
-					data_fnames[1] = yyfiles = data_fnames_full[1][:Nfiles]
-					
+					data_fnames[0] = data_fnames_full[0][:Nfiles]
+					data_fnames[1] = data_fnames_full[1][:Nfiles]
+					# print(data_fnames)
+					xxfiles = data_fnames[0]
+					yyfiles = data_fnames[1]
 					file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
 					file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
 					
@@ -5222,15 +5226,18 @@ elif 'hera' in INSTRUMENT:
 			# elif Specific_FileIndex_end[0] <= (Nfiles + 1) and Specific_FileIndex_end[1] <= (Nfiles + 1):
 			elif Specific_Files:
 				if LST_binned_Data:
-					data_fnames[0] = xxfiles = np.array(data_fnames_full[0])[Specific_FileIndex_List[0]]
-					data_fnames[1] = yyfiles = np.array(data_fnames_full[1])[Specific_FileIndex_List[1]]
+					data_fnames[0] = xxfiles = np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
+					data_fnames[1] = yyfiles = np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
 					
 				else:
+					# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
 					# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[0]:Specific_FileIndex_end[1]]
 					# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[1]:Specific_FileIndex_end[1]]
-					data_fnames[0] = xxfiles = np.array(data_fnames_full[0])[Specific_FileIndex_List[0]]
-					data_fnames[1] = yyfiles = np.array(data_fnames_full[1])[Specific_FileIndex_List[1]]
-					
+					data_fnames[0] =  np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
+					data_fnames[1] =  np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
+					# print(data_fnames)
+					xxfiles = data_fnames[0]
+					yyfiles = data_fnames[1]
 					file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
 					file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
 					
@@ -5255,37 +5262,41 @@ elif 'hera' in INSTRUMENT:
 			print('Problems happen when analyzing data_filenames.')
 		
 		if not LST_binned_Data:
-			badants = []
-			bad_ants_folder = os.path.join(DATA_PATH, 'bad_ants')
-			badants = np.loadtxt(os.path.join(bad_ants_folder, str(file_JDays[0]) + '.txt')).astype(int)
-			print ('Bad antennas on {0}: {1}'.format(file_JDays[0], badants))
-			# badants_append = [26, 84, 121]
-			for p in range(2):
-				for i, fbase in enumerate(files_bases[p]):
-					antfname = fbase.split('.')
-					antfname.pop(3)
-					antfname.pop(-1)
-					# if 'OR' in '.'.join(antfname):
-					# 	antfname = os.path.join(DATA_PATH + Observing_Session, '.'.join(antfname)[:-2] + '.ant_metrics.json')
-					# else:
-					# 	antfname = os.path.join(DATA_PATH + Observing_Session, '.'.join(antfname) + '.ant_metrics.json')
-					for session in Observing_Session:
-						antfname = os.path.join(DATA_PATH + session, '.'.join(antfname) + '.uv.ant_metrics.json')
-						if os.path.isfile(antfname):
-							try:
-								antmets = hqm.ant_metrics.load_antenna_metrics(antfname)
-								badants.extend(map(lambda x: x[0], antmets['xants']))
-								# badants = np.unique(badants)
-								# print('Badants: %s'%str(badants))
-							except:
-								print('Failed to detect Badants.')
-			badants = np.unique(badants)
-			print('Badants before appending: %s' % str(badants))
-			if len(badants_append) >= 1:
-				for bat in badants_append:
-					if (bat, 'x') in  antmets['final_metrics']['meanVij'].keys() or (bat, 'y') in antmets['final_metrics']['meanVij'].keys():
-						badants = np.append(badants, bat)
-			badants = np.unique(badants)
+			try:
+				badants = []
+				bad_ants_folder = os.path.join(DATA_PATH, 'bad_ants')
+				badants = np.loadtxt(os.path.join(bad_ants_folder, str(file_JDays[0]) + '.txt')).astype(int)
+				print ('Bad antennas on {0}: {1}'.format(file_JDays[0], badants))
+				# badants_append = [26, 84, 121]
+				for p in range(2):
+					for i, fbase in enumerate(files_bases[p]):
+						antfname = fbase.split('.')
+						antfname.pop(3)
+						antfname.pop(-1)
+						# if 'OR' in '.'.join(antfname):
+						# 	antfname = os.path.join(DATA_PATH + Observing_Session, '.'.join(antfname)[:-2] + '.ant_metrics.json')
+						# else:
+						# 	antfname = os.path.join(DATA_PATH + Observing_Session, '.'.join(antfname) + '.ant_metrics.json')
+						for session in Observing_Session:
+							antfname = os.path.join(DATA_PATH + session, '.'.join(antfname) + '.uv.ant_metrics.json')
+							if os.path.isfile(antfname):
+								try:
+									antmets = hqm.ant_metrics.load_antenna_metrics(antfname)
+									badants.extend(map(lambda x: x[0], antmets['xants']))
+									# badants = np.unique(badants)
+									# print('Badants: %s'%str(badants))
+								except:
+									print('Failed to detect Badants.')
+				badants = np.unique(badants)
+				print('Badants before appending: %s' % str(badants))
+				if len(badants_append) >= 1:
+					for bat in badants_append:
+						if (bat, 'x') in  antmets['final_metrics']['meanVij'].keys() or (bat, 'y') in antmets['final_metrics']['meanVij'].keys():
+							badants = np.append(badants, bat)
+				badants = np.unique(badants)
+			except:
+				badants = badants_append
+				print('Use input badants instead of loading form disc.')
 		else:
 			badants = badants_append
 		print('Badants: %s' % str(badants))
@@ -9785,6 +9796,7 @@ try:
 		Sigma = (AtNiAi.dot(AtNiA_noR)).dot(AtNiAi)
 	else:
 		Sigma = AtNiAi
+	print('Sigma has been calculated.')
 	if not Simulation_For_All:
 		Discrepancy_Ratio = np.abs(w_solution - fake_solution) / Sigma[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
 	else:
@@ -9793,10 +9805,11 @@ try:
 		Discrepancy_Ratio_full = np.abs(w_solution - fake_solution) / Sigma[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5
 	# print('\n>>>>>>>>>>>>>> Discrepancy Ratio: {0}'.format(Discrepancy_Ratio))
 	print('\n>>>>>>>>>>>>>> Discrepancy Ratio Mean: {0}\n'.format(np.mean(Discrepancy_Ratio)))
-	# print('>>>>>>>>>>>>>> Discrepancy Ratio wienned: {0}'.format(Discrepancy_Ratio_wienned))
-	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean wienned: {0}\n'.format(np.mean(Discrepancy_Ratio_wienned)))
-	# print('>>>>>>>>>>>>>> Discrepancy Ratio full: {0}'.format(Discrepancy_Ratio_full))
-	print('>>>>>>>>>>>>>> Discrepancy Ratio Mean full: {0}\n'.format(np.mean(Discrepancy_Ratio_full)))
+	if not Simulation_For_All:
+		# print('>>>>>>>>>>>>>> Discrepancy Ratio wienned: {0}'.format(Discrepancy_Ratio_wienned))
+		print('>>>>>>>>>>>>>> Discrepancy Ratio Mean wienned: {0}\n'.format(np.mean(Discrepancy_Ratio_wienned)))
+		# print('>>>>>>>>>>>>>> Discrepancy Ratio full: {0}'.format(Discrepancy_Ratio_full))
+		print('>>>>>>>>>>>>>> Discrepancy Ratio Mean full: {0}\n'.format(np.mean(Discrepancy_Ratio_full)))
 	print('>>>>>>>>>>>>>> Mean of AtNiAi: {0}'.format(np.mean(AtNiAi[np.arange(AtNiAi.shape[0]), np.arange(AtNiAi.shape[1])] ** 0.5)))
 	print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time))
 	print('INSTRUMENT: {0} \n'.format(INSTRUMENT))
