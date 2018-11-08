@@ -298,6 +298,7 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 		else:
 			A_i = A_j
 			del(A_j)
+			AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data, np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))))
 		
 		# if id_j == np.arange(0, length_C, chunk)[-1]:
 		# 	loop_list = np.arange(0, length_C, chunk)
@@ -374,23 +375,26 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 						clean_sim_data = clean_sim_data_j
 						AtNi_data = AtNi_data_j
 						AtNi_sim_data = AtNi_sim_data_j
-						AtNi_clean_sim_data = AtNi_clean_sim_data_j
+						# AtNi_clean_sim_data = AtNi_clean_sim_data_j
 						AtNi_fullsim_vis_ps = AtNi_fullsim_vis_ps_j
 					
 					elif id_i == 0 and id_j != 0:
 						clean_sim_data += clean_sim_data_j #+ clean_sim_data
 						AtNi_data = np.concatenate((AtNi_data_j, AtNi_data))
 						AtNi_sim_data = np.concatenate((AtNi_sim_data_j, AtNi_sim_data))
-						AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_j, AtNi_clean_sim_data))
+						# AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_j, AtNi_clean_sim_data))
 						AtNi_fullsim_vis_ps = np.concatenate((AtNi_fullsim_vis_ps_j, AtNi_fullsim_vis_ps), axis=0)
 						
 						if id_j == 1:
 							clean_sim_data += clean_sim_data_i #+ clean_sim_data
 							AtNi_data = np.concatenate((AtNi_data_i, AtNi_data))
 							AtNi_sim_data = np.concatenate((AtNi_sim_data_i, AtNi_sim_data))
-							AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_i, AtNi_clean_sim_data))
+							# AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_i, AtNi_clean_sim_data))
 							AtNi_fullsim_vis_ps = np.concatenate((AtNi_fullsim_vis_ps_i, AtNi_fullsim_vis_ps), axis=0)
-					
+							
+							AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))
+						
+						
 					if id_i == 0:
 						timer_multiply = time.time()
 						if dot:
@@ -411,6 +415,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 					del(A_j)
 				elif id_j == id_i + 1:
 					del(A_i)
+			
+			
 				
 			# elif id_i == id_j and id_i == 0:
 			# 	print('{0}-{1} and {2}-{3} chunks of A calculated.'.format(Ashape0_i, Ashape1_i, Ashape0_i, Ashape1_i))
@@ -4541,7 +4547,7 @@ plot_pixelization = False and not AtNiA_only
 plot_projection = False and not AtNiA_only
 plot_data_error = False and not AtNiA_only
 
-force_recompute = True
+force_recompute = False
 force_recompute_AtNiAi_eig = True
 force_recompute_AtNiAi = True
 force_recompute_S = True
@@ -4977,7 +4983,7 @@ elif 'hera' in INSTRUMENT:
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
 	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
 	
-	ChunkbyChunk_all = True # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not. If True, dynamic simulation is not valid.
+	ChunkbyChunk_all = True # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not.
 	save_chunk = True # Whether to save each chunk (in first loop) to disc and load later to avoid repeated calculation. If disc data writing loading not fast enough, better to turn this off especially with sufficient cores to parallel calculate chunk again.
 	Use_h5py = False # Data format for each chunk of A
 	Use_npy = False # Data format for each chunk of A
@@ -5076,7 +5082,7 @@ elif 'hera' in INSTRUMENT:
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 350 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 37 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10. ** (-6)) for i in range(Num_Pol)])
 		else:
@@ -5168,9 +5174,9 @@ elif 'hera' in INSTRUMENT:
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 128  # starting point to calculate dynamic A
-		nside_standard = 128  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = 128  # undynamic A matrix shape
+		nside_start = 32  # starting point to calculate dynamic A
+		nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = 32  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = False
 	WaterFall_Plot_with_MultiFreqSimulation = False
