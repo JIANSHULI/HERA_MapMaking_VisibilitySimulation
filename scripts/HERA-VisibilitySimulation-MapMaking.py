@@ -298,8 +298,10 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 		else:
 			A_i = A_j
 			del(A_j)
+			timer_sim_multi = time.time()
 			AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data, np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))))
-		
+			print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
+			
 		# if id_j == np.arange(0, length_C, chunk)[-1]:
 		# 	loop_list = np.arange(0, length_C, chunk)
 		for id_j, j in enumerate(reversed(np.arange(0, length_C, chunk))):
@@ -391,9 +393,9 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 							AtNi_sim_data = np.concatenate((AtNi_sim_data_i, AtNi_sim_data))
 							# AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_i, AtNi_clean_sim_data))
 							AtNi_fullsim_vis_ps = np.concatenate((AtNi_fullsim_vis_ps_i, AtNi_fullsim_vis_ps), axis=0)
-							
+							timer_sim_multi = time.time()
 							AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))
-						
+							print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
 						
 					if id_i == 0:
 						timer_multiply = time.time()
@@ -1628,17 +1630,19 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					beam_weight=None, ubls=None, C=299.792458, used_common_ubls=None, nUBL_used=None, nUBL_used_mfreq=None, nt_used=None, nside_standard=None, nside_start=None, nside_beamweight=None, beam_heal_equ_x=None, beam_heal_equ_y=None, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None, lsts=None, Parallel_A=False, Precision_full='complex64',
 					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144, Use_nside_bw_forFullsim=False,
 					nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False, equatorial_GSM_beamweight=None, equatorial_GSM_beamweight_mfreq=None, gsm_beamweighted=None, nside_distribution=None, final_index=None, thetas=None, phis=None, sizes=None, abs_thresh=None, npix=None, valid_pix_mask=None, fake_solution_map=None, fake_solution_map_mfreq=None,
-					A_Method_leg=False, Num_Pol=2, beam_heal_equ_z=None, beam_heal_equ_z_mfreq=None, Manual_PointSource=False, fullsim_vis_ps=None, ChunkbyChunk_all=False, id_chunk_i=0, save_chunk=True, Use_h5py = True, Use_npy=True, Use_memmap=True):
+					A_Method_leg=False, Num_Pol=2, beam_heal_equ_z=None, beam_heal_equ_z_mfreq=None, Manual_PointSource=False, fullsim_vis_ps=None, ChunkbyChunk_all=False, id_chunk_i=0, save_chunk=True, Use_h5py = False, Use_npy=True, Use_memmap=False):
 	print('flist: %s' % str(flist))
 	if ChunkbyChunk_all:
 		NoA_Out = False
 	
-	if Use_h5py and 'hdf5' not in A_path and not Use_npy and not Use_memmap:
+	if Use_h5py and '.hdf5' not in A_path and not Use_npy and not Use_memmap:
 		A_path = A_path	+ '.hdf5'
 	elif Use_memmap and '.dat' not in A_path:
 		A_path = A_path + '.dat'
-	elif Use_npy and 'npy' not in A_path:
+	elif Use_npy and '.npy' not in A_path:
 		A_path = A_path + '.npy'
+	else:
+		A_path = A_path + ''
 		
 	
 	if Synthesize_MultiFreq:
@@ -2749,6 +2753,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 		AtNi_fullsim_vis_ps = None
 		Ashape0, Ashape1 = A.shape
 		
+		print('\n>>>>>>>> A_path: {0} <<<<<<<<<\n'.format(A_path))
+		
 		if NoA_Out or (ChunkbyChunk_all and id_chunk_i==0):
 			# A = np.concatenate((np.real(A), np.imag(A))).astype('float64')
 			
@@ -2767,9 +2773,18 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			# Csim_data = (clean_sim_data + np.random.randn(len(clean_sim_data)) / CNi ** .5) if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / CNi ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
 			
 			# compute AtNi.y
+			timer_multi = time.time()
 			AtNi_data = np.transpose(A).dot((Cdata * CNi).astype(A.dtype))
+			print('AtNi_data has been calculated with {0} minutes used.'.format((time.time() - timer_multi) / 60.))
+			timer_multi_1 = time.time()
 			AtNi_sim_data = np.transpose(A).dot((Csim_data * CNi).astype(A.dtype))
-			AtNi_clean_sim_data = np.transpose(A).dot((clean_sim_data * CNi).astype(A.dtype))
+			print('AtNi_sim_data has been calculated with {0} minutes used.'.format((time.time() - timer_multi_1) / 60.))
+			if not ChunkbyChunk_all:
+				timer_multi_2 = time.time()
+				AtNi_clean_sim_data = np.transpose(A).dot((clean_sim_data * CNi).astype(A.dtype))
+				print('AtNi_clean_sim_data has been calculated with {0} minutes used.'.format((time.time() - timer_multi_2) / 60.))
+			else:
+				AtNi_clean_sim_data = None
 			if Manual_PointSource:
 				AtNi_fullsim_vis_ps = np.transpose(A).dot((fullsim_vis_ps.transpose() * CNi).transpose().astype(A.dtype))
 				print('Shape of fullsim_vis_ps: {0}'.format(fullsim_vis_ps.shape))
@@ -4728,7 +4743,7 @@ if INSTRUMENT == 'miteor':
 
 
 elif 'hera' in INSTRUMENT:
-	Simulation_For_All = True # Simulate from the very beginning: loading data.
+	Simulation_For_All = False # Simulate from the very beginning: loading data.
 	Use_SimulatedData = True if Simulation_For_All else False
 	
 	
@@ -4828,18 +4843,19 @@ elif 'hera' in INSTRUMENT:
 	if Simulation_For_All:
 		INSTRUMENT = INSTRUMENT + ('-ExBPh%s' % (BadBaseline_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Phase) else '') + ('-ExBAm%s' % (BadBaseline_Amp_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Amplitude) else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
-	LST_binned_Data = False  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
+	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
+	Delay_Filter = False
 	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
-	Filename_Suffix = '.uvOCRSL' if LST_binned_Data else '.uvOCRS'  # '.uvOCRS' '.uvOCRSD'
+	Filename_Suffix = ('.uvOCRSL' if LST_binned_Data else '.uvOCRS') if not Delay_Filter else ('.uvOCRSDL' if LST_binned_Data else '.uvOCRSD')  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
-	Specific_Files = False  # Choose a list of Specific Data Sets.
+	Specific_Files = True  # Choose a list of Specific Data Sets.
 	if len(sys.argv) > 2:
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
-		Specific_FileIndex_start = [0, 0] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
-		Specific_FileIndex_end = [200, 200] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+		Specific_FileIndex_start = [7, 7] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
+		Specific_FileIndex_end = [17, 17] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if (Specific_Files and not Simulation_For_All) else False
@@ -4966,7 +4982,7 @@ elif 'hera' in INSTRUMENT:
 	A_Method_leg = True # Whether to use the legacy method for calculating A or not.
 	
 	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 12 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	nchunk_A_full = 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	NoA_Out_fullsky = True # Whether or not to calculate full A matrix
@@ -4976,7 +4992,7 @@ elif 'hera' in INSTRUMENT:
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 12  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 22  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -4986,8 +5002,8 @@ elif 'hera' in INSTRUMENT:
 	ChunkbyChunk_all = True # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not.
 	save_chunk = True # Whether to save each chunk (in first loop) to disc and load later to avoid repeated calculation. If disc data writing loading not fast enough, better to turn this off especially with sufficient cores to parallel calculate chunk again.
 	Use_h5py = False # Data format for each chunk of A
-	Use_npy = False # Data format for each chunk of A
-	Use_memmap = True # Data format for each chunk of A, higher priority over the above two.
+	Use_npy = True # Data format for each chunk of A
+	Use_memmap = False # Data format for each chunk of A, higher priority over the above two.
 	
 	NoA_Out = True # If we get A out of get_A_multifreq() and then calculate other variables or directly get other usedful variables from get_A_multifreq().
 	Conjugate_A_append = False # If we add a conjugated copy of A matrix below the original one when calculating AtNiA.
@@ -5082,7 +5098,7 @@ elif 'hera' in INSTRUMENT:
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 37 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 350 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10. ** (-6)) for i in range(Num_Pol)])
 		else:
@@ -5174,8 +5190,8 @@ elif 'hera' in INSTRUMENT:
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 32  # starting point to calculate dynamic A
-		nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_start = 128  # starting point to calculate dynamic A
+		nside_standard = 128  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = 32  # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	WaterFall_Plot = False
@@ -8745,6 +8761,7 @@ else:
 		except:
 			continue
 
+	AtNiA.tofile(AtNiA_path)
 
 		
 print('Shape of AtNiA: {0}'.format(AtNiA.shape))
