@@ -39,7 +39,7 @@ def filter_reds_total(reds, bls=None, ex_bls=None, ants=None, ex_ants=None, ubls
     if ex_ants: bls = [(i,j) for i,j in bls if i not in ex_ants and j not in ex_ants]
     bld = {}
     for bl in bls: bld[bl] = bld[bl[::-1]] = None
-    reds = [[bl for bl in gp if bld.has_key(bl)] for gp in reds]
+    reds = [[bl for bl in gp if bld.has_key(tuple(bl))] for gp in reds]
     return [gp for gp in reds if len(gp) >= 1]
 
 def compute_reds(antpos, tol=0.1):
