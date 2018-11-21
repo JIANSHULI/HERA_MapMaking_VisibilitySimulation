@@ -257,7 +257,7 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 					  NoA_Out=False, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144, Use_nside_bw_forFullsim=False,
 					  nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False, equatorial_GSM_beamweight=None, equatorial_GSM_beamweight_mfreq=None, gsm_beamweighted=None, nside_distribution=None, final_index=None, thetas=None, phis=None, sizes=None, abs_thresh=None, npix=None, valid_pix_mask=None, fake_solution_map=None, fake_solution_map_mfreq=None,
 					  A_Method_leg=False, Num_Pol=2, beam_heal_equ_z=None, beam_heal_equ_z_mfreq=None, Manual_PointSource=False, fullsim_vis_ps=None, ChunkbyChunk_all=False, save_chunk=False, Use_h5py=True, Use_npy=False, Use_memmap=False, Use_memmap_AtNiA=False,
-                        Use_memmap_A_full=False, Use_rotated_beampattern_as_beamweight=False, Special_ReOrder=False, A_chunk_order='F'):  # C=AtNiA
+                        Use_memmap_A_full=False, Use_rotated_beampattern_as_beamweight=False, Special_ReOrder=False, A_chunk_order='F', Skip_AtNiA=False):  # C=AtNiA
 
 	
 	expected_time = 1.3e-11 * Ni.shape[0] * valid_npix ** 2
@@ -288,7 +288,7 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 		A_path_i = A_path + '-{0}-{1}'.format(nchunk, id_i) + A_path_suffix
 		if id_i != 0:
 			force_recompute = False
-		print('{0} row chunk being calculated ...'.format(id_i))
+		print('\n>>>>>>>>>> {0} row chunk being calculated ...'.format(id_i))
 		print('Shape of this chunk: {0}-{1}'.format(num_id_chunk, num_id_chunk))
 		
 		if id_i == 0:
@@ -310,18 +310,20 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 			# AtNi_fullsim_vis_ps_0 = AtNi_fullsim_vis_ps_i
 			
 			timer_multiply = time.time()
-			if dot:
-				C[i:i + num_id_chunk, i:i + num_id_chunk] = np.dot((A_i.transpose() * Ni), A_i)
-			else:
-				C[i:i + num_id_chunk, i:i + num_id_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_i)
-			print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
-			C[i:i + num_id_chunk, i:i + num_id_chunk] = (C[i:i + num_id_chunk, i:i + num_id_chunk] + np.transpose(C[i:i + num_id_chunk, i:i + num_id_chunk])) / 2.
+			if not Skip_AtNiA:
+				if dot:
+					C[i:i + num_id_chunk, i:i + num_id_chunk] = np.dot((A_i.transpose() * Ni), A_i)
+				else:
+					C[i:i + num_id_chunk, i:i + num_id_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_i)
+				print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
+				C[i:i + num_id_chunk, i:i + num_id_chunk] = (C[i:i + num_id_chunk, i:i + num_id_chunk] + np.transpose(C[i:i + num_id_chunk, i:i + num_id_chunk])) / 2.
 			
 		else:
 			A_i = A_j
 			del(A_j)
 			timer_sim_multi = time.time()
-			AtNi_sim_data = np.concatenate((AtNi_sim_data, np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))))
+			if Use_rotated_beampattern_as_beamweight:
+				AtNi_sim_data = np.concatenate((AtNi_sim_data, np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))))
 			AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data, np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))))
 			print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
 		
@@ -334,7 +336,7 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 			num_jd_chunk = np.min((chunk, length_C - j))
 			chunk_width_list[id_j] = num_jd_chunk
 			
-			print('{0}-{1} chunk being calculated ...'.format(id_i, id_j))
+			print('\n>>>>>>> {0}-{1} chunk being calculated ...'.format(id_i, id_j))
 			print('Shape of this chunk: {0}-{1}'.format(num_id_chunk, num_jd_chunk))
 			
 			if id_i < id_j:
@@ -426,22 +428,24 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 							timer_sim_multi = time.time()
 							AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))
 							print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
-						
-					if id_i == 0:
-						timer_multiply = time.time()
-						if dot:
-							C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.dot((A_j.transpose() * Ni), A_j)
-						else:
-							C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_j.transpose() * Ni, A_j)
-						print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
-						C[j:j + num_jd_chunk, j:j + num_jd_chunk] = (C[j:j + num_jd_chunk, j:j + num_jd_chunk] + np.transpose(C[j:j + num_jd_chunk, j:j + num_jd_chunk])) / 2.
-						
-				timer_multiply = time.time()
-				if dot:
-					C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.dot((A_i.transpose() * Ni), A_j)
-				else:
-					C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_j)
-				print('{0} minutes used for multiplying A chunks.'.format((time.time() - timer_multiply) / 60.))
+					
+					if not Skip_AtNiA:
+						if id_i == 0:
+							timer_multiply = time.time()
+							if dot:
+								C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.dot((A_j.transpose() * Ni), A_j)
+							else:
+								C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_j.transpose() * Ni, A_j)
+							print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
+							C[j:j + num_jd_chunk, j:j + num_jd_chunk] = (C[j:j + num_jd_chunk, j:j + num_jd_chunk] + np.transpose(C[j:j + num_jd_chunk, j:j + num_jd_chunk])) / 2.
+				
+				if not Skip_AtNiA:
+					timer_multiply = time.time()
+					if dot:
+						C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.dot((A_i.transpose() * Ni), A_j)
+					else:
+						C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_j)
+					print('{0} minutes used for multiplying A chunks.'.format((time.time() - timer_multiply) / 60.))
 				
 				if id_j > id_i + 1:
 					del(A_j)
@@ -471,7 +475,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 			elif id_i > id_j:
 				print('{0}-{1} and {2}-{3} chunks of A calculated.'.format(Ashape0_i, Ashape1_i, Ashape0_i, num_jd_chunk))
 				
-				C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.transpose(C[j:j + num_jd_chunk, i:i + num_id_chunk])
+				if not Skip_AtNiA:
+					C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.transpose(C[j:j + num_jd_chunk, i:i + num_id_chunk])
 				
 			
 			print ("\n{0}/{1}, {2}/{3}: {4:.5f} minute\n".format(id_i, nchunk, id_j, nchunk, (time.time() - ltm) / 60.))
@@ -3087,7 +3092,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			# 	AtNi_fullsim_vis_ps = np.transpose(A).dot((fullsim_vis_ps.transpose() * CNi).transpose().astype(A.dtype))
 			# 	print('Shape of fullsim_vis_ps: {0}'.format(fullsim_vis_ps.shape))
 			# 	print('Shape of AtNi_fullsim_vis_ps: {0}'.format(AtNi_fullsim_vis_ps.shape))
-			print('Time used for total multi: {0}'.format((time.time() - timer_multi_total)/60.))
+			print('Time used for total multi: {0} minutes.'.format((time.time() - timer_multi_total)/60.))
 			
 			if not ChunkbyChunk_all:
 				if os.path.isfile(AtNiA_path) and not force_recompute:
@@ -3177,7 +3182,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					except:
 						print('No A deleted in the function.')
 					if not Use_memmap_AtNiA:
-						AtNiA.tofile(AtNiA_path)
+						np.save(AtNiA_path, arr=AtNiA)
 					
 			gc.collect()
 			
@@ -4935,6 +4940,11 @@ else:
 	except:
 		print ('Run Python.')
 
+try:
+	os.system("sshpass -p '5-Zuibang' scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation".format(script_dir + '/HERA-VisibilitySimulation-MapMaking.py'))
+	print('Script successfully sent to remote server.')
+except:
+	print('Script not sent')
 
 ###########################################################
 ################ data file and load beam #################
@@ -5326,7 +5336,7 @@ elif 'hera' in INSTRUMENT:
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
 	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 8 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	nchunk_A_full = 16 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Use_rotated_beampattern_as_beamweight = True # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
@@ -5340,18 +5350,18 @@ elif 'hera' in INSTRUMENT:
 	A_chunk_order = 'F' # Numpy.memmap order: 'C' (default, row), 'F'.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 40  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 90  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
-	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
+	Use_LinalgInv = True # Whether to use np.linalg.inv to inverse AtNiA.
 	
 	ChunkbyChunk_all = True # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not.
 	save_chunk = True # Whether to save each chunk (in first loop) to disc and load later to avoid repeated calculation. If disc data writing loading not fast enough, better to turn this off especially with sufficient cores to parallel calculate chunk again.
 	Use_h5py = False # Data format for each chunk of A
-	Use_npy = False # Data format for each chunk of A
-	Use_memmap = True if ChunkbyChunk_all else True # Data format for each chunk of A, higher priority over the above two.
+	Use_npy = True # Data format for each chunk of A
+	Use_memmap = False if ChunkbyChunk_all else True # Data format for each chunk of A, higher priority over the above two.
 	Use_memmap_AtNiA = True if ChunkbyChunk_all else True # Use np.memmap for AtNiA so as to access only part of it to save memory.
 	
 	A_Method_leg = True if not Use_memmap else True  # Whether to use the legacy method for calculating A or not.
@@ -5443,7 +5453,7 @@ elif 'hera' in INSTRUMENT:
 	if not Simulation_For_All:
 		Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
 	else:
-		Integration_Time = 10.7375 * 28.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 14.  # seconds; * 3., 14
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	
 	###################################################################################################################################################################
@@ -5459,8 +5469,8 @@ elif 'hera' in INSTRUMENT:
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.3
-			lsts_end = 4.3
+			lsts_start = 2.55
+			lsts_end = 4.05
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -5562,7 +5572,10 @@ elif 'hera' in INSTRUMENT:
 	else:
 		datatag = '_2018_ampcaled'  # '_2016_01_20_avg_unpollock'#'_seccasa.rad'#
 		vartag = '_2018_ampcaled'  # '_2016_01_20_avg_unpollockx100'#''#1
-	datadir = script_dir + '/../Output/'
+	if 'blender' in DATA_PATH:
+		datadir = script_dir + '/../Output/' # '/Volumes/Jianshu_Li_SSD/Output/' # '/Volumes/Jianshu_Li_Hard_Drive_4/Output/'
+	elif 'JianshuLi' in DATA_PATH:
+		datadir = '/Volumes/Jianshu_Li_SSD/Output/'  # '/Volumes/Jianshu_Li_SSD/Output/' # '/Volumes/Jianshu_Li_Hard_Drive_4/Output/' # '/Volumes/Jianshu_Li_Hard_Drive_5/Output/'
 	antpairs = None
 	
 	#######################################################################################################
@@ -8148,12 +8161,13 @@ if Calculate_SimulationData_Noise:
 	sim_var_yy_filename = script_dir + '/../Output/{0}_{1}_p2_scale{2}_u{3}_t{4}_nside{5}_bnside{6}_var_sim_yy.simvis' .format(INSTRUMENT, freq, scale_noise_ratio if scale_noise else '-none', nUBL_used + 1, nt_used, nside_standard, bnside)
 	if Num_Pol == 3:
 		sim_var_zz_filename = script_dir + '/../Output/{0}_{1}_p2_scale{2}_u{3}_t{4}_nside{5}_bnside{6}_var_sim_zz.simvis'.format(INSTRUMENT, freq, scale_noise_ratio if scale_noise else '-none', nUBL_used + 1, nt_used, nside_standard, bnside)
-	#if not os.path.isfile(sim_var_xx_filename):
-	N['x'].astype('float64').tofile(sim_var_xx_filename)
-	#if not os.path.isfile(sim_var_yy_filename):
-	N['y'].astype('float64').tofile(sim_var_yy_filename)
+	if not os.path.isfile(sim_var_xx_filename):
+		N['x'].astype('float64').tofile(sim_var_xx_filename)
+	if not os.path.isfile(sim_var_yy_filename):
+		N['y'].astype('float64').tofile(sim_var_yy_filename)
 	if Num_Pol == 3:
-		N['z'].astype('float64').tofile(sim_var_zz_filename)
+		if not os.path.isfile(sim_var_zz_filename):
+			N['z'].astype('float64').tofile(sim_var_zz_filename)
 	
 	Del = True
 	if Del:
@@ -8449,12 +8463,13 @@ if Synthesize_MultiFreq:
 		sim_var_yy_filename = script_dir + '/../Output/{0}_{1}_p2_scale{2}_u{3}_t{4}_nside{5}_bnside{6}_var_sim_yy.simvis'.format(INSTRUMENT, freq, scale_noise_ratio if scale_noise else '-none', nUBL_used + 1, nt_used, nside_standard, bnside)
 		if Num_Pol == 3:
 			sim_var_zz_filename = script_dir + '/../Output/{0}_{1}_p2_scale{2}_u{3}_t{4}_nside{5}_bnside{6}_var_sim_zz.simvis'.format(INSTRUMENT, freq, scale_noise_ratio if scale_noise else '-none', nUBL_used + 1, nt_used, nside_standard, bnside)
-		# if not os.path.isfile(sim_var_xx_filename):
-		N['x'].astype('float64').tofile(sim_var_xx_filename)
-		# if not os.path.isfile(sim_var_yy_filename):
-		N['y'].astype('float64').tofile(sim_var_yy_filename)
+		if not os.path.isfile(sim_var_xx_filename):
+			N['x'].astype('float64').tofile(sim_var_xx_filename)
+		if not os.path.isfile(sim_var_yy_filename):
+			N['y'].astype('float64').tofile(sim_var_yy_filename)
 		if Num_Pol == 3:
-			N['z'].astype('float64').tofile(sim_var_zz_filename)
+			if not os.path.isfile(sim_var_zz_filename):
+				N['z'].astype('float64').tofile(sim_var_zz_filename)
 		
 		Del = True
 		if Del:
@@ -9066,8 +9081,29 @@ elif crosstalk_type == 'autocorr':
 	AtNiA_tag += "_autocorr"
 if pre_ampcal:
 	AtNiA_tag += "_ampcal"
+AtNi_data_tag = 'AtNi_data' + A_filename
+AtNi_sim_data_tag = 'AtNi_sdata' + A_filename
+AtNi_clean_sim_data_tag = 'AtNi_clsdata' + A_filename
+AtNi_fullsim_vis_ps_tag = 'AtNi_fvpdata' + A_filename
 AtNiA_filename = AtNiA_tag + A_filename
-AtNiA_path = datadir + tag + AtNiA_filename
+
+if 'JianshuLi' not in DATA_PATH:
+	if Use_memmap_AtNiA:
+		AtNiA_path = datadir + tag + AtNiA_filename
+	else:
+		AtNiA_path = datadir + tag + AtNiA_filename + '.npy'
+else:
+	if Use_memmap_AtNiA:
+		AtNiA_path = script_dir + '/../Output/' + tag + AtNiA_filename
+	else:
+		AtNiA_path = script_dir + '/../Output/' + tag + AtNiA_filename + '.npy'
+	
+	
+AtNi_data_path = datadir + tag + AtNi_data_tag + '.npy'
+AtNi_sim_data_path = datadir + tag + AtNi_sim_data_tag + '.npy'
+AtNi_clean_sim_data_path = datadir + tag + AtNi_clean_sim_data_tag + '.npy'
+AtNi_fullsim_vis_ps_path = datadir + tag + AtNi_fullsim_vis_ps_tag + '.npy'
+
 if os.path.isfile(AtNiA_path) and AtNiA_only and not force_recompute:
 	sys.exit(0)
 
@@ -9087,8 +9123,12 @@ NoA_Out = NoA_Out if not fit_for_additive else False
 # 					Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid,gsm_beamweighted=gsm_beamweighted, thetas=thetas, phis=phis, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq)
 # ChunkbyChunk_All = True
 
+Skip_AtNiA = True if os.path.isfile(AtNiA_path) else False
+Read_AtNi_Derivants = True
+Direct_AtNiAi = True if (os.path.isfile(AtNiA_path) and os.path.isfile(AtNi_data_path) and os.path.isfile(AtNi_sim_data_path) and os.path.isfile(AtNi_clean_sim_data_path) and os.path.isfile(AtNi_fullsim_vis_ps_path)) else False
+Send_AtNi_Derivants = True if Direct_AtNiAi else True
 
-if not ChunkbyChunk_all:
+if not ChunkbyChunk_all and not Direct_AtNiAi:
 	clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution, AtNi_fullsim_vis_ps = \
 		get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True, Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
 						flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=np.array([freq for id_p in range(Num_Pol)]), equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=valid_npix,
@@ -9097,12 +9137,19 @@ if not ChunkbyChunk_all:
 						Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh, Precision_full=Precision_full,
 						npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps,
 						ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order)
-else:
+elif not Direct_AtNiAi:
 	if Use_memmap_AtNiA:
-		AtNiA = np.memmap(AtNiA_path, dtype=Precision_masked,
-							 mode='w+', shape=(valid_npix, valid_npix))
+		if Skip_AtNiA:
+			AtNiA = np.memmap(AtNiA_path, dtype=Precision_masked,
+			                  mode='r+', shape=(valid_npix, valid_npix))
+		else:
+			AtNiA = np.memmap(AtNiA_path, dtype=Precision_masked,
+								 mode='w+', shape=(valid_npix, valid_npix))
 	else:
-		AtNiA = np.zeros((valid_npix, valid_npix), dtype=Precision_masked)
+		if Skip_AtNiA:
+			AtNiA = np.load(AtNiA_path).reshape((valid_npix, valid_npix))
+		else:
+			AtNiA = np.zeros((valid_npix, valid_npix), dtype=Precision_masked)
 	Ashape0 = nt_used * nUBL_used * 4
 	Ashape1 = valid_npix
 	clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNi_fullsim_vis_ps = ATNIA_doublechunk_all(C=AtNiA, vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path, A_got=None, A_version=A_version, AllSky=False,
@@ -9113,7 +9160,8 @@ else:
 							NoA_Out=NoA_Out, Ni=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=nchunk, UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
 							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
 							npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps,
-							ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order) # Use npy if it's true, npy has higher priority.
+							ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order,
+	                                                                                                          Skip_AtNiA=Skip_AtNiA) # Use npy if it's true, npy has higher priority.
 	#
 	# for nchunk_li in nchunk*np.arange(1, 4, 0.2):
 	# 	try:
@@ -9126,14 +9174,64 @@ else:
 	# 					NoA_Out=NoA_Out, Ni=Ni, Cdata=data, Csim_data=sim_data, fake_solution=fake_solution, AtNiA_path=AtNiA_path, Precision_masked=Precision_masked, nchunk_AtNiA_maxcut=nchunk_AtNiA_maxcut, nchunk_AtNiA_step=nchunk_AtNiA_step, nchunk_AtNiA=nchunk_AtNiA, nchunk=int(nchunk_li), UseDot=UseDot, Parallel_AtNiA=Parallel_AtNiA,
 	# 					Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
 	# 					npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps,
-	# 					ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order) # Use npy if it's true, npy has higher priority.
+	# 					ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order,
+	#                    Skip_AtNiA=Skip_AtNiA) # Use npy if it's true, npy has higher priority.
 	#
 	# 		break
 	# 	except:
 	# 		continue
 	
 	# AtNiA.tofile(AtNiA_path)
+	
+	if not Use_memmap_AtNiA:
+		np.save(AtNiA_path, arr=AtNiA)
+	
+	
+elif Direct_AtNiAi:
+	timer_1 = time.time()
+	if Use_memmap_AtNiA:
+		AtNiA = np.memmap(AtNiA_path, dtype=Precision_masked,
+		                  mode='r+', shape=(valid_npix, valid_npix))
+	else:
+		AtNiA = np.load(AtNiA_path).reshape((valid_npix, valid_npix))
+	print('AtNiA loaded: {0} seconds'.format(time.time() - timer_1))
+	timer_2 = time.time()
+	AtNi_data = np.load(AtNi_data_path)
+	AtNi_sim_data = np.load(AtNi_sim_data_path)
+	AtNi_clean_sim_data = np.load(AtNi_clean_sim_data_path)
+	AtNi_fullsim_vis_ps = np.load(AtNi_fullsim_vis_ps_path).reshape((valid_npix, fullsim_vis_ps.shape[1]))
+	print('AtNi Devirants Loaded: {0} seconds.'.format(time.time() - timer_2))
 
+if Send_AtNi_Derivants and not Direct_AtNiAi:
+	if not Use_memmap_AtNiA:
+		np.save(AtNi_data_path, arr=AtNi_data)
+	np.save(AtNi_sim_data_path, arr=AtNi_sim_data)
+	np.save(AtNi_clean_sim_data_path, arr=AtNi_clean_sim_data)
+	np.save(AtNi_fullsim_vis_ps_path, arr=AtNi_fullsim_vis_ps)
+	try:
+		timer_3 = time.time()
+		if Use_memmap_AtNiA:
+			os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/Output/'.format(AtNiA_path))
+		else:
+			os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/Output/'.format(AtNiA_path))
+		print('AtNiA sent in {0} minutes.'.format((time.time() - timer_3)/60.))
+	except:
+		print('AtNiA not sent.')
+	
+	try:
+		timer_4 = time.time()
+		os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/Output/'.format(AtNi_data_path))
+		os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/Output/'.format(AtNi_sim_data_path))
+		os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/Output/'.format(AtNi_clean_sim_data_path))
+		os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/Output/'.format(AtNi_fullsim_vis_ps_path))
+		print('AtNi Derivants sent in {0} minutes.'.format((time.time() - timer_4) / 60.))
+	except:
+		print('AtNi Derivants not sent.')
+	
+	# os.system('scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation'.format(script_dir + '/HERA-VisibilitySimulation-MapMaking.py'))
+	os.system("sshpass -p '5-Zuibang' ssh jshu_li@eor-14.mit.edu 'cd /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/; /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/bin/ipython HERA-VisibilitySimulation-MapMaking.py' ")
+	# os.system("sshpass -p '5-Zuibang' ssh jshu_li@blender.mit.edu 'cd /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/; /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/bin/ipython HERA-VisibilitySimulation-MapMaking.py' ")
+	# ! sshpass -p '5-Zuibang' ssh jshu_li@eor-14.mit.edu 'cd /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/scripts; /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/bin/ipython HERA-VisibilitySimulation-MapMaking.py'
 		
 print('Shape of AtNiA: {0}'.format(AtNiA.shape))
 
@@ -9496,6 +9594,7 @@ if pre_ampcal:
 # nchunk_AtNiA = 96
 # nchunk_AtNiA_maxcut = 4
 # UseDot = True
+AtNiAi_path = datadir + tag + AtNiAi_tag + '_S{0}_RE*_N{1}_v{2:.1f}' .format(S_type, vartag, AtNiAi_version) + A_filename
 AtNiAi_candidate_files = glob.glob(datadir + tag + AtNiAi_tag + '_S{0}_RE*_N{1}_v{2:.1f}' .format(S_type, vartag, AtNiAi_version) + A_filename)
 if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_recompute and not force_recompute_S and not AtNiA_only:
 	rcond = 10 ** min([float(fn.split('_RE')[1].split('_N')[0]) for fn in AtNiAi_candidate_files])
@@ -9506,19 +9605,25 @@ if len(AtNiAi_candidate_files) > 0 and not force_recompute_AtNiAi and not force_
 	print ("Reading Regularized AtNiAi..."),
 	sys.stdout.flush()
 	if Use_LinalgInv:
-		AtNiAi = np.fromfile(AtNiAi_path, dtype=Precision_AtNiAi).reshape((Ashape1, Ashape1))
+		if Use_memmap_AtNiA:
+			AtNiAi = np.memmap(AtNiAi_path, dtype=Precision_AtNiAi,
+			                   mode='r+', shape=(valid_npix, valid_npix))
+		else:
+			AtNiAi = np.fromfile(AtNiAi_path, dtype=Precision_AtNiAi).reshape((Ashape1, Ashape1))
 	else:
 		AtNiAi = sv.InverseCholeskyMatrix.fromfile(AtNiAi_path, len(S_diag), Precision_AtNiAi)
 else:
 	if not NoA_Out:
-		if os.path.isfile(AtNiA_path) and not force_recompute:
+		if os.path.isfile(AtNiA_path) and not force_recompute and not ChunkbyChunk_all:
 			print ("Reading AtNiA...")
 			sys.stdout.flush()
 			if Use_memmap_AtNiA:
 				AtNiA = np.memmap(AtNiA_path, dtype=Precision_masked,
 				                  mode='w+', shape=(Ashape1, Ashape1))
 			else:
-				AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
+				AtNiA = np.load(AtNiA_path).reshape((valid_npix, valid_npix))
+			# else:
+			# 	AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 			# AtNiA = np.fromfile(AtNiA_path, dtype=Precision_masked).reshape((Ashape1, Ashape1))
 		else:
 			print ("Allocating AtNiA...")
@@ -9557,7 +9662,12 @@ else:
 	# if la.norm(S) != la.norm(np.diagonal(S)):
 	#     raise Exception("Non-diagonal S not supported yet")
 	
-	AtNiAi = None
+	# AtNiAi = None
+	if Use_memmap_AtNiA:
+		AtNiAi = np.memmap(AtNiAi_path, dtype=Precision_AtNiAi,
+		                  mode='w+', shape=(valid_npix, valid_npix))
+	else:
+		AtNiAi = np.zeros((valid_npix, valid_npix), dtype=Precision_AtNiAi)
 	for rcond in rcond_list:
 		# add Si on top of AtNiA without renaming AtNiA to save memory
 		maxAtNiA = np.max(AtNiA)
@@ -10025,15 +10135,18 @@ map_GSM_nonmask.writeto(outfile_GSM_NoMask_name, overwrite=True)
 GSM_NoMask_all = fits.getdata(outfile_GSM_NoMask_name).squeeze()
 GSM_NoMask = GSM_NoMask_all[valid_pix_mask]
 
-if Manual_PointSource:
-	num_ps_fig = w_point_sky.shape[1]
-	# w_point_sky_full = np.ones((num_ps_fig, 12*nside_standard**2))
-	for id_ps in range(num_ps_fig):
-		point_source_map = fits.HDUList()
-		w_point_sky_full = sol2map(w_point_sky[Re_Mask][:, id_ps], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
-		point_source_map.append(fits.ImageHDU(data=np.real(w_point_sky_full)))
-		outfile_data_name = script_dir + '/../Output/Point_Spread/results_w-PS-{0}-{1:.4f}MHz-dipole-nubl{2}-nt{3}-mtbin{4}-mfbin{5}-tbin{6}-bnside-{7}-nside_standard-{8}-rescale-{9:.3f}-Deg-unlimit-All-S-{10}-recond-{11}-{12}-{13:.4f}-{14:.4f}.fits' .format(tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', id_ps, random_pix_phi_theta[id_ps, 0], random_pix_phi_theta[id_ps, 1])
-		point_source_map.writeto(outfile_data_name, overwrite=True)
+try:
+	if Manual_PointSource:
+		num_ps_fig = w_point_sky.shape[1]
+		# w_point_sky_full = np.ones((num_ps_fig, 12*nside_standard**2))
+		for id_ps in range(num_ps_fig):
+			point_source_map = fits.HDUList()
+			w_point_sky_full = sol2map(w_point_sky[Re_Mask][:, id_ps], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+			point_source_map.append(fits.ImageHDU(data=np.real(w_point_sky_full)))
+			outfile_data_name = script_dir + '/../Output/Point_Spread/results_w-PS-{0}-{1:.4f}MHz-dipole-nubl{2}-nt{3}-mtbin{4}-mfbin{5}-tbin{6}-bnside-{7}-nside_standard-{8}-rescale-{9:.3f}-Deg-unlimit-All-S-{10}-recond-{11}-{12}-{13:.4f}-{14:.4f}.fits' .format(tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', id_ps, random_pix_phi_theta[id_ps, 0], random_pix_phi_theta[id_ps, 1])
+			point_source_map.writeto(outfile_data_name, overwrite=True)
+except:
+	print('Point_Spread_Functions not saved.')
 
 # thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
 bright_pixels_Data = np.array([90. - thetas_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi, phis_standard[np.argsort(ww_solution_all)[-20:]] * 180. / np.pi])
