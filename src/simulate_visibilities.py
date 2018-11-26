@@ -373,6 +373,8 @@ class Visibility_Simulator:
 
         angle_list = tlist/12.*np.pi
         ps_vec = -np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+        if ps_vec.ndim > 1:
+            print('Shape of ps_vec: {0};'.format(ps_vec.shape)),
         ik = 2.j*np.pi*freq/299.792458
         ###for i, phi in zip(range(len(angle_list)), angle_list):
             ####print beam_heal_equ.shape, np.pi/2 - dec, ra - phi
@@ -380,11 +382,19 @@ class Visibility_Simulator:
         ###return result
         try:
             try:
-                result = hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec))
+                if ps_vec.ndim == 1:
+                    result = hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec))
+                else:
+                    result = np.array([hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - angle_list[id_ang]) for id_ang in range(len(angle_list))]) * np.exp(ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec))
+                    print('result shape: {0}'.format(result.shape))
                 # print('Use Dot.')
                 # print (rotatez_matrix(angle_list).shape, d_equ.shape)
             except:
-                result = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.einsum('ijt,uj->uti', rotatez_matrix(angle_list), d_equ).dot(ps_vec))
+                if ps_vec.ndim == 1:
+                    result = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.einsum('ijt,uj->uti', rotatez_matrix(angle_list), d_equ).dot(ps_vec))
+                else:
+                    result = np.array([hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - angle_list[id_ang]) for id_ang in range(len(angle_list))]) * np.exp(ik * np.einsum('ijt,uj->uti', rotatez_matrix(angle_list), d_equ).dot(ps_vec))
+                    print('result shape: {0}'.format(result.shape))
                 print('Use Einsum.')
                 # print (rotatez_matrix(angle_list).shape, d_equ.shape)
         except:

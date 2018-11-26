@@ -2002,8 +2002,10 @@ class UVData(UVBase):
                     freq_inds = np.append(
                         freq_inds, np.where(freq_arr_use == f)[0])
                 else:
-                    raise ValueError(
-                        'Frequency {f} is not present in the freq_array'.format(f=f))
+                    freq_inds = np.append(
+                        freq_inds, np.argsort(np.abs(freq_arr_use - f))[0])
+                    # raise ValueError(
+                    #     'Frequency {f} is not present in the freq_array'.format(f=f))
 
             if len(frequencies) > 1:
                 freq_ind_separation = freq_inds[1:] - freq_inds[:-1]
@@ -2727,6 +2729,7 @@ class UVData(UVBase):
                                            set(uv_object.freq_array[0, freq_chans])))
     
         if frequencies is not None:
+            print('Picking frequencies specified.')
             frequencies = uvutils.get_iterable(frequencies)
             if n_selects > 0:
                 history_update_string += ', frequencies'
@@ -2742,8 +2745,10 @@ class UVData(UVBase):
                     freq_inds = np.append(
                         freq_inds, np.where(freq_arr_use == f)[0])
                 else:
-                    raise ValueError(
-                        'Frequency {f} is not present in the freq_array'.format(f=f))
+                    freq_inds = np.append(
+                        freq_inds, np.argsort(np.abs(freq_arr_use - f))[0])
+                    # raise ValueError(
+                    #     'Frequency {f} is not present in the freq_array'.format(f=f))
         
             if len(frequencies) > 1:
                 freq_ind_separation = freq_inds[1:] - freq_inds[:-1]
@@ -3028,7 +3033,7 @@ class UVData(UVBase):
     def read_miriad(self, filepath, correct_lat_lon=True, run_check=False,
                     check_extra=False,
                     run_check_acceptability=False, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], antenna_nums=None, ant_str=None, ant_pairs_nums=None,
-                    polarizations=None, time_range=None):
+                    polarizations=None, time_range=None, Frequency_Select=None):
         """
         Read in data from a miriad file.
 
@@ -3047,8 +3052,8 @@ class UVData(UVBase):
                              run_check=run_check, check_extra=check_extra,
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
-            if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
-                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+            if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             # print('Number of Unique baselines after Dred: %s'%self.Nubls)
@@ -3086,8 +3091,8 @@ class UVData(UVBase):
                                         run_check=run_check, check_extra=check_extra,
                                         run_check_acceptability=run_check_acceptability,
                                         phase_type=phase_type)
-                        if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
-                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+                        if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
                         self += uv2
                         # self.__add__(uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
                         
@@ -3142,7 +3147,7 @@ class UVData(UVBase):
     def read_uvh5(self, filename, antenna_nums=None, antenna_names=None,
                   ant_str=None, bls=None, frequencies=None, freq_chans=None,
                   times=None, polarizations=None, blt_inds=None, read_data=True,
-                  run_check=False, check_extra=False, run_check_acceptability=False, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
+                  run_check=False, check_extra=False, run_check_acceptability=False, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], Frequency_Select=None):
         """
         Read a UVH5 file.
 
@@ -3213,8 +3218,8 @@ class UVData(UVBase):
                            read_data=read_data, run_check=run_check,
                            check_extra=check_extra,
                            run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
-            if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
-                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+            if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
 
             print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
             # print('Number of Unique baselines after Dred: %s' % self.Nubls)
@@ -3264,8 +3269,8 @@ class UVData(UVBase):
                                       blt_inds=blt_inds, read_data=read_data,
                                       run_check=run_check, check_extra=check_extra,
                                       run_check_acceptability=run_check_acceptability)
-                        if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
-                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
+                        if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
                         self += uv2
                         # self.__add__(other=uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
         
