@@ -16,6 +16,8 @@ import healpy.pixelfunc as hpf
 import healpy.visufunc as hpv
 import healpy.rotator as hpr
 import os, time, sys
+import numexpr as ne
+
 #some constant
 pi=m.pi
 e=m.e
@@ -35,7 +37,8 @@ def stoc(spher):
     return spher[0] * np.array([np.cos(spher[2])*np.sin(spher[1]), np.sin(spher[1])*np.sin(spher[2]), np.cos(spher[1])])
 
 def rotatez_matrix(t):
-    return np.array([[np.cos(t), -np.sin(t), np.zeros_like(t)], [np.sin(t), np.cos(t), np.zeros_like(t)], [np.zeros_like(t), np.zeros_like(t), np.ones_like(t)]])
+    return np.array([[ne.evaluate('cos(t)'), ne.evaluate('-sin(t)'), np.zeros_like(t)], [ne.evaluate('sin(t)'), ne.evaluate('cos(t)'), np.zeros_like(t)], [np.zeros_like(t), np.zeros_like(t), np.ones_like(t)]])
+    # return np.array([[np.cos(t), -np.sin(t), np.zeros_like(t)], [np.sin(t), np.cos(t), np.zeros_like(t)], [np.zeros_like(t), np.zeros_like(t), np.ones_like(t)]])
 
 def rotatez(dirlist,t):
     [theta,phi] = dirlist
@@ -372,7 +375,8 @@ class Visibility_Simulator:
             tlist = np.array(tlist)
 
         angle_list = tlist/12.*np.pi
-        ps_vec = -np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+        # ps_vec = -np.array([np.cos(dec)*np.cos(ra), np.cos(dec)*np.sin(ra), np.sin(dec)])
+        ps_vec = - np.array([ne.evaluate('cos(dec)*cos(ra)'), ne.evaluate('cos(dec)*sin(ra)'), ne.evaluate('sin(dec)')])
         if ps_vec.ndim > 1:
             print('Shape of ps_vec: {0};'.format(ps_vec.shape)),
         ik = 2.j*np.pi*freq/299.792458
@@ -383,9 +387,35 @@ class Visibility_Simulator:
         try:
             try:
                 if ps_vec.ndim == 1:
-                    result = hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - np.array(angle_list)) * np.exp(ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec))
+                    beam_direct = hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - np.array(angle_list))
+                    rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
+                    # rotate_angle_list = rotatez_matrix(angle_list).transpose(2, 0, 1).reshape(len(angle_list) * 3, 3)
+                    # shape_0, shape_1, shape_2 = rotate_angle_list.shape
+                    # rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).transpose(2, 1, 0)
+                    # rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3)
+                    # complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list))
+                    complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                    # complex_phase = ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec)
+                    result = ne.evaluate('beam_direct * exp(complex_phase)')
+                    # result = beam_direct * np.exp(complex_phase)
                 else:
-                    result = np.array([hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - angle_list[id_ang]) for id_ang in range(len(angle_list))]) * np.exp(ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec))
+                    timer_0 = time.time()
+                    beam_direct = np.array([hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - angle_list[id_ang]) for id_ang in range(len(angle_list))])
+                    print('Time used for beam_direct: {0} seconds.'.format(time.time() - timer_0))
+                    timer_1 = time.time()
+                    rotate_angle_list = rotatez_matrix(angle_list).transpose(2, 0, 1).reshape(len(angle_list) * 3, 3)
+                    print('rotata_angle_list shape: {0}'.format(rotate_angle_list.shape))
+                    rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3)
+                    # rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
+                    print('Time used for rotate_baseline: {0} seconds.'.format(time.time() - timer_1))
+                    timer_4 = time.time()
+                    complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
+                    # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                    print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
+                    timer_2 = time.time()
+                    result = ne.evaluate('beam_direct * exp(complex_phase)')
+                    # result = beam_direct * np.exp(complex_phase)
+                    print('Time used for result: {0} seconds'.format(time.time() - timer_2))
                     print('result shape: {0}'.format(result.shape))
                 # print('Use Dot.')
                 # print (rotatez_matrix(angle_list).shape, d_equ.shape)

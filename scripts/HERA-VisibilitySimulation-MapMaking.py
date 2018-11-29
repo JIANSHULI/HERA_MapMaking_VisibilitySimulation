@@ -70,6 +70,8 @@ import scipy as sp
 
 import gc
 
+import numexpr as ne
+
 PI = np.pi
 TPI = PI * 2
 
@@ -5036,11 +5038,13 @@ def Antenna_Layout_ConeSurface(id_layout=0, nants=19, cone_angle=np.pi/4., cone_
 	
 	return np.array(ant_pos), id_layout
 	
-Frequency_Min = 165.
-Frequency_Max = 175.
-Frequency_Step = 10.
+Frequency_Min = 112.5
+Frequency_Max = 192.5
+Frequency_Step = 5.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
+	# if Frequency_Select == 150.:
+	# 	continue
 	timer_freq = time.time()
 	print('Programme Starts for {2}-Frequency-{0}MHz at: {1}'.format(Frequency_Select, datetime.datetime.now(), id_Frequency_Select))
 	
@@ -5377,7 +5381,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if Simulation_For_All:
 		INSTRUMENT = INSTRUMENT + ('-ExBPh%s' % (BadBaseline_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Phase) else '') + ('-ExBAm%s' % (BadBaseline_Amp_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Amplitude) else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
-	LST_binned_Data = False  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
+	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Delay_Filter = False
 	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
@@ -5388,8 +5392,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
-		Specific_FileIndex_start = [15, 15] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
-		Specific_FileIndex_end = [60, 60] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+		Specific_FileIndex_start = [6, 6] if LST_binned_Data else [15, 15] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
+		Specific_FileIndex_end = [32, 32] if LST_binned_Data else [60, 60] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if (Specific_Files and not Simulation_For_All) else False
@@ -5426,6 +5430,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		# TGSSADR J101809.2-314415 [ra: 154.53835, dec: -31.73773]; TGSSADR J071717.6-250454 [ra: 109.32351, dec: -25.0817]; TGSSADR J020012.1-305327 [ra: 30.05044, dec: -30.89106];
 		# NGC 0612| 23.49058 | -36.49325 |G|  8925| 0.029771 |    |13.16|  0.000|167|10|83|17|14|20|0
 		# UPS: [ra: 127.96375, dec: -38.68219] [ra:50.625, dec:-27.9532]-64:35955-154.8576 [ra:30.234375, dec: -22.02431284] [ra: 78.75, dec: -39.45089] [ra: 74.53125, dec: -21.38194258] [ra: 50.625, dec: -27.95318688] [ra: 52.734375, dec: -22.02431284]
+		# J033846-352238: 54.694252; -35.377464 10.03 Jy (151 MHZ)
 		# TGSSADR J034630.8-342238	[ra:56.62874, dec:-34.37740] Flux:14368.5 mJy, 876.6 mJy, 32:8636; Map:10.9884 Jy
 		# TGSSADR J035135.7-274435	[ra:57.89898, dec:-27.74306] Flux:28356.2 mJy, 3696.0 mJy, 32:9025; Map:23.2329 Jy
 		# TGSSADR J044437.6-280950	[ra:71.15667, dec:-28.16395] Flux:47367.9 mJy, 13948.1 mJy, 64:34680; Map: 31.0332 Jy 32:9914 Map:16.5593
@@ -5514,24 +5519,24 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
 	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 10 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	nchunk_A_full = 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Use_rotated_beampattern_as_beamweight = True # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
 	NoA_Out_fullsky = False if Use_memmap_A_full else True # Whether or not to calculate full A matrix
 	
-	Parallel_A = True # Parallel Computing for A matrix.
+	Parallel_A = False # Parallel Computing for A matrix.
 	nchunk_A_valid = 1 # Parallel calculate A for each part of nchunk_A_part parts of valid sky.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Special_ReOrder = False # If to use old A dimensions.
 	A_chunk_order = 'F' # Numpy.memmap order: 'C' (default, row), 'F'.
-	Array_Pvec_fullsky = True if not Parallel_A_fullsky else True
-	Array_Pvec = True if not Parallel_A else True # Set ps_vec being np.array istead of one by one.
+	Array_Pvec_fullsky = True if not Parallel_A_fullsky else False
+	Array_Pvec = True if not Parallel_A else False # Set ps_vec being np.array istead of one by one.
 	
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 6  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 4  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -5564,7 +5569,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Frequency_Average_preload = int(sys.argv[8])
 	else:
 		Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-		Frequency_Average_preload = 20  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+		Frequency_Average_preload = 10  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
 	Select_freq = True  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -5656,8 +5661,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.25
-			lsts_end = 4.35
+			lsts_start = 1.
+			lsts_end = 3.
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -5740,8 +5745,10 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	else:
 		nside_start = 32  # starting point to calculate dynamic A
 		nside_standard = 32  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 32  # undynamic A matrix shape
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if Simulation_For_All else 8 # undynamic A matrix shape
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
+	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
+	
 	WaterFall_Plot = False
 	WaterFall_Plot_with_MultiFreqSimulation = False
 	
@@ -5781,6 +5788,103 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		
 	if not Simulation_For_All:
 		
+		data_fnames = {}
+		files_bases = {}
+		file_times = {}
+		data_fnames_full = [[], []]
+		
+		if LST_binned_Data:
+			for session in Observing_Session:
+				for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
+					data_fnames_full[0].append(fname_x)
+				for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
+					data_fnames_full[1].append(fname_y)
+			data_fnames_full[0] = sorted(data_fnames_full[0])
+			data_fnames_full[1] = sorted(data_fnames_full[1])
+		else:
+			for session in Observing_Session:
+				for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + session) + Filename_Suffix))):
+					data_fnames_full[0].append(fname_x)
+				for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + session) + Filename_Suffix))):
+					data_fnames_full[1].append(fname_y)
+			data_fnames_full[0] = sorted(data_fnames_full[0])
+			data_fnames_full[1] = sorted(data_fnames_full[1])
+		
+		Nfiles = min(Nfiles_temp, len(data_fnames_full[0]), len(data_fnames_full[1]))
+		
+		# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
+		
+		try:
+			if not Specific_Files:
+				if LST_binned_Data:
+					# data_fnames[0] = xxfiles = sorted(((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + Observing_Session) + Filename_Suffix))))[:Nfiles]
+					# data_fnames[1] = yyfiles = sorted(((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + Observing_Session) + Filename_Suffix))))[:Nfiles]
+					data_fnames[0] = xxfiles = data_fnames_full[0][:Nfiles]
+					data_fnames[1] = yyfiles = data_fnames_full[1][:Nfiles]
+				
+				else:
+					# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
+					# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
+					# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
+					data_fnames[0] = data_fnames_full[0][:Nfiles]
+					data_fnames[1] = data_fnames_full[1][:Nfiles]
+					# print(data_fnames)
+					xxfiles = data_fnames[0]
+					yyfiles = data_fnames[1]
+					file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
+					file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
+					
+					file_JDays = {}
+					file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
+					file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
+				
+				files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
+				files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
+				
+				if file_JDays[0] != file_JDays[1]:
+					raise ValueError('Two Pols from diffent days.')
+				else:
+					INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + ('-NJD%s' % (len(Observing_Session))) + '-Nf%s' % Nfiles + ('-CjSmBSL' if Conjugate_CertainBSL else '') + ('-CjSmBSL2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
+				print ('Nfiles: %s' % Nfiles)
+			
+			# elif Specific_FileIndex_end[0] <= (Nfiles + 1) and Specific_FileIndex_end[1] <= (Nfiles + 1):
+			elif Specific_Files:
+				if LST_binned_Data:
+					data_fnames[0] = xxfiles = np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
+					data_fnames[1] = yyfiles = np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
+				
+				else:
+					# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
+					# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[0]:Specific_FileIndex_end[1]]
+					# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[1]:Specific_FileIndex_end[1]]
+					data_fnames[0] = np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
+					data_fnames[1] = np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
+					# print(data_fnames)
+					xxfiles = data_fnames[0]
+					yyfiles = data_fnames[1]
+					file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
+					file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
+					
+					file_JDays = {}
+					file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
+					file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
+				
+				files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
+				files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
+				
+				if len(data_fnames[0]) != len(data_fnames[1]):
+					raise ValueError('Two Pols have different number of data sets.')
+				else:
+					Nfiles = len(data_fnames[0])
+				
+				if file_JDays[0] != file_JDays[1]:
+					raise ValueError('Two Pols from diffent days.')
+				else:
+					INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + '-SD%s%s' % (str(Specific_FileIndex_start[0]), str(Specific_FileIndex_end[0])) + ('-NJD%s' % (len(Observing_Session))) + '-Nf%s' % Nfiles + ('-CjBs' if Conjugate_CertainBSL else '') + ('-CjBs2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
+				print ('Nfiles: %s' % Nfiles)
+		except:
+			print('Problems happen when analyzing data_filenames.')
+			
 		if id_Frequency_Select == 0:
 			# specify model file and load into UVData, load into dictionary
 			timer_loading = time.time()
@@ -5824,38 +5928,14 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			
 			fulldflags = {}
 			
-			data_fnames = {}
-			files_bases = {}
-			file_times = {}
+			
+
 			# file_JDays = {}
 			
 			autocorr_data_mfreq = {}  # np.zeros((2, Ntimes, Nfreqs)) /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192287662/2458044/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192114862/2458042
 			autocorr_data_mfreq_origin = {}
 			autocorr_data = {}
 			
-			# /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1193758938/2458061  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192114862/2458042
-			# Observing_Session = '/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-			data_fnames_full = [[], []]
-			if LST_binned_Data:
-				for session in Observing_Session:
-					for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
-						data_fnames_full[0].append(fname_x)
-					for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
-						data_fnames_full[1].append(fname_y)
-				data_fnames_full[0] = sorted(data_fnames_full[0])
-				data_fnames_full[1] = sorted(data_fnames_full[1])
-			else:
-				for session in Observing_Session:
-					for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + session) + Filename_Suffix))):
-						data_fnames_full[0].append(fname_x)
-					for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + session) + Filename_Suffix))):
-						data_fnames_full[1].append(fname_y)
-				data_fnames_full[0] = sorted(data_fnames_full[0])
-				data_fnames_full[1] = sorted(data_fnames_full[1])
-				
-			Nfiles = min(Nfiles_temp, len(data_fnames_full[0]), len(data_fnames_full[1]))
-			
-			# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
 			redundancy = [[], []]
 			redundancy_origin = [[], []]
 			model_redundancy = [[], []]
@@ -5863,77 +5943,105 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			flist = {}
 			index_freq = {}
 			
-			try:
-				if not Specific_Files:
-					if LST_binned_Data:
-						# data_fnames[0] = xxfiles = sorted(((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + Observing_Session) + Filename_Suffix))))[:Nfiles]
-						# data_fnames[1] = yyfiles = sorted(((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + Observing_Session) + Filename_Suffix))))[:Nfiles]
-						data_fnames[0] = xxfiles = data_fnames_full[0][:Nfiles]
-						data_fnames[1] = yyfiles = data_fnames_full[1][:Nfiles]
-						
-					else:
-						# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
-						# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
-						# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
-						data_fnames[0] = data_fnames_full[0][:Nfiles]
-						data_fnames[1] = data_fnames_full[1][:Nfiles]
-						# print(data_fnames)
-						xxfiles = data_fnames[0]
-						yyfiles = data_fnames[1]
-						file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
-						file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
-						
-						file_JDays = {}
-						file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
-						file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
-					
-					files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
-					files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
-					
-					if file_JDays[0] != file_JDays[1]:
-						raise ValueError('Two Pols from diffent days.')
-					else:
-						INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + ('-NJD%s' %(len(Observing_Session))) + '-Nf%s' % Nfiles + ('-CjSmBSL' if Conjugate_CertainBSL else '') + ('-CjSmBSL2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
-					print ('Nfiles: %s' % Nfiles)
-				
-				# elif Specific_FileIndex_end[0] <= (Nfiles + 1) and Specific_FileIndex_end[1] <= (Nfiles + 1):
-				elif Specific_Files:
-					if LST_binned_Data:
-						data_fnames[0] = xxfiles = np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
-						data_fnames[1] = yyfiles = np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
-						
-					else:
-						# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
-						# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[0]:Specific_FileIndex_end[1]]
-						# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[1]:Specific_FileIndex_end[1]]
-						data_fnames[0] =  np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
-						data_fnames[1] =  np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
-						# print(data_fnames)
-						xxfiles = data_fnames[0]
-						yyfiles = data_fnames[1]
-						file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
-						file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
-						
-						file_JDays = {}
-						file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
-						file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
-					
-					files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
-					files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
-					
-					if len(data_fnames[0]) != len(data_fnames[1]):
-						raise ValueError('Two Pols have different number of data sets.')
-					else:
-						Nfiles = len(data_fnames[0])
-					
-					if file_JDays[0] != file_JDays[1]:
-						raise ValueError('Two Pols from diffent days.')
-					else:
-						INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + '-SD%s%s' % (str(Specific_FileIndex_start[0]), str(Specific_FileIndex_end[0])) + ('-NJD%s' %(len(Observing_Session))) + '-Nf%s' % Nfiles + ('-CjBs' if Conjugate_CertainBSL else '') + ('-CjBs2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
-					print ('Nfiles: %s' % Nfiles)
-			except:
-				print('Problems happen when analyzing data_filenames.')
-			
+			# /nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1193758938/2458061  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192114862/2458042
+			# Observing_Session = '/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
+			# data_fnames = {}
+			# files_bases = {}
+			# file_times = {}
+			#
+			# data_fnames_full = [[], []]
+			# if LST_binned_Data:
+			# 	for session in Observing_Session:
+			# 		for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
+			# 			data_fnames_full[0].append(fname_x)
+			# 		for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
+			# 			data_fnames_full[1].append(fname_y)
+			# 	data_fnames_full[0] = sorted(data_fnames_full[0])
+			# 	data_fnames_full[1] = sorted(data_fnames_full[1])
+			# else:
+			# 	for session in Observing_Session:
+			# 		for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + session) + Filename_Suffix))):
+			# 			data_fnames_full[0].append(fname_x)
+			# 		for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + session) + Filename_Suffix))):
+			# 			data_fnames_full[1].append(fname_y)
+			# 	data_fnames_full[0] = sorted(data_fnames_full[0])
+			# 	data_fnames_full[1] = sorted(data_fnames_full[1])
+			#
+			# Nfiles = min(Nfiles_temp, len(data_fnames_full[0]), len(data_fnames_full[1]))
+			#
+			# # print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
+			#
+			# try:
+			# 	if not Specific_Files:
+			# 		if LST_binned_Data:
+			# 			# data_fnames[0] = xxfiles = sorted(((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + Observing_Session) + Filename_Suffix))))[:Nfiles]
+			# 			# data_fnames[1] = yyfiles = sorted(((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + Observing_Session) + Filename_Suffix))))[:Nfiles]
+			# 			data_fnames[0] = xxfiles = data_fnames_full[0][:Nfiles]
+			# 			data_fnames[1] = yyfiles = data_fnames_full[1][:Nfiles]
+			#
+			# 		else:
+			# 			# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
+			# 			# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
+			# 			# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[:Nfiles]
+			# 			data_fnames[0] = data_fnames_full[0][:Nfiles]
+			# 			data_fnames[1] = data_fnames_full[1][:Nfiles]
+			# 			# print(data_fnames)
+			# 			xxfiles = data_fnames[0]
+			# 			yyfiles = data_fnames[1]
+			# 			file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
+			# 			file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
+			#
+			# 			file_JDays = {}
+			# 			file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
+			# 			file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
+			#
+			# 		files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
+			# 		files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
+			#
+			# 		if file_JDays[0] != file_JDays[1]:
+			# 			raise ValueError('Two Pols from diffent days.')
+			# 		else:
+			# 			INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + ('-NJD%s' %(len(Observing_Session))) + '-Nf%s' % Nfiles + ('-CjSmBSL' if Conjugate_CertainBSL else '') + ('-CjSmBSL2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
+			# 		print ('Nfiles: %s' % Nfiles)
+			#
+			# 	# elif Specific_FileIndex_end[0] <= (Nfiles + 1) and Specific_FileIndex_end[1] <= (Nfiles + 1):
+			# 	elif Specific_Files:
+			# 		if LST_binned_Data:
+			# 			data_fnames[0] = xxfiles = np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
+			# 			data_fnames[1] = yyfiles = np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
+			#
+			# 		else:
+			# 			# print('Nfiles:{0}: data_fnames_full: {1}'.format(Nfiles, data_fnames_full))
+			# 			# data_fnames[0] = xxfiles = sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[0]:Specific_FileIndex_end[1]]
+			# 			# data_fnames[1] = yyfiles = sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + Observing_Session) + Filename_Suffix)))[Specific_FileIndex_start[1]:Specific_FileIndex_end[1]]
+			# 			data_fnames[0] =  np.array(data_fnames_full[0])[Specific_FileIndex_List[0][:Nfiles]]
+			# 			data_fnames[1] =  np.array(data_fnames_full[1])[Specific_FileIndex_List[1][:Nfiles]]
+			# 			# print(data_fnames)
+			# 			xxfiles = data_fnames[0]
+			# 			yyfiles = data_fnames[1]
+			# 			file_times[0] = xxfile_times = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:3]), xxfiles), np.float)
+			# 			file_times[1] = yyfile_times = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:3]), yyfiles), np.float)
+			#
+			# 			file_JDays = {}
+			# 			file_JDays[0] = np.array(map(lambda x: '.'.join(os.path.basename(x).split('.')[1:2]), xxfiles), np.int)[0]
+			# 			file_JDays[1] = np.array(map(lambda y: '.'.join(os.path.basename(y).split('.')[1:2]), yyfiles), np.int)[0]
+			#
+			# 		files_bases[0] = xxfile_bases = map(os.path.basename, xxfiles)
+			# 		files_bases[1] = yyfile_bases = map(os.path.basename, yyfiles)
+			#
+			# 		if len(data_fnames[0]) != len(data_fnames[1]):
+			# 			raise ValueError('Two Pols have different number of data sets.')
+			# 		else:
+			# 			Nfiles = len(data_fnames[0])
+			#
+			# 		if file_JDays[0] != file_JDays[1]:
+			# 			raise ValueError('Two Pols from diffent days.')
+			# 		else:
+			# 			INSTRUMENT = INSTRUMENT + '-' + str(file_JDays[0]) + '-SD%s%s' % (str(Specific_FileIndex_start[0]), str(Specific_FileIndex_end[0])) + ('-NJD%s' %(len(Observing_Session))) + '-Nf%s' % Nfiles + ('-CjBs' if Conjugate_CertainBSL else '') + ('-CjBs2' if Conjugate_CertainBSL2 else '') + ('-CjBs3' if Conjugate_CertainBSL3 else '')
+			# 		print ('Nfiles: %s' % Nfiles)
+			# except:
+			# 	print('Problems happen when analyzing data_filenames.')
+			#
 			if not LST_binned_Data:
 				try:
 					badants = []
@@ -7591,49 +7699,58 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	print ("done.")
 	
 	
-	pca1 = hp.fitsfunc.read_map(script_dir + '/../data/gsm1.fits' + str(nside_beamweight))
-	pca2 = hp.fitsfunc.read_map(script_dir + '/../data/gsm2.fits' + str(nside_beamweight))
-	pca3 = hp.fitsfunc.read_map(script_dir + '/../data/gsm3.fits' + str(nside_beamweight))
-	components = np.loadtxt(script_dir + '/../data/components.dat')
-	scale_loglog = si.interp1d(np.log(components[:, 0]), np.log(components[:, 1]))
-	w1 = si.interp1d(components[:, 0], components[:, 2])
-	w2 = si.interp1d(components[:, 0], components[:, 3])
-	w3 = si.interp1d(components[:, 0], components[:, 4])
-	gsm_beamweight = np.exp(scale_loglog(np.log(freq))) * (w1(freq) * pca1 + w2(freq) * pca2 + w3(freq) * pca3)
-	if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
-		gsm_beamweight_mfreq = np.array([np.exp(scale_loglog(np.log(flist[0][i]))) * (w1(flist[0][i]) * pca1 + w2(flist[0][i]) * pca2 + w3(flist[0][i]) * pca3) for i in range(nf_used)])
 	
-	# DeAverage_GSM = True
-	if DeAverage_GSM:
-		gsm_beamweight = gsm_beamweight - np.mean(gsm_beamweight)
+	if not Inter_from_standard:
+		pca1 = hp.fitsfunc.read_map(script_dir + '/../data/gsm1.fits' + str(nside_beamweight))
+		pca2 = hp.fitsfunc.read_map(script_dir + '/../data/gsm2.fits' + str(nside_beamweight))
+		pca3 = hp.fitsfunc.read_map(script_dir + '/../data/gsm3.fits' + str(nside_beamweight))
+		components = np.loadtxt(script_dir + '/../data/components.dat')
+		scale_loglog = si.interp1d(np.log(components[:, 0]), np.log(components[:, 1]))
+		w1 = si.interp1d(components[:, 0], components[:, 2])
+		w2 = si.interp1d(components[:, 0], components[:, 3])
+		w3 = si.interp1d(components[:, 0], components[:, 4])
+		gsm_beamweight = np.exp(scale_loglog(np.log(freq))) * (w1(freq) * pca1 + w2(freq) * pca2 + w3(freq) * pca3)
 		if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
-			gsm_beamweight_mfreq = gsm_beamweight_mfreq - np.mean(gsm_beamweight_mfreq, axis=1)
+			gsm_beamweight_mfreq = np.array([np.exp(scale_loglog(np.log(flist[0][i]))) * (w1(flist[0][i]) * pca1 + w2(flist[0][i]) * pca2 + w3(flist[0][i]) * pca3) for i in range(nf_used)])
+		
+		# DeAverage_GSM = True
+		if DeAverage_GSM:
+			gsm_beamweight = gsm_beamweight - np.mean(gsm_beamweight)
+			if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
+				gsm_beamweight_mfreq = gsm_beamweight_mfreq - np.mean(gsm_beamweight_mfreq, axis=1)
+		
+		# rotate sky map and converts to nest
+		equatorial_GSM_beamweight = np.zeros(12 * nside_beamweight ** 2, 'float')
+		print ("Rotating GSM_beamweight and converts to nest...")
+		
+		if INSTRUMENT == 'miteor':
+			DecimalYear = 2013.58  # 2013, 7, 31, 16, 47, 59, 999998)
+			JulianEpoch = 2013.58
+		elif 'hera47' in INSTRUMENT:
+			if not Simulation_For_All:
+				DecimalYear = Time(data_times[0][0], format='jd').decimalyear + (np.mean(Time(data_times[0], format='jd').decimalyear) - Time(data_times[0][0], format='jd').decimalyear) * Time_Expansion_Factor
+				JulianEpoch = Time(data_times[0][0], format='jd').jyear + (np.mean(Time(data_times[0], format='jd').jyear) - Time(data_times[0][0], format='jd').jyear) * Time_Expansion_Factor  # np.mean(Time(data_times[0], format='jd').jyear)
+			else:
+				DecimalYear = 2018.8
+				JulianEpoch = 2018.8
+		
+		sys.stdout.flush()
+		equ_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=JulianEpoch))
+		ang0, ang1 = hp.rotator.rotateDirection(equ_to_gal_matrix,
+												hpf.pix2ang(nside_beamweight, range(12 * nside_beamweight ** 2), nest=True))
+		equatorial_GSM_beamweight = hpf.get_interp_val(gsm_beamweight, ang0, ang1)
+		equatorial_GSM_beamweight_mfreq = np.zeros(0)
+		if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
+			equatorial_GSM_beamweight_mfreq = np.array([hpf.get_interp_val(gsm_beamweight_mfreq[i], ang0, ang1) for i in range(nf_used)])
+		print ("done.")
 	
-	# rotate sky map and converts to nest
-	equatorial_GSM_beamweight = np.zeros(12 * nside_beamweight ** 2, 'float')
-	print ("Rotating GSM_beamweight and converts to nest...")
-	
-	if INSTRUMENT == 'miteor':
-		DecimalYear = 2013.58  # 2013, 7, 31, 16, 47, 59, 999998)
-		JulianEpoch = 2013.58
-	elif 'hera47' in INSTRUMENT:
-		if not Simulation_For_All:
-			DecimalYear = Time(data_times[0][0], format='jd').decimalyear + (np.mean(Time(data_times[0], format='jd').decimalyear) - Time(data_times[0][0], format='jd').decimalyear) * Time_Expansion_Factor
-			JulianEpoch = Time(data_times[0][0], format='jd').jyear + (np.mean(Time(data_times[0], format='jd').jyear) - Time(data_times[0][0], format='jd').jyear) * Time_Expansion_Factor  # np.mean(Time(data_times[0], format='jd').jyear)
-		else:
-			DecimalYear = 2018.8
-			JulianEpoch = 2018.8
-	
-	sys.stdout.flush()
-	equ_to_gal_matrix = hp.rotator.Rotator(coord='cg').mat.dot(sv.epoch_transmatrix(2000, stdtime=JulianEpoch))
-	ang0, ang1 = hp.rotator.rotateDirection(equ_to_gal_matrix,
-											hpf.pix2ang(nside_beamweight, range(12 * nside_beamweight ** 2), nest=True))
-	equatorial_GSM_beamweight = hpf.get_interp_val(gsm_beamweight, ang0, ang1)
-	equatorial_GSM_beamweight_mfreq = np.zeros(0)
-	if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
-		equatorial_GSM_beamweight_mfreq = np.array([hpf.get_interp_val(gsm_beamweight_mfreq[i], ang0, ang1) for i in range(nf_used)])
-	print ("done.")
-	
+	else:
+		thetas_beamweight, phis_beamweight = hpf.pix2ang(nside_beamweight, range(hpf.nside2npix(nside_beamweight)), nest=True)
+		equatorial_GSM_beamweight = hpf.get_interp_val(equatorial_GSM_standard, thetas_beamweight, phis_beamweight, nest=True)
+		equatorial_GSM_beamweight_mfreq = np.zeros(0)
+		if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
+			equatorial_GSM_beamweight_mfreq = np.array([hpf.get_interp_val(equatorial_GSM_standard_mfreq[id_f], thetas_beamweight, phis_beamweight, nest=True) for id_f in range(nf_used)])
+		print('GSM Interpolated from nside_standard Done.')
 	
 	Del = True
 	if Del:
@@ -7680,6 +7797,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 																																																									   Use_BeamWeight=Use_BeamWeight, thresh=thresh, valid_pix_thresh=valid_pix_thresh, equatorial_GSM_beamweight=equatorial_GSM_beamweight, equatorial_GSM_beamweight_mfreq=equatorial_GSM_beamweight_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol,
 																																																									   beam_heal_equ_z=beam_heal_equ_z,
 																																																									   Use_memmap_A_full=Use_memmap_A_full, A_path_full=A_path_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Array_Pvec=Array_Pvec_fullsky)
+	
 	# try:
 	# 	if NoA_Out_fullsky or Use_memmap_A_full:
 	# 		beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
@@ -7869,8 +7987,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# num_figures_phi = 5
 	num_figures = 5 if not Simulation_For_All else 5
 	# point_step = int(total_num / num_figures)
+	thetas_beamweight, phis_beamweight = hpf.pix2ang(nside_beamweight, range(hpf.nside2npix(nside_beamweight)), nest=True)
 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
-	
 	
 	Flist_select_point = np.array([np.array([freq]) for id_p in range(Num_Pol)])
 	if Num_Pol == 2:
@@ -7885,8 +8003,10 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	#                           dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)) # xx and yy are each half of I # .transpose((3, 1, 4, 0, 5, 2)).reshape(2 * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
 	
 	# equatorial_GSM_beamweight_nest = equatorial_GSM_beamweight[hpf.ring2nest(nside_beamweight, range(12 * nside_beamweight ** 2))]
-	autocorr_vis = np.array([[[vs.calculate_pointsource_visibility(phis_standard[n], (np.pi / 2. - thetas_standard[n]), np.array([[0, 0, 0]]), f, None, beam_heal_equ[id_p], None, lsts) / 2. for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)],
+	autocorr_vis = np.array([[[vs.calculate_pointsource_visibility(phis_beamweight[n], (np.pi / 2. - thetas_beamweight[n]), np.array([[0, 0, 0]]), f, None, beam_heal_equ[id_p], None, lsts) / 2. for n in range(12 * nside_beamweight ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)],
 							dtype=Precision_full).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * 1 * nt_used,  12 * nside_beamweight ** 2).dot(equatorial_GSM_beamweight)
+	# autocorr_vis = np.array([[[vs.calculate_pointsource_visibility(phis_standard[n], (np.pi / 2. - thetas_standard[n]), np.array([[0, 0, 0]]), f, None, beam_heal_equ[id_p], None, lsts) / 2. for n in range(12 * nside_standard ** 2)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)],
+	#                         dtype=Precision_full).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * 1 * nt_used,  12 * nside_standard ** 2).dot(equatorial_GSM_standard)
 	autocorr_vis_normalized = np.array([autocorr_vis[p, :] / (la.norm(autocorr_vis[p, :]) / la.norm(np.ones_like(autocorr_vis[p, :]))) for p in range(Num_Pol)])
 	
 	
@@ -10513,7 +10633,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		crd = 0
 		for coord in ['C', 'CG']:
 			# plt.clf()
-			plt.figure(98000000 + crd)
+			plt.figure(9000000000 + 10000*id_Frequency_Select + crd)
 			crd += 10
 			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 			plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
@@ -10524,7 +10644,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		
 		for coord in ['C', 'CG']:
 			# plt.clf()
-			plt.figure(98000000 + crd)
+			plt.figure(9500000000 + 10000*id_Frequency_Select + crd)
 			crd += 10
 			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 			plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
@@ -10537,7 +10657,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		try:
 			for coord in ['C', 'CG']:
 				# plt.clf()
-				plt.figure(98000000 + crd)
+				plt.figure(9900000000 + 10000*id_Frequency_Select + crd)
 				crd += 10
 				plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 				plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
@@ -10720,33 +10840,34 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			# print('>>>>>>>>>>>>>> Discrepancy Ratio full: {0}'.format(Discrepancy_Ratio_full))
 			print('>>>>>>>>>>>>>> Discrepancy Ratio Mean full: {0}\n'.format(np.mean(Discrepancy_Ratio_full)))
 		print('>>>>>>>>>>>>>> Mean of Sigma: {0}'.format(np.mean(Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])] ** 0.5)))
-		print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7} ; ants_with_bad: {8}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time, len(ants)))
+		print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7} ; ants_with_bad: {8}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time, len(ants[0])))
 		print('INSTRUMENT: {0} \n'.format(INSTRUMENT))
+		print('>>>>>>>LST-Range: {0}-{1} \n'.format(lsts.min(), lsts.max()))
 		
 		del(Sigma)
 		
 	except:
 		print('\nDiscrepancy Ratio not Calculated. \n')
 		# print('>>>>>>>>>>>>>> Mean of Sigma: {0}'.format(np.mean(Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])] ** 0.5)))
-		print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7} ; ants_with_bad: {8}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time, len(ants)))
+		print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7} ; ants_with_bad: {8}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time, len(ants[0])))
 		print('INSTRUMENT: {0} \n'.format(INSTRUMENT))
-
+		print('>>>>>>LST-Range: {0}-{1} \n'.format(lsts.min(), lsts.max()))
 
 	sys.stdout.flush()
 	
 	timer_end_freq = time.time()
 	try:
-		print('Programme for {2}Frequency_Select-{0}MHz Ends at: {1}' .format(freq, datetime.datetime.now(), id_Frequency_Select))
-		print('>>>>>>>>>>>>>>>>>> Total Used Time for This Frequency: {0} seconds. <<<<<<<<<<<<<<<<<<<<' .format(timer_end_freq - timer_freq))
+		print('Programme for {2}Frequency_Select-{0}MHz Ends at: {1} \n' .format(freq, datetime.datetime.now(), id_Frequency_Select))
+		print('>>>>>>>>>>>>>>>>>> Total Used Time for This Frequency: {0} seconds. <<<<<<<<<<<<<<<<<<<< \n' .format(timer_end_freq - timer_freq))
 	except:
-		print('No Used Time Printed.')
+		print('No Used Time Printed. \n')
 
 Timer_End = time.time()
 try:
 	print('Programme Ends at: {0}' .format(datetime.datetime.now()))
-	print('>>>>>>>>>>>>>>>>>> Total Used Time: {0} seconds. <<<<<<<<<<<<<<<<<<<<' .format(Timer_End - Timer_Start))
+	print('>>>>>>>>>>>>>>>>>> Total Used Time: {0} seconds. <<<<<<<<<<<<<<<<<<<< \n' .format(Timer_End - Timer_Start))
 except:
-	print('No Used Time Printed.')
+	print('No Used Time Printed. \n')
 
 VariableMemory_Used = {}
 for var, obj in locals().items():
