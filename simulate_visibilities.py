@@ -352,7 +352,7 @@ class Visibility_Simulator:
             sys.stdout.flush()
         return Bulm
 
-    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False):#d in horizontal coord, tlist in lst hours, beam in unites of power
+    def calculate_pointsource_visibility(self, ra, dec, d, freq, beam_healpix_hor = None, beam_heal_equ = None, nt = None, tlist = None, verbose = False, RI=False):#d in horizontal coord, tlist in lst hours, beam in unites of power
         if self.initial_zenith.tolist() == [1000, 1000]:
             raise Exception('ERROR: need to set self.initial_zenith first, which is at t=0, the position of zenith in equatorial coordinate in ra dec radians.')
         if tlist is None and nt is None:
@@ -380,6 +380,7 @@ class Visibility_Simulator:
         if ps_vec.ndim > 1:
             print('Shape of ps_vec: {0};'.format(ps_vec.shape)),
         ik = 2.j*np.pi*freq/299.792458
+        k = 2.*np.pi*freq/299.792458
         ###for i, phi in zip(range(len(angle_list)), angle_list):
             ####print beam_heal_equ.shape, np.pi/2 - dec, ra - phi
             ###result[i] = hpf.get_interp_val(beam_heal_equ, np.pi/2 - dec, ra - phi) * np.exp(ik*rotatez_matrix(phi).dot(d_equ).dot(ps_vec))
@@ -394,9 +395,15 @@ class Visibility_Simulator:
                     # rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).transpose(2, 1, 0)
                     # rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3)
                     # complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list))
-                    complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                    # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
                     # complex_phase = ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec)
-                    result = ne.evaluate('beam_direct * exp(complex_phase)')
+                    if not RI:
+                        complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                        result = ne.evaluate('beam_direct * exp(complex_phase)')
+                    else:
+                        print('>>RI'),
+                        complex_phase = k * np.dot(rotate_baseline, ps_vec)
+                        result = np.array([ne.evaluate('beam_direct * cos(complex_phase)'), ne.evaluate('beam_direct * sin(complex_phase)')])
                     # result = beam_direct * np.exp(complex_phase)
                 else:
                     timer_0 = time.time()
@@ -408,12 +415,25 @@ class Visibility_Simulator:
                     rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3)
                     # rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
                     print('Time used for rotate_baseline: {0} seconds.'.format(time.time() - timer_1))
-                    timer_4 = time.time()
-                    complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
-                    # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
-                    print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
-                    timer_2 = time.time()
-                    result = ne.evaluate('beam_direct * exp(complex_phase)')
+                    # timer_4 = time.time()
+                    # complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
+                    # # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                    # print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
+                    if not RI:
+                        timer_4 = time.time()
+                        complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
+                        # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                        print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
+                        timer_2 = time.time()
+                        result = ne.evaluate('beam_direct * exp(complex_phase)')
+                    else:
+                        timer_4 = time.time()
+                        complex_phase = k * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
+                        # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                        print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
+                        timer_2 = time.time()
+                        print('>>RI'),
+                        result = np.array([ne.evaluate('beam_direct * cos(complex_phase)'), ne.evaluate('beam_direct * sin(complex_phase)')])
                     # result = beam_direct * np.exp(complex_phase)
                     print('Time used for result: {0} seconds'.format(time.time() - timer_2))
                     print('result shape: {0}'.format(result.shape))
