@@ -389,7 +389,7 @@ class Visibility_Simulator:
             try:
                 if ps_vec.ndim == 1:
                     beam_direct = hpf.get_interp_val(beam_heal_equ, np.pi / 2 - dec, ra - np.array(angle_list))
-                    rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
+                    # rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
                     # rotate_angle_list = rotatez_matrix(angle_list).transpose(2, 0, 1).reshape(len(angle_list) * 3, 3)
                     # shape_0, shape_1, shape_2 = rotate_angle_list.shape
                     # rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).transpose(2, 1, 0)
@@ -398,11 +398,11 @@ class Visibility_Simulator:
                     # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
                     # complex_phase = ik * np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0).dot(ps_vec)
                     if not RI:
-                        complex_phase = ik * np.dot(rotate_baseline, ps_vec)
+                        complex_phase = ik * np.dot(np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0), ps_vec)
                         result = ne.evaluate('beam_direct * exp(complex_phase)')
                     else:
                         print('>>RI'),
-                        complex_phase = k * np.dot(rotate_baseline, ps_vec)
+                        complex_phase = k * np.dot(np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0), ps_vec)
                         result = np.array([ne.evaluate('beam_direct * cos(complex_phase)'), ne.evaluate('beam_direct * sin(complex_phase)')])
                     # result = beam_direct * np.exp(complex_phase)
                 else:
@@ -412,23 +412,23 @@ class Visibility_Simulator:
                     timer_1 = time.time()
                     rotate_angle_list = rotatez_matrix(angle_list).transpose(2, 0, 1).reshape(len(angle_list) * 3, 3)
                     print('rotata_angle_list shape: {0}'.format(rotate_angle_list.shape))
-                    rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3)
-                    # rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
-                    print('Time used for rotate_baseline: {0} seconds.'.format(time.time() - timer_1))
+                    # rotate_baseline = np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3)
+                    # # rotate_baseline = np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0)
+                    # print('Time used for rotate_baseline: {0} seconds.'.format(time.time() - timer_1))
                     # timer_4 = time.time()
                     # complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
                     # # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
                     # print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
                     if not RI:
                         timer_4 = time.time()
-                        complex_phase = ik * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
+                        complex_phase = ik * np.dot(np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3), ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
                         # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
                         print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
                         timer_2 = time.time()
                         result = ne.evaluate('beam_direct * exp(complex_phase)')
                     else:
                         timer_4 = time.time()
-                        complex_phase = k * np.dot(rotate_baseline, ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
+                        complex_phase = k * np.dot(np.dot(rotate_angle_list, d_equ.transpose()).reshape(len(angle_list), 3, len(d_equ)).transpose(2, 0, 1).reshape(len(d_equ) * len(angle_list), 3), ps_vec).reshape(len(d_equ), len(angle_list), ps_vec.shape[1])
                         # complex_phase = ik * np.dot(rotate_baseline, ps_vec)
                         print('Time used for complex_phase: {0} seconds.'.format(time.time() - timer_4))
                         timer_2 = time.time()

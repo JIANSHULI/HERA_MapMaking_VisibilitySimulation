@@ -67,10 +67,15 @@ from random import *
 
 import h5py
 import scipy as sp
+import scipy.linalg as spl
 
 import gc
 
 import numexpr as ne
+print('ne.num_threads: {0} before.'.format(ne.detect_number_of_threads()))
+os.environ['NUMEXPR_MAX_THREADS'] = '{0}'.format(ne.detect_number_of_cores())
+ne.set_num_threads(ne.detect_number_of_cores())
+print('ne.num_threads: {0} after.'.format(ne.detect_number_of_threads()))
 
 PI = np.pi
 TPI = PI * 2
@@ -259,7 +264,7 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 					  NoA_Out=False, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144, Use_nside_bw_forFullsim=False,
 					  nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False, equatorial_GSM_beamweight=None, equatorial_GSM_beamweight_mfreq=None, gsm_beamweighted=None, nside_distribution=None, final_index=None, thetas=None, phis=None, sizes=None, abs_thresh=None, npix=None, valid_pix_mask=None, fake_solution_map=None, fake_solution_map_mfreq=None,
 					  A_Method_leg=False, Num_Pol=2, beam_heal_equ_z=None, beam_heal_equ_z_mfreq=None, Manual_PointSource=False, fullsim_vis_ps=None, ChunkbyChunk_all=False, save_chunk=False, Use_h5py=True, Use_npy=False, Use_memmap=False, Use_memmap_AtNiA=False,
-						Use_memmap_A_full=False, Use_rotated_beampattern_as_beamweight=False, Special_ReOrder=False, A_chunk_order='F', Skip_AtNiA=False, Memory_Keep=25, Array_Pvec = False, RI=False):  # C=AtNiA
+						Use_memmap_A_full=False, Use_rotated_beampattern_as_beamweight=False, Special_ReOrder=False, A_chunk_order='F', Skip_AtNiA=False, Memory_Keep=25, Array_Pvec = False, RI=False, Save_Memory=True):  # C=AtNiA
 
 	
 	expected_time = 1.3e-11 * Ni.shape[0] * valid_npix ** 2
@@ -283,6 +288,7 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 	id_i = 0
 	id_j = 0
 	chunk_width_list = np.zeros(len(np.arange(0, length_C, chunk)))
+	sqrNi = ne.evaluate('sqrt(Ni)')
 	for id_i, i in enumerate(np.arange(0, length_C, chunk)):
 		num_id_chunk = np.min((chunk, length_C - i))
 		chunk_width_list[id_i] = num_id_chunk
@@ -311,22 +317,45 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 			# AtNi_clean_sim_data_0 = AtNi_clean_sim_data_i
 			# AtNi_fullsim_vis_ps_0 = AtNi_fullsim_vis_ps_i
 			
-			timer_multiply = time.time()
-			if not Skip_AtNiA:
-				if dot:
-					C[i:i + num_id_chunk, i:i + num_id_chunk] = np.dot((A_i.transpose() * Ni), A_i)
-				else:
-					C[i:i + num_id_chunk, i:i + num_id_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_i)
-				print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
-				C[i:i + num_id_chunk, i:i + num_id_chunk] = (C[i:i + num_id_chunk, i:i + num_id_chunk] + np.transpose(C[i:i + num_id_chunk, i:i + num_id_chunk])) / 2.
+			if Save_Memory:
+				timer_multiply = time.time()
+				
+				A_i *= sqrNi.reshape(len(sqrNi), 1)
+				
+				if not Skip_AtNiA:
+					if dot:
+						# C[i:i + num_id_chunk, i:i + num_id_chunk] = spl.blas.dgemm(alpha=1.0, a=A_i.T * Ni, b=A_i.T, trans_b=True)
+						C[i:i + num_id_chunk, i:i + num_id_chunk] = np.dot(A_i.T, A_i)
+					else:
+						C[i:i + num_id_chunk, i:i + num_id_chunk] = np.einsum('ji,jk->ik', A_i.T, A_i)
+					print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
+					C[i:i + num_id_chunk, i:i + num_id_chunk] = (C[i:i + num_id_chunk, i:i + num_id_chunk] + np.transpose(C[i:i + num_id_chunk, i:i + num_id_chunk])) / 2.
+				
+			else:
+				timer_multiply = time.time()
+				
+				if not Skip_AtNiA:
+					if dot:
+						# C[i:i + num_id_chunk, i:i + num_id_chunk] = spl.blas.dgemm(alpha=1.0, a=A_i.T * Ni, b=A_i.T, trans_b=True)
+						C[i:i + num_id_chunk, i:i + num_id_chunk] = np.dot((A_i.transpose() * Ni), A_i)
+					else:
+						C[i:i + num_id_chunk, i:i + num_id_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_i)
+					print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
+					C[i:i + num_id_chunk, i:i + num_id_chunk] = (C[i:i + num_id_chunk, i:i + num_id_chunk] + np.transpose(C[i:i + num_id_chunk, i:i + num_id_chunk])) / 2.
 			
 		else:
 			A_i = A_j
 			del(A_j)
 			timer_sim_multi = time.time()
 			if Use_rotated_beampattern_as_beamweight:
-				AtNi_sim_data = np.concatenate((AtNi_sim_data, np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))))
-			AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data, np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))))
+				if Save_Memory:
+					AtNi_sim_data = np.concatenate((AtNi_sim_data, np.transpose(A_i).dot((sim_data * sqrNi).astype(A_i.dtype))))
+				else:
+					AtNi_sim_data = np.concatenate((AtNi_sim_data, np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))))
+			if Save_Memory:
+				AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data, np.transpose(A_i).dot((clean_sim_data * sqrNi).astype(A_i.dtype))))
+			else:
+				AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data, np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))))
 			print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
 		
 		gc.collect()
@@ -385,6 +414,9 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 					except:
 						print('No printing A.')
 					
+					if Save_Memory:
+						A_j *= sqrNi.reshape(len(sqrNi), 1)
+					
 					Ashape0_j, Ashape1_j = A_j.shape
 					print('A loaded with {0} minutes used.'.format((time.time() - timer_load_A) / 60.))
 					print('\n{0}-{1} and {2}-{3} chunks of A Loaded.\n'.format(Ashape0_i, Ashape1_i, Ashape0_j, Ashape1_j))
@@ -417,15 +449,36 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 									Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI)
 				
 					print('\n{0}-{1} and {2}-{3} chunks of A calculated.\n'.format(Ashape0_i, Ashape1_i, Ashape0_j, Ashape1_j))
+					if Save_Memory:
+						A_j *= sqrNi.reshape(len(sqrNi), 1)
 					
-					
-					if id_i == 0 and id_j == len(np.arange(0, length_C, chunk)) - 1:
+					if id_i == 0 and (id_j == len(np.arange(0, length_C, chunk)) - 1):
 						clean_sim_data = clean_sim_data_j
 						AtNi_data = AtNi_data_j
 						AtNi_sim_data = AtNi_sim_data_j
 						# AtNi_clean_sim_data = AtNi_clean_sim_data_j
 						AtNi_fullsim_vis_ps = AtNi_fullsim_vis_ps_j
-					
+						
+						if id_j == 1:
+							clean_sim_data += clean_sim_data_i #+ clean_sim_data
+							AtNi_data = np.concatenate((AtNi_data_i, AtNi_data))
+							AtNi_sim_data = np.concatenate((AtNi_sim_data_i, AtNi_sim_data))
+							# AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_i, AtNi_clean_sim_data))
+							AtNi_fullsim_vis_ps = np.concatenate((AtNi_fullsim_vis_ps_i, AtNi_fullsim_vis_ps), axis=0)
+							if Use_rotated_beampattern_as_beamweight:
+								sim_data = clean_sim_data + np.random.randn(len(clean_sim_data)) / ne.evaluate('sqrt(Ni)')  # Ni ** .5  # Full Simulated, being Normalized (abs calibration), Noise
+								if Save_Memory:
+									AtNi_sim_data = np.transpose(A_i).dot((sim_data * sqrNi).astype(A_i.dtype))
+								else:
+									AtNi_sim_data = np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))
+							
+							timer_sim_multi = time.time()
+							if Save_Memory:
+								AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * sqrNi).astype(A_i.dtype))
+							else:
+								AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))
+							print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
+							
 					elif id_i == 0 and id_j != 0:
 						clean_sim_data += clean_sim_data_j #+ clean_sim_data
 						AtNi_data = np.concatenate((AtNi_data_j, AtNi_data))
@@ -440,28 +493,51 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 							# AtNi_clean_sim_data = np.concatenate((AtNi_clean_sim_data_i, AtNi_clean_sim_data))
 							AtNi_fullsim_vis_ps = np.concatenate((AtNi_fullsim_vis_ps_i, AtNi_fullsim_vis_ps), axis=0)
 							if Use_rotated_beampattern_as_beamweight:
-								sim_data = clean_sim_data + np.random.randn(len(clean_sim_data)) / Ni ** .5  # Full Simulated, being Normalized (abs calibration), Noise
-								AtNi_sim_data = np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))
+								sim_data = clean_sim_data + np.random.randn(len(clean_sim_data)) / ne.evaluate('sqrt(Ni)') # Ni ** .5  # Full Simulated, being Normalized (abs calibration), Noise
+								if Save_Memory:
+									AtNi_sim_data = np.transpose(A_i).dot((sim_data * sqrNi).astype(A_i.dtype))
+								else:
+									AtNi_sim_data = np.transpose(A_i).dot((sim_data * Ni).astype(A_i.dtype))
+									
 							timer_sim_multi = time.time()
-							AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))
+							if Save_Memory:
+								AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * sqrNi).astype(A_i.dtype))
+							else:
+								AtNi_clean_sim_data = np.transpose(A_i).dot((clean_sim_data * Ni).astype(A_i.dtype))
 							print('AtNi_clean_sim_data for this chunk calculated with {0} minutes used.'.format((time.time() - timer_sim_multi) / 60.))
 					
 					if not Skip_AtNiA:
 						if id_i == 0:
 							timer_multiply = time.time()
-							if dot:
-								C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.dot((A_j.transpose() * Ni), A_j)
+							if Save_Memory:
+								if dot:
+									# C[j:j + num_jd_chunk, j:j + num_jd_chunk] = spl.blas.dgemm(alpha=1.0, a=A_j.T * Ni, b=A_j.T, trans_b=True)
+									C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.dot(A_j.T, A_j)
+								else:
+									C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_j.T, A_j)
 							else:
-								C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_j.transpose() * Ni, A_j)
+								if dot:
+									# C[j:j + num_jd_chunk, j:j + num_jd_chunk] = spl.blas.dgemm(alpha=1.0, a=A_j.T * Ni, b=A_j.T, trans_b=True)
+									C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.dot((A_j.transpose() * Ni), A_j)
+								else:
+									C[j:j + num_jd_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_j.transpose() * Ni, A_j)
 							print('{0} minutes used for multiplying diagnal A chunks.'.format((time.time() - timer_multiply) / 60.))
 							C[j:j + num_jd_chunk, j:j + num_jd_chunk] = (C[j:j + num_jd_chunk, j:j + num_jd_chunk] + np.transpose(C[j:j + num_jd_chunk, j:j + num_jd_chunk])) / 2.
 				
 				if not Skip_AtNiA:
 					timer_multiply = time.time()
-					if dot:
-						C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.dot((A_i.transpose() * Ni), A_j)
+					if Save_Memory:
+						if dot:
+							# C[i:i + num_id_chunk, j:j + num_jd_chunk] = spl.blas.dgemm(alpha=1.0, a=A_i.T * Ni, b=A_j.T, trans_b=True)
+							C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.dot(A_i.T, A_j)
+						else:
+							C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_i.T, A_j)
 					else:
-						C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_j)
+						if dot:
+							# C[i:i + num_id_chunk, j:j + num_jd_chunk] = spl.blas.dgemm(alpha=1.0, a=A_i.T * Ni, b=A_j.T, trans_b=True)
+							C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.dot((A_i.transpose() * Ni), A_j)
+						else:
+							C[i:i + num_id_chunk, j:j + num_jd_chunk] = np.einsum('ji,jk->ik', A_i.transpose() * Ni, A_j)
 					print('{0} minutes used for multiplying A chunks.'.format((time.time() - timer_multiply) / 60.))
 				
 				if id_j > id_i + 1:
@@ -1680,9 +1756,9 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 		return None
 
 
-def Calculate_pointsource_visibility(vs, ra, dec, d, freq, beam_healpix_hor=None, beam_heal_equ=None, nt=None, tlist=None, verbose=False):
+def Calculate_pointsource_visibility(vs, ra, dec, d, freq, beam_healpix_hor=None, beam_heal_equ=None, nt=None, tlist=None, verbose=False, RI=False):
 	# print('ra:{0} ; dec:{1} '.format(ra, dec))
-	return vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose)
+	return vs.calculate_pointsource_visibility(ra, dec, d, freq, beam_healpix_hor=beam_healpix_hor, beam_heal_equ=beam_heal_equ, nt=nt, tlist=tlist, verbose=verbose, RI=RI)
 
 def Calculate_pointsource_visibility_R_I(vs, ra, dec, d, freq, beam_healpix_hor=None, beam_heal_equ=None, nt=None, tlist=None, verbose=False):
 	timer_0 = time.time()
@@ -1938,7 +2014,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						num_pix_chunk = np.min([12 * nside_beamweight ** 2 / nchunk_A_full, 12 * nside_beamweight ** 2 - id_pix_chunk])
 						print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / (12 * nside_beamweight ** 2)))
 						if Array_Pvec:
-							A_multiprocess_list = np.array([[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+							pass
+							# A_multiprocess_list = np.array([[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 						else:
 							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, hpf.pix2ang(nside_beamweight, n)[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, n)[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 						print('{0} minutes used for paralleling A chunk.'.format((time.time() - id_time_stamp) / 60.))
@@ -1946,18 +2023,23 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						if Use_memmap_A_full:
 							if Array_Pvec:
 								# A[:, :, id_pix_chunk:id_pix_chunk + num_pix_chunk] = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
-								A[:, :, id_pix_chunk:id_pix_chunk + num_pix_chunk] = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
+								A[:, :, id_pix_chunk:id_pix_chunk + num_pix_chunk] = 0.5 * np.array([[vs.calculate_pointsource_visibility(hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+								# A[:, :, id_pix_chunk:id_pix_chunk + num_pix_chunk] = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
 							else:
 								A[:, :, id_pix_chunk:id_pix_chunk + num_pix_chunk] = 0.5 * np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
 						else:
 							if Array_Pvec:
 								# A_list_id_chunk = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
-								A_list_id_chunk = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
+								# A_list_id_chunk = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
+								A_list_id_chunk = 0.5 * np.array([[vs.calculate_pointsource_visibility(hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[1], (np.pi / 2. - hpf.pix2ang(nside_beamweight, np.arange(id_pix_chunk, id_pix_chunk + num_pix_chunk))[0]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 							else:
 								A_list_id_chunk = np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((0, 1, 3, 4, 2)).reshape(Num_Pol, len(Flist_select[id_p]) * len(used_common_ubls) * nt_used, num_pix_chunk)
 								A_list_id_chunk *= 0.5
 						print('{0} minutes used for calculating together with paralleling A chunk.'.format((time.time() - id_time_stamp) / 60.))
-						del(A_multiprocess_list)
+						try:
+							del(A_multiprocess_list)
+						except:
+							pass
 						pool.terminate()
 						pool.join()
 						
@@ -2715,25 +2797,30 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 						else:
 							pool = Pool(maxtasksperchild=maxtasksperchild)
 						if Array_Pvec:
-							A_multiprocess_list = np.array([[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+							A_multiprocess_list = np.array([[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True)) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+							# pass
 						else:
-							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+							A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True)) for n in range(valid_npix)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 						if A_Method_leg:
 							if Array_Pvec:
 								# A[:] = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
 								A[:] = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
+								# A[:] = np.array([[vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True) for f in Flist_select[id_p]] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
 							else:
 								A[:] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
 						else:
 							if Array_Pvec:
-								# A = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
-								A = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
+								A = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
+								# A = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
 							else:
 								A = np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
 							# A = np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(valid_npix)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)
 						A *= 0.5
 						clean_sim_data = A.dot(fake_solution.astype(A.dtype))
-						del (A_multiprocess_list)
+						try:
+							del (A_multiprocess_list)
+						except:
+							pass
 						pool.terminate()
 						pool.join()
 					else:
@@ -2747,13 +2834,15 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							print('Percent Done: {2}% ; id_pix_chunk:{0} ; num_pix_chunk:{1} .'.format(id_pix_chunk, num_pix_chunk, 100. * id_pix_chunk / np.float(valid_npix)))
 							
 							if Array_Pvec:
-								A_multiprocess_list = np.array([[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[id_pix_chunk: id_pix_chunk + num_pix_chunk], (np.pi / 2. - thetas[id_pix_chunk: id_pix_chunk + num_pix_chunk]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+								pass
+								# A_multiprocess_list = np.array([[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[id_pix_chunk: id_pix_chunk + num_pix_chunk], (np.pi / 2. - thetas[id_pix_chunk: id_pix_chunk + num_pix_chunk]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True)) for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 							else:
-								A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility_R_I, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
+								A_multiprocess_list = np.array([[[pool.apply_async(Calculate_pointsource_visibility, args=(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True)) for n in range(id_pix_chunk, id_pix_chunk + num_pix_chunk)] for f in Flist_select[id_p]] for id_p in range(Num_Pol)])
 							if A_Method_leg:
 								if Array_Pvec:
 									# A[ :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk) * 0.5
-									A[ :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk) * 0.5
+									A[:, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[vs.calculate_pointsource_visibility(phis[id_pix_chunk: id_pix_chunk + num_pix_chunk], (np.pi / 2. - thetas[id_pix_chunk: id_pix_chunk + num_pix_chunk]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True) for f in Flist_select[id_p]] for id_p in range(Num_Pol)]).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk) * 0.5
+									# A[ :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk) * 0.5
 								else:
 									A[ :, id_pix_chunk: id_pix_chunk + num_pix_chunk] = np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)]).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk) * 0.5
 								id_time_stamp = time.time()
@@ -2767,7 +2856,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							else:
 								if Array_Pvec:
 									# A_list_id_chunk = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk)
-									A_list_id_chunk = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk)
+									# A_list_id_chunk = 0.5 * np.array([[A_multiprocess_list[id_p][id_f].get() for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk)
+									A_list_id_chunk = np.array([[vs.calculate_pointsource_visibility(phis[id_pix_chunk: id_pix_chunk + num_pix_chunk], (np.pi / 2. - thetas[id_pix_chunk: id_pix_chunk + num_pix_chunk]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, False, True) for f in Flist_select[id_p]] for id_p in range(Num_Pol)]).transpose((2, 1, 3, 0, 4, 5)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk) * 0.5
 								else:
 									A_list_id_chunk = np.array([[[A_multiprocess_list[id_p][id_f][n].get() for n in range(num_pix_chunk)] for id_f in range(len(Flist_select[id_p]))] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, num_pix_chunk)
 									A_list_id_chunk *= 0.5
@@ -2778,7 +2868,10 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 									A = np.concatenate((A, A_list_id_chunk), axis=-1)
 									clean_sim_data += A_list_id_chunk.dot(fake_solution[id_pix_chunk:id_pix_chunk + num_pix_chunk].astype(A.dtype))
 								del (A_list_id_chunk)
-							del (A_multiprocess_list)
+							try:
+								del (A_multiprocess_list)
+							except:
+								pass
 							
 							pool.terminate()
 							pool.join()
@@ -2946,26 +3039,42 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 									print ("\r{0:.2f}% completed, {1} minutes left for {2}-{3}-{4}-chunk{5}".format(100. * float(n) / (valid_npix), float(valid_npix - n) / (n + 1) * (float(time.time() - timer) / 60.), pol_list[id_p], id_f, f, id_chunk_i)),
 									sys.stdout.flush()
 									if Synthesize_MultiFreq:
-										A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
+										if RI:
+											A[:, id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts, RI=RI) * 0.5) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
+										else:
+											A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5) * (fake_solution_map_mfreq[id_f, n] / fake_solution_map[n])  # xx and yy are each half of I
 									else:
-										A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5)  # xx and yy are each half of I
+										if RI:
+											A[:, id_f, :, id_p, :, n] = (vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts, RI=RI) * 0.5)  # xx and yy are each half of I
+										else:
+											A[:, id_f, :, id_p, :, n] = (Calculate_pointsource_visibility_R_I(vs, ra, dec, used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5)  # xx and yy are each half of I
 								# # A[:, -1, :, n] = vs.calculate_pointsource_visibility(ra, dec, used_common_ubls, freq, beam_heal_equ=beam_heal_equ_y, tlist=lsts) / 2
 							else:
 								sys.stdout.flush()
 								if Synthesize_MultiFreq:
-									A[:, id_f, :, id_p, :, :] = (Calculate_pointsource_visibility_R_I(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5) * (fake_solution_map_mfreq[id_f, :] / fake_solution_map[:])  # xx and yy are each half of I
-								else:
+									# A[:, id_f, :, id_p, :, :] = (Calculate_pointsource_visibility_R_I(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5) * (fake_solution_map_mfreq[id_f, :] / fake_solution_map[:])  # xx and yy are each half of I
 									if RI:
-										A[:, id_f, :, id_p, :, :] = vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts, RI=RI) * 0.5  # xx and yy are each half of I
+										A[:, id_f, :, id_p, :, :] = vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts, RI=RI) * 0.5 * (fake_solution_map_mfreq[id_f, :] / fake_solution_map[:])  # xx and yy are each half of I
 									else:
 										timer_0 = time.time()
-										temp_visibility = vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5
+										temp_visibility = vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5 * (fake_solution_map_mfreq[id_f, :] / fake_solution_map[:])
 										print('Time used for temp_visibility: {0} minutes'.format((time.time() - timer_0) / 60.))
 										timer_1 = time.time()
 										A[:, id_f, :, id_p, :, :] =  np.array([ne.evaluate('real(temp_visibility)'), ne.evaluate('imag(temp_visibility)')]) # xx and yy are each half of I
 										print('Time used for real/imag assignment: {0} seconds.'.format(time.time() - timer_1))
 										del (temp_visibility)
-										# A[:, id_f, :, id_p, :, :] = (Calculate_pointsource_visibility_R_I(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5)  # xx and yy are each half of I
+								else:
+									if RI:
+										A[:, id_f, :, id_p, :, :] = vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts, RI=RI) * 0.5  # xx and yy are each half of I
+									else:
+										# timer_0 = time.time()
+										# temp_visibility = vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5
+										# print('Time used for temp_visibility: {0} minutes'.format((time.time() - timer_0) / 60.))
+										# timer_1 = time.time()
+										# A[:, id_f, :, id_p, :, :] =  np.array([ne.evaluate('real(temp_visibility)'), ne.evaluate('imag(temp_visibility)')]) # xx and yy are each half of I
+										# print('Time used for real/imag assignment: {0} seconds.'.format(time.time() - timer_1))
+										# del (temp_visibility)
+										A[:, id_f, :, id_p, :, :] = (Calculate_pointsource_visibility_R_I(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, beam_heal_equ=beam_heal_equ, tlist=lsts) * 0.5)  # xx and yy are each half of I
 									
 								
 						print('\n Time consumed by {0}: {1} minutes \n'.format(pol_list[id_p], (time.time() - timer_id_p)/60.))
@@ -3005,9 +3114,15 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 							# if A_Method_leg:
 							# 	A[:] = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) * 0.5 for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
 							# else:
-							A = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) * 0.5 for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
+							if RI:
+								A = np.array([[[vs.calculate_pointsource_visibility(phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, RI=RI) * 0.5 for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
+							else:
+								A = np.array([[[Calculate_pointsource_visibility_R_I(vs, phis[n], (np.pi / 2. - thetas[n]), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) * 0.5 for n in range(valid_npix)] for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
 						else:
-							A = np.array([[Calculate_pointsource_visibility_R_I(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) * 0.5 for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
+							if RI:
+								A = np.array([[vs.calculate_pointsource_visibility(phis, (np.pi / 2. - thetas), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts, RI=RI) * 0.5 for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
+							else:
+								A = np.array([[Calculate_pointsource_visibility_R_I(vs, phis, (np.pi / 2. - thetas), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) * 0.5 for id_f, f in enumerate(Flist_select[id_p])] for id_p in range(Num_Pol)], dtype=Precision_masked).transpose((3, 1, 4, 0, 5, 2)).reshape(2 * len(Flist_select[0]) * nUBL_used * Num_Pol * nt_used, valid_npix)  # xx and yy are each half of I
 						
 				print ("\n {0} minutes used A uparallel".format((float(time.time() - timer) / 60.)))
 				print ('Shape of A after reshaping: {0} \n' .format(A.shape))
@@ -5533,7 +5648,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
-	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
+	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
 	nchunk_A_full = 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
@@ -5541,17 +5656,17 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
 	NoA_Out_fullsky = False if Use_memmap_A_full else True # Whether or not to calculate full A matrix
 	
-	Parallel_A = False # Parallel Computing for A matrix.
-	nchunk_A_valid = 1 # Parallel calculate A for each part of nchunk_A_part parts of valid sky.
+	Parallel_A = True # Parallel Computing for A matrix.
+	nchunk_A_valid = 3 # Parallel calculate A for each part of nchunk_A_part parts of valid sky.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Special_ReOrder = False # If to use old A dimensions.
 	A_chunk_order = 'F' # Numpy.memmap order: 'C' (default, row), 'F'.
-	Array_Pvec_fullsky = True if not Parallel_A_fullsky else False
-	Array_Pvec = True if not Parallel_A else False # Set ps_vec being np.array istead of one by one.
+	Array_Pvec_fullsky = True if not Parallel_A_fullsky else True
+	Array_Pvec = True if not Parallel_A else True # Set ps_vec being np.array istead of one by one.
 	RI = True # If use cos/sin instead of exp/real/imag when calculate A_masked.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 30 if 'blender' in DATA_PATH else 4  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 17 if 'blender' in DATA_PATH else 4  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -5566,6 +5681,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Use_memmap_AtNiA = True if ChunkbyChunk_all else True # Use np.memmap for AtNiA so as to access only part of it to save memory.
 	Use_memmap_AtNiAi = False
 	
+	Save_Memory = True # If to apply sqrt(Ni) on each of two chunks before dot so as to save one copy of memory.
 	Memory_Keep = 55. # GB
 	
 	A_Method_leg = True if not Use_memmap else True  # Whether to use the legacy method for calculating A or not.
@@ -9547,7 +9663,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 								Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
 								npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps,
 								ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order,
-								Skip_AtNiA=Skip_AtNiA, Array_Pvec=Array_Pvec, RI=RI) # Use npy if it's true, npy has higher priority.
+								Skip_AtNiA=Skip_AtNiA, Array_Pvec=Array_Pvec, RI=RI, Save_Memory=Save_Memory) # Use npy if it's true, npy has higher priority.
 		#
 		# for nchunk_li in nchunk*np.arange(1, 4, 0.2):
 		# 	try:
