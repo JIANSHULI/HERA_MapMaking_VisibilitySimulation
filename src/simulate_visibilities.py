@@ -401,7 +401,7 @@ class Visibility_Simulator:
                         complex_phase = ik * np.dot(np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0), ps_vec)
                         result = ne.evaluate('beam_direct * exp(complex_phase)')
                     else:
-                        print('>>RI'),
+                        # print('>>RI'),
                         complex_phase = k * np.dot(np.dot(rotatez_matrix(angle_list).transpose(0, 2, 1), d_equ.transpose()).transpose(2, 1, 0), ps_vec)
                         result = np.array([ne.evaluate('beam_direct * cos(complex_phase)'), ne.evaluate('beam_direct * sin(complex_phase)')])
                     # result = beam_direct * np.exp(complex_phase)

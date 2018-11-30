@@ -5648,7 +5648,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
-	Parallel_A_fullsky = True  # Parallel Computing for Fullsky A matrix.
+	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
 	nchunk_A_full = 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
@@ -5657,12 +5657,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	NoA_Out_fullsky = False if Use_memmap_A_full else True # Whether or not to calculate full A matrix
 	
 	Parallel_A = True # Parallel Computing for A matrix.
-	nchunk_A_valid = 3 # Parallel calculate A for each part of nchunk_A_part parts of valid sky.
+	nchunk_A_valid = 5 # Parallel calculate A for each part of nchunk_A_part parts of valid sky.
 	Del_A = False  # Whether to delete A and save A tio disc or keep in memory, which can save time but cost memory.
 	Special_ReOrder = False # If to use old A dimensions.
 	A_chunk_order = 'F' # Numpy.memmap order: 'C' (default, row), 'F'.
-	Array_Pvec_fullsky = True if not Parallel_A_fullsky else True
-	Array_Pvec = True if not Parallel_A else True # Set ps_vec being np.array istead of one by one.
+	Array_Pvec_fullsky = True if not Parallel_A_fullsky else False
+	Array_Pvec = True if not Parallel_A else False # Set ps_vec being np.array istead of one by one.
 	RI = True # If use cos/sin instead of exp/real/imag when calculate A_masked.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
