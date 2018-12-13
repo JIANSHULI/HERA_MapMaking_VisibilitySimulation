@@ -3,7 +3,7 @@
 import time, datetime
 
 Timer_Start = time.time()
-print('Programme Starts at: %s' % str(datetime.datetime.now()))
+print('Programme Starts at: {0}' .format(datetime.datetime.now()))
 import ephem, sys, os, resource, warnings
 # import simulate_visibilities.Bulm as Bulm
 import HERA_MapMaking_VisibilitySimulation.Bulm
@@ -264,7 +264,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 					  NoA_Out=False, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144, Use_nside_bw_forFullsim=False,
 					  nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False, equatorial_GSM_beamweight=None, equatorial_GSM_beamweight_mfreq=None, gsm_beamweighted=None, nside_distribution=None, final_index=None, thetas=None, phis=None, sizes=None, abs_thresh=None, npix=None, valid_pix_mask=None, fake_solution_map=None, fake_solution_map_mfreq=None,
 					  A_Method_leg=False, Num_Pol=2, beam_heal_equ_z=None, beam_heal_equ_z_mfreq=None, Manual_PointSource=False, fullsim_vis_ps=None, ChunkbyChunk_all=False, save_chunk=False, Use_h5py=True, Use_npy=False, Use_memmap=False, Use_memmap_AtNiA=False,
-						Use_memmap_A_full=False, Use_rotated_beampattern_as_beamweight=False, Special_ReOrder=False, A_chunk_order='F', Skip_AtNiA=False, Memory_Keep=50., Array_Pvec = False, RI=False, Save_Memory=True, Return_phase=False):  # C=AtNiA
+						Use_memmap_A_full=False, Use_rotated_beampattern_as_beamweight=False, Special_ReOrder=False, A_chunk_order='F', Skip_AtNiA=False, Memory_Keep=50., Array_Pvec = False, RI=False, Save_Memory=True, Return_phase=False,
+						  Coarse_Pixels=False, Coarse_Pixels_num=4, valid_pix_threshold_coarse=10.**(-2), valid_pix_mask_origin=None, extra_valid_mask=None, Scale_A_extra=True):  # C=AtNiA
 
 	
 	expected_time = 1.3e-11 * Ni.shape[0] * valid_npix ** 2
@@ -289,6 +290,25 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 	id_j = 0
 	chunk_width_list = np.zeros(len(np.arange(0, length_C, chunk)))
 	sqrNi = ne.evaluate('sqrt(Ni)')
+	
+	if Coarse_Pixels:
+		index_valid = np.arange(len(valid_pix_mask))[valid_pix_mask]
+		# print('Number in coarse_mask: {0}'.format(np.sum(coarse_mask)))
+		# index_valid_coarse = np.arange(len(valid_pix_mask))[coarse_mask]
+		# print(index_valid.shape)
+		# print(index_valid_coarse.shape)
+		extra_pixel_list = np.zeros_like(index_valid).astype('bool')
+		for id_pix in range(len(extra_pixel_list)):
+			if id_pix in extra_valid_mask:
+				extra_pixel_list[id_pix] = True
+		# print(np.where(index_valid == index_valid_coarse[id_pix])[0])
+		# extra_pixel_list[id_pix] = np.where(index_valid[i:i + num_id_chunk] == index_valid_coarse[id_pix])[0][0]
+		# print(extra_pixel_list.shape)
+		extra_valid_mask = extra_pixel_list
+		# print(extra_valid_mask.shape)
+	else:
+		extra_valid_mask = valid_pix_mask
+	
 	for id_i, i in enumerate(np.arange(0, length_C, chunk)):
 		num_id_chunk = np.min((chunk, length_C - i))
 		chunk_width_list[id_i] = num_id_chunk
@@ -300,6 +320,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 		print('Shape of this chunk: {0}-{1}'.format(len(Ni), num_id_chunk))
 		
 		if id_i == 0:
+		
+			
 			A_i, clean_sim_data_i, AtNi_data_i, AtNi_sim_data_i, AtNi_clean_sim_data_i, AtNi_fullsim_vis_ps_i, Ashape0_i, Ashape1_i = get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path_i, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True,
 				  Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
 				  flist=flist, Flist_select=Flist_select, Flist_select_index=Flist_select_index, Reference_Freq_Index=None, Reference_Freq=Reference_Freq, equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, beam_weight=beam_weight, valid_npix=num_id_chunk,
@@ -309,7 +331,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 				  Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas[i:i + num_id_chunk], phis=phis[i:i + num_id_chunk], sizes=sizes, abs_thresh=abs_thresh,
 				  npix=npix, valid_pix_mask=valid_pix_mask[i:i + num_id_chunk], fake_solution_map=fake_solution_map[i:i + num_id_chunk], fake_solution_map_mfreq=fake_solution_map_mfreq[:, i:i + num_id_chunk] if fake_solution_map_mfreq is not None else None, A_Method_leg=A_Method_leg,
 				  Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps, id_chunk_i=id_i, ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=False, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA,
-					Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase)
+					Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI,
+					Return_phase=Return_phase, Coarse_Pixels=Coarse_Pixels, Coarse_Pixels_num=Coarse_Pixels_num, valid_pix_threshold_coarse=valid_pix_threshold_coarse, valid_pix_mask_origin=valid_pix_mask_origin[i:i + num_id_chunk], extra_valid_mask=extra_valid_mask[i:i + num_id_chunk], Scale_A_extra=Scale_A_extra)
 			
 			# clean_sim_data_0 = clean_sim_data_i
 			# AtNi_data_0 = AtNi_data_i
@@ -435,7 +458,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 							  Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas[j:j + num_jd_chunk], phis=phis[j:j + num_jd_chunk], sizes=sizes, abs_thresh=abs_thresh,
 							  npix=npix, valid_pix_mask=valid_pix_mask[j:j + num_jd_chunk], fake_solution_map=fake_solution_map[j:j + num_jd_chunk], fake_solution_map_mfreq=fake_solution_map_mfreq[:, j:j + num_jd_chunk] if fake_solution_map_mfreq is not None else None, A_Method_leg=A_Method_leg,
 							  Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps, id_chunk_i=id_i, ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=False, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA,
-							  Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase)
+							  Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase,
+								Coarse_Pixels = Coarse_Pixels, Coarse_Pixels_num = Coarse_Pixels_num, valid_pix_threshold_coarse = valid_pix_threshold_coarse, valid_pix_mask_origin = valid_pix_mask_origin[j:j + num_jd_chunk], extra_valid_mask = extra_valid_mask[j:j + num_jd_chunk], Scale_A_extra = Scale_A_extra)
 					else:
 						A_j, clean_sim_data_j, AtNi_data_j, AtNi_sim_data_j, AtNi_clean_sim_data_j, AtNi_fullsim_vis_ps_j, Ashape0_j, Ashape1_j = get_A_multifreq(vs=vs, fit_for_additive=fit_for_additive, additive_A=additive_A, force_recompute=force_recompute, Compute_A=True, A_path=A_path_j, A_got=None, A_version=A_version, AllSky=False, MaskedSky=True,
 								Synthesize_MultiFreq=Synthesize_MultiFreq, thresh=thresh, valid_pix_thresh=valid_pix_thresh, Use_BeamWeight=Use_BeamWeight, Only_AbsData=Only_AbsData, Del_A=Del_A,
@@ -446,7 +470,8 @@ def ATNIA_doublechunk_all(C=None, Ni=None, nchunk=20, dot=True, vs=None, fit_for
 								Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas[j:j + num_jd_chunk], phis=phis[j:j + num_jd_chunk], sizes=sizes, abs_thresh=abs_thresh,
 								npix=npix, valid_pix_mask=valid_pix_mask[j:j + num_jd_chunk], fake_solution_map=fake_solution_map[j:j + num_jd_chunk], fake_solution_map_mfreq=fake_solution_map_mfreq[:, j:j + num_jd_chunk] if fake_solution_map_mfreq is not None else None, A_Method_leg=A_Method_leg,
 								Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps, id_chunk_i=id_i, ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA,
-									Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase)
+									Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order, Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase,
+									Coarse_Pixels=Coarse_Pixels, Coarse_Pixels_num=Coarse_Pixels_num, valid_pix_threshold_coarse=valid_pix_threshold_coarse, valid_pix_mask_origin=valid_pix_mask_origin[j:j + num_jd_chunk], extra_valid_mask=extra_valid_mask[j:j + num_jd_chunk], Scale_A_extra=Scale_A_extra)
 				
 					print('\n{0}-{1} and {2}-{3} chunks of A calculated.\n'.format(Ashape0_i, Ashape1_i, Ashape0_j, Ashape1_j))
 					if Save_Memory:
@@ -1775,7 +1800,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					NoA_Out=False, CNi=None, Cdata=None, Csim_data=None, fake_solution=None, AtNiA_path='', Precision_masked='float64', nchunk_AtNiA_maxcut=4, nchunk_AtNiA_step=0.5, nchunk_AtNiA=24, nchunk=1, UseDot=True, Parallel_AtNiA=False, Conjugate_A_append=False, Scale_AtNiA=1., maxtasksperchild=144, Use_nside_bw_forFullsim=False,
 					nchunk_A_full=1, nchunk_A_valid=1, beam_weight_calculated=False, equatorial_GSM_beamweight=None, equatorial_GSM_beamweight_mfreq=None, gsm_beamweighted=None, nside_distribution=None, final_index=None, thetas=None, phis=None, sizes=None, abs_thresh=None, npix=None, valid_pix_mask=None, fake_solution_map=None, fake_solution_map_mfreq=None,
 					A_Method_leg=False, Num_Pol=2, beam_heal_equ_z=None, beam_heal_equ_z_mfreq=None, Manual_PointSource=False, fullsim_vis_ps=None, ChunkbyChunk_all=False, id_chunk_i=0, save_chunk=True, Use_h5py = False, Use_npy=True, Use_memmap=False, Use_memmap_AtNiA=False, Use_memmap_A_full=False, A_path_full=None, Use_rotated_beampattern_as_beamweight=False,
-					Special_ReOrder=False, A_chunk_order='F', Array_Pvec=False, RI=True, Return_phase=False):
+					Special_ReOrder=False, A_chunk_order='F', Array_Pvec=False, RI=True, Return_phase=False, Coarse_Pixels=False, Coarse_Pixels_num=4, valid_pix_threshold_coarse=10.**(-2), valid_pix_mask_origin=None, extra_valid_mask=None, Scale_A_extra=True):
 	print('flist: %s' % str(flist))
 	if ChunkbyChunk_all:
 		NoA_Out = False
@@ -2446,9 +2471,11 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 												   enumerate(lsts)]
 												  ])
 				
-				beam_weight = (la.norm(beam_weight_stack.reshape((2 * beam_weight_stack.shape[1], beam_weight_stack.shape[2])), axis=0) ** 0.5)[hpf.nest2ring(nside_standard, range(12 * nside_standard ** 2))]
+				beam_weight = (la.norm(beam_weight_stack[0], axis=0) ** 2. + la.norm(beam_weight_stack[1], axis=0) ** 2.)[hpf.nest2ring(nside_standard, range(12 * nside_standard ** 2))] ** 0.5
+				# beam_weight = (la.norm(beam_weight_stack.reshape((2 * beam_weight_stack.shape[1], beam_weight_stack.shape[2])), axis=0) ** 0.5)[hpf.nest2ring(nside_standard, range(12 * nside_standard ** 2))]
 				del(beam_weight_stack)
-						
+				print('beam_weight_max: {0} ; beam_weight_min: {1} ; beam_weight_mean: {2}.'.format(beam_weight.max(), beam_weight[beam_weight > valid_pix_thresh].min(), beam_weight[beam_weight > valid_pix_thresh].mean()))
+				
 			print('Further processing beam_weight.')
 			beam_weight = beam_weight / np.mean(beam_weight)
 			thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
@@ -2466,11 +2493,57 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			pixelize(gsm_beamweighted, nside_distribution, nside_standard, nside_start, abs_thresh,
 					 final_index, thetas, phis, sizes)
 			npix = len(thetas)
+			
+			print(valid_pix_threshold_coarse)
 			if Use_BeamWeight:
-				valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > valid_pix_thresh * max(beam_weight)
+				valid_pix_mask_coarse = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > (valid_pix_threshold_coarse * max(beam_weight))
 			else:
-				valid_pix_mask = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > valid_pix_thresh * max(gsm_beamweighted)
+				valid_pix_mask_coarse = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > (valid_pix_threshold_coarse * max(gsm_beamweighted))
+			
+			print(valid_pix_thresh)
+			if Use_BeamWeight:
+				valid_pix_mask = hpf.get_interp_val(beam_weight, thetas, phis, nest=True) > (valid_pix_thresh * max(beam_weight))
+			else:
+				valid_pix_mask = hpf.get_interp_val(gsm_beamweighted, thetas, phis, nest=True) > (valid_pix_thresh * max(gsm_beamweighted))
+				
+
+			
+			print('Original number in valid_pix_mask: {0}'.format(np.sum(valid_pix_mask)))
+			print('Original number in valid_pix_mask_coarse: {0}'.format(np.sum(valid_pix_mask_coarse)))
+			
+			if Coarse_Pixels:
+				print('\n Coarsing Pixels ... \n')
+				extra_valid_mask = (~valid_pix_mask_coarse) & valid_pix_mask
+				print('Number in extra_valid_mask: {0}'.format(np.sum(extra_valid_mask)))
+				coarse_mask = np.zeros_like(extra_valid_mask).astype('bool')
+				print('Number of selected piexels: {0}'.format(coarse_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))][extra_valid_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]][::Coarse_Pixels_num][:-1].shape))
+				index_selected = hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))[extra_valid_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]][::Coarse_Pixels_num][:-1]
+				# coarse_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))][extra_valid_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]][::Coarse_Pixels_num][:-1] = True
+				coarse_mask[index_selected] = True
+				# print(coarse_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))][extra_valid_mask[hpf.ring2nest(nside_standard, range(12 * nside_standard ** 2))]][::Coarse_Pixels_num])
+				print('Number in coarse_mask: {0}'.format(np.sum(coarse_mask)))
+				extra_valid_mask = coarse_mask
+				
+				
+			valid_pix_mask_origin = valid_pix_mask
+			if Coarse_Pixels:
+				valid_pix_mask = valid_pix_mask_coarse + coarse_mask
+				
+				index_valid = np.arange(len(valid_pix_mask))[valid_pix_mask]
+				# print('Number in coarse_mask: {0}'.format(np.sum(coarse_mask)))
+				index_valid_coarse = np.arange(len(valid_pix_mask))[coarse_mask]
+				# print(index_valid.shape)
+				# print(index_valid_coarse.shape)
+				extra_pixel_list = np.zeros_like(index_valid_coarse)
+				for id_pix in range(len(index_valid_coarse)):
+					# print(np.where(index_valid == index_valid_coarse[id_pix])[0])
+					extra_pixel_list[id_pix] = np.where(index_valid == index_valid_coarse[id_pix])[0][0]
+				# print(extra_pixel_list.shape)
+				extra_valid_mask = extra_pixel_list
+				# print(extra_valid_mask.shape)
+				
 			valid_npix = np.sum(valid_pix_mask)
+			# valid_npix_coarse = np.sum(valid_pix_mask_coarse)
 			print('Shape of valid_pix_mask: {0}'.format(valid_pix_mask.shape))
 			print ('\n >>>>>>>>>>>>> VALID NPIX = {0} <<<<<<<<<<<<<<\n'.format(valid_npix))
 			
@@ -2482,6 +2555,9 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				print('Time used for final_index: {0}'.format(time.time() - timer_final_index))
 			else:
 				fake_solution_map = equatorial_GSM_standard
+		
+			# if Coarse_Pixels:
+			# 	fake_solution_map[coarse_mask] *= Coarse_Pixels_num
 			fake_solution_map = fake_solution_map[valid_pix_mask]
 			print('fake_solution_map calculated.')
 			
@@ -2492,6 +2568,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 					for i in range(npix):
 						fake_solution_map_mfreq_temp[id_f, i] = np.sum(equatorial_GSM_standard_mfreq[f, final_index == i])
 					fake_solution_map_mfreq[id_f] = fake_solution_map_mfreq_temp[id_f, valid_pix_mask]
+				# if Coarse_Pixels:
+				# 	fake_solution_map_mfreq[:, coarse_mask] *= Coarse_Pixels_num
 			
 			# try:
 			# 	del (equatorial_GSM_standard)
@@ -2520,16 +2598,16 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			gc.collect()
 			if not NoA_Out_fullsky and not Use_memmap_A_full:
 				if Use_nside_bw_forFullsim:
-					return A, beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
+					return A, beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution, valid_pix_mask_origin, extra_valid_mask
 				else:
-					return A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
+					return A, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution, valid_pix_mask_origin, extra_valid_mask
 			else:
 				if Use_memmap_A_full:
 					del(A)
 				if Use_nside_bw_forFullsim:
-					return beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
+					return beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution, valid_pix_mask_origin, extra_valid_mask
 				else:
-					return beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution
+					return beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution, valid_pix_mask_origin, extra_valid_mask
 		else:
 			if Use_nside_bw_forFullsim:
 				return A, fullsim_vis
@@ -3182,6 +3260,17 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			# 	A = A.reshape(2 * len(Flist_select[0]) * nUBL_used * 2 * nt_used, valid_npix)
 			# print('>>>>>>>>>>>>>>>>> Shape of A after reshaping: {0}' .format(A.shape))
 			
+			if Coarse_Pixels and Scale_A_extra:
+				print('\n Scaling extra pixels in A ...')
+				# index_valid = np.arange(len(valid_pix_mask))[valid_pix_mask]
+				# index_valid_coarse = np.arange(len(valid_pix_mask))[extra_valid_mask]
+				# extra_pixel_list = np.zeros_like(index_valid_coarse)
+				# for id_pix in range(len(index_valid_coarse)):
+				# 	# print(np.where(index_valid == index_valid_coarse[id_pix])[0])
+				# 	extra_pixel_list[id_pix] = np.where(index_valid == index_valid_coarse[id_pix])[0][0]
+				A[:, extra_valid_mask] *= Coarse_Pixels_num
+				print('\n >>>>> Scale A extra pixels \n')
+			
 			if (Del_A and not NoA_Out) and not ChunkbyChunk_all:
 				try:
 					timer_save_A = time.time()
@@ -3266,7 +3355,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 		print('\n>>>>>>>> A_path: {0} <<<<<<<<<\n'.format(A_path))
 		gc.collect()
 		
-
+		
 		if NoA_Out or (ChunkbyChunk_all and id_chunk_i==0):
 			# A = np.concatenate((np.real(A), np.imag(A))).astype('float64')
 			
@@ -5226,8 +5315,8 @@ def Antenna_Layout_ConeSurface(id_layout=0, nants=19, cone_angle=np.pi/4., cone_
 	
 	return np.array(ant_pos), id_layout
 	
-Frequency_Min = 150.0
-Frequency_Max = 155.0
+Frequency_Min = 100.0
+Frequency_Max = 105.0
 Frequency_Step = 10.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
@@ -5249,7 +5338,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# else:
 	# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 	Num_Pol = int(2)
-	INSTRUMENT = 'hera'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
+	INSTRUMENT = 'hera-vivaldi'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
 	INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol)
 	filetype = 'miriad' # 'miriad', 'uvh5'
 	print (INSTRUMENT)
@@ -5310,11 +5399,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		except:
 			print ('Run Python.')
 	
-	try:
-		os.system("sshpass -p '5-Zuibang' scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation".format(script_dir + '/HERA-VisibilitySimulation-MapMaking.py'))
-		print('Script successfully sent to remote server.')
-	except:
-		print('Script not sent')
+	Sent_Script = False if 'blender' in DATA_PATH else False
+	if Sent_Script:
+		try:
+			os.system("sshpass -p '5-Zuibang' scp -r {0} jshu_li@blender.mit.edu:/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation".format(script_dir + '/HERA-VisibilitySimulation-MapMaking.py'))
+			print('Script successfully sent to remote server.')
+		except:
+			print('Script not sent')
 	
 	###########################################################
 	################ data file and load beam #################
@@ -5569,9 +5660,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if Simulation_For_All:
 		INSTRUMENT = INSTRUMENT + ('-ExBPh%s' % (BadBaseline_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Phase) else '') + ('-ExBAm%s' % (BadBaseline_Amp_Threshold) if (Exclude_BadBaselines_Comparing2Simulation and Do_Amplitude) else '') + ('-AV' if Only_AbsData else '') + ('-RV' if Real_Visibility else '')
 	
-	LST_binned_Data = False  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
+	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Delay_Filter = False
+	Delay_Filter = True
 	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 	Filename_Suffix = ('.uvOCRSL' if LST_binned_Data else '.uvOCRS') if not Delay_Filter else ('.uvOCRSDL' if LST_binned_Data else '.uvOCRSD')  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
@@ -5706,11 +5797,15 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
-	Parallel_A_fullsky = False  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	Parallel_A_fullsky = True if 'blender' in DATA_PATH else False  # Parallel Computing for Fullsky A matrix.
+	nchunk_A_full = 16 if 'blender' in DATA_PATH else 1 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Use_rotated_beampattern_as_beamweight = True # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
+	Coarse_Pixels = True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels_num = 4
+	valid_pix_threshold_coarse = 10. ** (-2.7) if 'blender' in DATA_PATH else 10. ** (-2.)
+	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
+	Use_rotated_beampattern_as_beamweight = True if not Coarse_Pixels else True  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
 	NoA_Out_fullsky = False if Use_memmap_A_full else True # Whether or not to calculate full A matrix
 	
@@ -5724,15 +5819,15 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	RI = True # If use cos/sin instead of exp/real/imag when calculate A_masked.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 85 if 'blender' in DATA_PATH else 90  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 8 if 'blender' in DATA_PATH else 9  # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
 	UseDot = True  # Whether to use numpy.dot(paralleled) to multiply matrix or numpy.einsum(not paralleled)
-	Use_LinalgInv = True # Whether to use np.linalg.inv to inverse AtNiA.
+	Use_LinalgInv = False # Whether to use np.linalg.inv to inverse AtNiA.
 	
 	ChunkbyChunk_all = True # Weather to calculate all A derivants chunk by chunk to save memory but more time-consummingly or not.
-	save_chunk = True # Whether to save each chunk (in first loop) to disc and load later to avoid repeated calculation. If disc data writing loading not fast enough, better to turn this off especially with sufficient cores to parallel calculate chunk again.
+	save_chunk = False if 'blender' in DATA_PATH else True # Whether to save each chunk (in first loop) to disc and load later to avoid repeated calculation. If disc data writing loading not fast enough, better to turn this off especially with sufficient cores to parallel calculate chunk again.
 	Use_h5py = False # Data format for each chunk of A
 	Use_memmap = False if ChunkbyChunk_all else False # Data format for each chunk of A, higher priority over the above two.
 	Use_npy = False if Use_memmap else True  # Data format for each chunk of A
@@ -5834,13 +5929,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
 	else:
-		Integration_Time = 10.7375 * 4.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 14.  # seconds; * 3., 14
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 37 if 'blender' in DATA_PATH else 350 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 243 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10.** (-6)) for i in range(Num_Pol)])
 		else:
@@ -5851,8 +5946,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 3.05
-			lsts_end = 3.5
+			lsts_start = 1.8
+			lsts_end = 4.8
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -5866,7 +5961,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		
 		badants = badants_append
 		
-		Vivaldi_TrueCoordinate = True
+		Vivaldi_TrueCoordinate = False
 		if 'spar' in INSTRUMENT:
 			array_position,  id_layout = Antenna_Layout_ConeSurface(id_layout=0, nants=antenna_num, cone_angle=np.pi/4., cone_height=10**4., num_layer_list=[1, 6, 6, 6], layer_height_list=None, layer_angle_list=None)
 			antenna_num = array_position.shape[0]
@@ -5895,7 +5990,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		else:
 			array_position = np.loadtxt(DATA_PATH + '/hera_positions_staged/antenna_positions_{0}.dat'.format(antenna_num))
 		antpos = np.array([array_position for id_p in range(Num_Pol)])
-		if 'vivaldi' not in INSTRUMENT:
+		if 'vivaldi' not in INSTRUMENT or not Vivaldi_TrueCoordinate:
 			ants = np.array([np.arange(antenna_num) for i in range(Num_Pol)])
 		else:
 			ants = np.array([ants for i in range(Num_Pol)])
@@ -5923,7 +6018,17 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6)
 		else:
-			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6)
+			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.)
+	
+	Narrow_Beam = True if Simulation_For_All else False # Narrow the beam to primary beam.
+	Narrow_Beam_threshold = valid_pix_thresh # 10. ** (-6.)  # Threshold for Primary Beam.
+	Uniform_Beam = False if Simulation_For_All else False # Uniform the beam in selected region.
+	Multiply_Beam_PS = False  # If multiply beam onto PS.
+	if Uniform_Beam:
+		print('\n >>>>>>>>>>> Beam uniformed to 1. \n')
+	if Narrow_Beam:
+		print('\n >>>>>>>>>>> Beam narrowed by threshold: {0} \n'.format(Narrow_Beam_threshold))
+	
 	Constrain_Stripe = False # Whether to exlude edges of the stripe or not when outputting and plotting last several plots.
 	DEC_range = np.array([-25., -37.])
 	Use_BeamWeight = False  # Use beam_weight for calculating valid_pix_mask.
@@ -5933,9 +6038,10 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 128 if 'blender' in DATA_PATH else 128  # starting point to calculate dynamic A
-		nside_standard = 128 if 'blender' in DATA_PATH else 128  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 8 if Simulation_For_All else 8 # undynamic A matrix shape
+		nside_start = 128 if 'blender' in DATA_PATH else 32  # starting point to calculate dynamic A
+		nside_standard = 128 if 'blender' in DATA_PATH else 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if Simulation_For_All else 8 # undynamic A matrix shape
+	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
 	
@@ -5946,8 +6052,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Beam_Normalization = True #
 	bnside = 64 if 'spar' not in INSTRUMENT else nside_standard # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
-	INSTRUMENT = INSTRUMENT + ('-CS' if Constrain_Stripe else '') + ('-OB' if Old_BeamPattern else '-NB') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-BN' if Beam_Normalization else '') \
-				 + ('-LST' if LST_binned_Data else '') + ('-li' if Use_LinalgInv else '')
+	INSTRUMENT = INSTRUMENT + ('-CS' if Constrain_Stripe else '') + ('-OB' if Old_BeamPattern else '-NB') + ('-UP' if Uniform_Beam else '') + ('-NP{0:.6f}'.format(Narrow_Beam_threshold) if Narrow_Beam else '') + ('-AGP' if Add_GroundPlane2BeamPattern else '-NGP') + ('-BN' if Beam_Normalization else '') \
+				 + ('-LST' if LST_binned_Data else '') + ('-DF'if Delay_Filter else '') + ('-li' if Use_LinalgInv else '') + ('-CP-{0}-{1}'.format(Coarse_Pixels_num, valid_pix_threshold_coarse) if Coarse_Pixels else '') + ('-SE' if Scale_A_extra else '')
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
 	if 'ampcal' in tag:
@@ -7682,6 +7788,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		else:
 			if Add_GroundPlane2BeamPattern:
 				beam_pattern_normalized_map_mfreq_z[:, np.where(thetas_beam >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
+			if Narrow_Beam:
+				max_beam = beam_pattern_normalized_map_mfreq_z.max()
+				beam_pattern_normalized_map_mfreq_z[beam_pattern_normalized_map_mfreq_z <= Narrow_Beam_threshold * max_beam] = 0.
+				print('max_beam: {0}'.format(max_beam))
+				print('Number of positive pixels in beam: {0}'.format(np.sum(beam_pattern_normalized_map_mfreq_z > (Narrow_Beam_threshold * max_beam))/len(flist_beam)))
+			if Uniform_Beam:
+				beam_pattern_normalized_map_mfreq_z[~(beam_pattern_normalized_map_mfreq_z <= Narrow_Beam_threshold * max_beam)] = 1.
 			R = hp.Rotator(rot=[np.pi / 2, 0, 0], deg=False)
 			beam_pattern_normalized_map_mfreq[0] = beam_pattern_normalized_map_mfreq_z
 			thetas_y, phis_y = R(thetas_beam, phis_beam)
@@ -7708,6 +7821,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		beam_theta, beam_phi = hp.pix2ang(64, np.arange(64 ** 2 * 12))
 		if Add_GroundPlane2BeamPattern:
 			beam_E[:, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
+		if Narrow_Beam:
+			max_beam = beam_E.max()
+			beam_E[beam_E <= (Narrow_Beam_threshold * max_beam)] = 0.
+			print('max_beam: {0}'.format(max_beam))
+			print('Number of positive pixels in beam: {0}'.format(np.sum(beam_E > (Narrow_Beam_threshold * max_beam))))
+		if Uniform_Beam:
+			beam_E[~(beam_E <= (Narrow_Beam_threshold * max_beam))] = 1.
 		# R = hp.Rotator(rot=[0,0,-np.pi/2], deg=False)
 		R = hp.Rotator(rot=[np.pi / 2, 0, 0], deg=False)
 		beam_theta2, beam_phi2 = R(beam_theta, beam_phi)
@@ -7727,13 +7847,20 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		
 		Nfreqs = len(beam_freqs)
 		beam_theta, beam_phi = hp.pix2ang(64, np.arange(64 ** 2 * 12))
-		if Add_GroundPlane2BeamPattern:
-			beam_EN[:, :, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
-		
 		if Beam_Normalization:
 			for i in range(2):
 				for id_f in range(beam_EN.shape[1]):
 					beam_EN[i, id_f] = beam_EN[i, id_f] / beam_EN[i, id_f].max()
+		if Add_GroundPlane2BeamPattern:
+			beam_EN[:, :, np.where(beam_theta >= 0.5 * np.pi)[0]] = 0.  # Introduce Ground Plane by setting theta larger than 0.5PI to be zero.
+		if Narrow_Beam:
+			max_beam = beam_EN.max()
+			beam_EN[beam_EN <= (Narrow_Beam_threshold * max_beam)] = 0.
+			print('max_beam: {0}'.format(max_beam))
+			print('Number of positive pixels in beam: {0}'.format(np.sum(beam_EN > (Narrow_Beam_threshold * max_beam))))
+		if Uniform_Beam:
+			beam_EN[~(beam_EN <= (Narrow_Beam_threshold * max_beam))] = 1.
+
 		local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
 	
 	#	# normalize each frequency to max of 1
@@ -7792,6 +7919,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	beam_heal_equ_x = sv.rotate_healpixmap(beam_heal_hor_x, 0, np.pi / 2. - vs.initial_zenith[1], vs.initial_zenith[0])
 	beam_heal_equ_y = sv.rotate_healpixmap(beam_heal_hor_y, 0, np.pi / 2. - vs.initial_zenith[1], vs.initial_zenith[0])
 	beam_heal_equ_z = None
+	if Narrow_Beam:
+		beam_heal_equ_x[beam_heal_equ_x <= Narrow_Beam_threshold * beam_heal_equ_x.max()] = 0.0
+		beam_heal_equ_y[beam_heal_equ_y <= Narrow_Beam_threshold * beam_heal_equ_y.max()] = 0.0
+		
+	if Uniform_Beam:
+		beam_heal_equ_x[~(beam_heal_equ_x <= Narrow_Beam_threshold * beam_heal_equ_x.max())] = 1.0
+		beam_heal_equ_y[~(beam_heal_equ_y <= Narrow_Beam_threshold * beam_heal_equ_y.max())] = 1.0
 	
 	beam_heal_equ_x_mfreq = np.zeros(0)
 	beam_heal_equ_y_mfreq = np.zeros(0)
@@ -7801,16 +7935,31 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		beam_heal_hor_y_mfreq = np.array([local_beam_unpol(flist[1][i])[1] for i in range(nf_used)])
 		beam_heal_equ_x_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_x_mfreq[i], 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(nf_used)])
 		beam_heal_equ_y_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_y_mfreq[i], 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(nf_used)])
-	
+		if Narrow_Beam:
+			beam_heal_equ_x_mfreq[beam_heal_equ_x_mfreq <= Narrow_Beam_threshold * beam_heal_equ_x_mfreq.max()] = 0.0
+			beam_heal_equ_y_mfreq[beam_heal_equ_y_mfreq <= Narrow_Beam_threshold * beam_heal_equ_y_mfreq.max()] = 0.0
+		
+		if Uniform_Beam:
+			beam_heal_equ_x_mfreq[~(beam_heal_equ_x_mfreq <= Narrow_Beam_threshold * beam_heal_equ_x_mfreq.max())] = 1.0
+			beam_heal_equ_y_mfreq[~(beam_heal_equ_y_mfreq <= Narrow_Beam_threshold * beam_heal_equ_y_mfreq.max())] = 1.0
+		
 	if Num_Pol == 3:
 		beam_heal_hor_z = local_beam_unpol(freq)[2]
 		beam_heal_equ_z = sv.rotate_healpixmap(beam_heal_hor_z, 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0])
+		if Narrow_Beam:
+			beam_heal_equ_z[beam_heal_equ_z <= Narrow_Beam_threshold * beam_heal_equ_z.max()] = 0.0
+		if Uniform_Beam:
+			beam_heal_equ_z[~(beam_heal_equ_z <= Narrow_Beam_threshold * beam_heal_equ_z.max())] = 1.0
+			
 		beam_heal_equ_z_mfreq = np.zeros(0)
 	if Absolute_Calibration_dred_mfreq or PointSource_AbsCal or Synthesize_MultiFreq:
 		beam_heal_hor_z_mfreq = np.array([local_beam_unpol(flist[3][i])[2] for i in range(nf_used)])
 		beam_heal_equ_z_mfreq = np.array([sv.rotate_healpixmap(beam_heal_hor_z_mfreq[i], 0, np.pi / 2 - vs.initial_zenith[1], vs.initial_zenith[0]) for i in range(nf_used)])
-	
-	
+		if Narrow_Beam:
+			beam_heal_equ_z_mfreq[beam_heal_equ_z_mfreq <= Narrow_Beam_threshold * beam_heal_equ_z_mfreq.max()] = 0.0
+		if Uniform_Beam:
+			beam_heal_equ_z_mfreq[~(beam_heal_equ_z_mfreq <= Narrow_Beam_threshold * beam_heal_equ_z_mfreq.max())] = 1.0
+		
 	
 	Plot_Beam = True
 	if Plot_Beam:
@@ -7968,17 +8117,18 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	
 	A_path_full = datadir + 'A_full_nt{0}_nubl{1}_nstandard{2}_lst-{3}-{4}.dat'.format(nt_used, nUBL_used, nside_standard, lsts.min(), lsts.max())
 	if NoA_Out_fullsky or Use_memmap_A_full:
-		beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
+		beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution, valid_pix_mask_origin, extra_valid_mask = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
 																																																									A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A_fullsky,
 																																																									Reference_Freq_Index=None, Reference_Freq=np.array([freq for id_p in range(Num_Pol)]), equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild,
 																																																									nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
 																																																									ubls=ubls, used_common_ubls=used_common_ubls, nt_used=nt_used, nside_standard=nside_standard, nside_start=nside_start, nside_beamweight=nside_beamweight, beam_heal_equ_x=beam_heal_equ_x, beam_heal_equ_y=beam_heal_equ_y, beam_heal_equ_x_mfreq=None, beam_heal_equ_y_mfreq=None,
 																																																									lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky,
 																																																									Use_BeamWeight=Use_BeamWeight, thresh=thresh, valid_pix_thresh=valid_pix_thresh, equatorial_GSM_beamweight=equatorial_GSM_beamweight, equatorial_GSM_beamweight_mfreq=equatorial_GSM_beamweight_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z,
-																																																									Use_memmap_A_full=Use_memmap_A_full, A_path_full=A_path_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Array_Pvec=Array_Pvec_fullsky, Return_phase=Return_phase)
+																																																									Use_memmap_A_full=Use_memmap_A_full, A_path_full=A_path_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Array_Pvec=Array_Pvec_fullsky, Return_phase=Return_phase,
+																																																																			 Coarse_Pixels=Coarse_Pixels, Coarse_Pixels_num=Coarse_Pixels_num, valid_pix_threshold_coarse=valid_pix_threshold_coarse)
 	
 	else:
-		A, beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
+		A, beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution, valid_pix_mask_origin, extra_valid_mask = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
 																																																									   A_path='', A_got=None, A_version=1.0, AllSky=True, MaskedSky=False, Synthesize_MultiFreq=False, flist=flist, Flist_select=None, Parallel_A=Parallel_A_fullsky,
 																																																									   Reference_Freq_Index=None, Reference_Freq=np.array([freq for id_p in range(Num_Pol)]), equatorial_GSM_standard=equatorial_GSM_standard, equatorial_GSM_standard_mfreq=equatorial_GSM_standard_mfreq, Precision_full=Precision_full, maxtasksperchild=maxtasksperchild,
 																																																									   nchunk_A_full=nchunk_A_full, Use_nside_bw_forFullsim=Use_nside_bw_forFullsim,
@@ -7986,7 +8136,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 																																																									   beam_heal_equ_y_mfreq=None, lsts=lsts, NoA_Out_fullsky=NoA_Out_fullsky,
 																																																									   Use_BeamWeight=Use_BeamWeight, thresh=thresh, valid_pix_thresh=valid_pix_thresh, equatorial_GSM_beamweight=equatorial_GSM_beamweight, equatorial_GSM_beamweight_mfreq=equatorial_GSM_beamweight_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol,
 																																																									   beam_heal_equ_z=beam_heal_equ_z,
-																																																									   Use_memmap_A_full=Use_memmap_A_full, A_path_full=A_path_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Array_Pvec=Array_Pvec_fullsky, Return_phase=Return_phase)
+																																																									   Use_memmap_A_full=Use_memmap_A_full, A_path_full=A_path_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Array_Pvec=Array_Pvec_fullsky, Return_phase=Return_phase,
+																																																																				Coarse_Pixels=Coarse_Pixels, Coarse_Pixels_num=Coarse_Pixels_num, valid_pix_threshold_coarse=valid_pix_threshold_coarse)
 	
 	# try:
 	# 	if NoA_Out_fullsky or Use_memmap_A_full:
@@ -8175,7 +8326,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# from random import *
 	# num_figures_theta = 5
 	# num_figures_phi = 5
-	num_figures = 5 if not Simulation_For_All else 5
+	num_figures = 15 if not Simulation_For_All else 20
 	# point_step = int(total_num / num_figures)
 	thetas_beamweight, phis_beamweight = hpf.pix2ang(nside_beamweight, range(hpf.nside2npix(nside_beamweight)), nest=True)
 	thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
@@ -8201,7 +8352,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	
 	
 	# random_pix_phi_theta = np.array([[uniform(phis.min() + 0.1, phis.max() - 0.1), uniform(thetas.min() + 0.1, thetas.max() - 0.1)] for id_pix in range(num_figures)])
-	random_pix_phi_theta = np.array([[uniform(lsts.min(), lsts.max()) * np.pi/12., uniform(112./180.*np.pi, 128./180.*np.pi)] for id_pix in range(num_figures)])
+	random_pix_phi_theta = np.array([[uniform(lsts.min(), lsts.max()) * np.pi/12., uniform(115./180.*np.pi, 125./180.*np.pi)] for id_pix in range(num_figures)])
 	random_pix_id_valid = np.array([np.argmin(la.norm(random_pix_phi_theta[id_fig] - np.array([phis, thetas]).transpose(), axis=-1)) for id_fig in range(num_figures)])
 	random_pix_phi_theta_invalid = np.array([[uniform(0., 2*np.pi), uniform(0., np.pi)] for id_pix in range(num_figures)])
 	# fullsim_vis_ps = np.array([[[Calculate_pointsource_visibility_R_I(vs, uniform(phis.min() + 0.1, phis.max() - 0.1), (np.pi / 2. - uniform(thetas.min() + 0.1, thetas.max() - 0.1)), used_common_ubls, f, None, beam_heal_equ[id_p], None, lsts) / 2. for id_pix in range(num_figures)] for id_f, f in enumerate(Flist_select_point[id_p])] for id_p in range(Num_Pol)],
@@ -9686,7 +9837,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		print('\n>>>>>>> Skip_AtNiA')
 	Read_AtNi_Derivants = True
 	Direct_AtNiAi = True if (os.path.isfile(AtNiA_path) and os.path.isfile(AtNi_data_path) and os.path.isfile(AtNi_sim_data_path) and os.path.isfile(AtNi_clean_sim_data_path) and os.path.isfile(AtNi_fullsim_vis_ps_path)) else False
-	Send_AtNi_Derivants = False if Direct_AtNiAi else False if 'blender' in DATA_PATH else True
+	Send_AtNi_Derivants = False if Direct_AtNiAi else False if 'blender' in DATA_PATH else False
 	
 	if not ChunkbyChunk_all and not Direct_AtNiAi:
 		clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution, AtNi_fullsim_vis_ps = \
@@ -9697,7 +9848,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh, Precision_full=Precision_full,
 							npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps,
 							ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order,
-							Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase)
+							Array_Pvec=Array_Pvec, RI=RI, Return_phase=Return_phase, Coarse_Pixels = Coarse_Pixels, Coarse_Pixels_num = Coarse_Pixels_num, valid_pix_threshold_coarse = valid_pix_threshold_coarse, valid_pix_mask_origin = valid_pix_mask_origin, extra_valid_mask = extra_valid_mask, Scale_A_extra = Scale_A_extra)
 	elif not Direct_AtNiAi:
 		if Use_memmap_AtNiA:
 			if Skip_AtNiA:
@@ -9722,7 +9873,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 								Conjugate_A_append=Conjugate_A_append, Scale_AtNiA=Scale_AtNiA, maxtasksperchild=maxtasksperchild, nchunk_A_valid=nchunk_A_valid, gsm_beamweighted=gsm_beamweighted, nside_distribution=nside_distribution, final_index=final_index, thetas=thetas, phis=phis, sizes=sizes, abs_thresh=abs_thresh,
 								npix=npix, valid_pix_mask=valid_pix_mask, fake_solution_map=fake_solution_map, fake_solution_map_mfreq=fake_solution_map_mfreq, A_Method_leg=A_Method_leg, Num_Pol=Num_Pol, beam_heal_equ_z=beam_heal_equ_z, beam_heal_equ_z_mfreq=beam_heal_equ_z_mfreq, Manual_PointSource=Manual_PointSource, fullsim_vis_ps=fullsim_vis_ps,
 								ChunkbyChunk_all=ChunkbyChunk_all, save_chunk=save_chunk, Use_h5py=Use_h5py, Use_npy=Use_npy, Use_memmap=Use_memmap, Use_memmap_AtNiA=Use_memmap_AtNiA, Use_memmap_A_full=Use_memmap_A_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Special_ReOrder=Special_ReOrder, A_chunk_order=A_chunk_order,
-								Skip_AtNiA=Skip_AtNiA, Array_Pvec=Array_Pvec, RI=RI, Save_Memory=Save_Memory, Return_phase=Return_phase, Memory_Keep=Memory_Keep) # Use npy if it's true, npy has higher priority.
+								Skip_AtNiA=Skip_AtNiA, Array_Pvec=Array_Pvec, RI=RI, Save_Memory=Save_Memory, Return_phase=Return_phase, Memory_Keep=Memory_Keep,
+								    Coarse_Pixels = Coarse_Pixels, Coarse_Pixels_num = Coarse_Pixels_num, valid_pix_threshold_coarse = valid_pix_threshold_coarse, valid_pix_mask_origin = valid_pix_mask_origin, extra_valid_mask = extra_valid_mask, Scale_A_extra = Scale_A_extra) # Use npy if it's true, npy has higher priority.
 		#
 		# for nchunk_li in nchunk*np.arange(1, 4, 0.2):
 		# 	try:
@@ -10281,6 +10433,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			
 			print ('trying', rcond)
 			sys.stdout.flush()
+			print(datetime.datetime.now())
 			try:
 				if rcond == 0:
 					AtNiAi_filename = AtNiAi_tag + '_S{0}_RE-N_N{1}_v{2:.1f}' .format(S_type, vartag, AtNiAi_version) + A_filename
@@ -10302,17 +10455,17 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 				print('Time used for inverting AtNiA: {0} seconds'.format(time.time() - timer_AtNiAi))
 				
 				# Check Whether the matrix is well-inverse or not using two methods - Mean and RMS.
-				Check_Iverse_AtNiA = True
-				Check_Iverse_AtNiA_threshold = 0.1
-				if Check_Iverse_AtNiA:
-					if Use_LinalgInv:
-						AtNiA_AtNiAi = np.dot(AtNiA, AtNiAi)
-					else:
-						AtNiA_AtNiAi = AtNiAi.dotv(AtNiA)
-					rms_reconstruct = np.std(np.diagonal(AtNiA_AtNiAi))
-					mean_reconstruct = np.mean(np.diagonal(AtNiA_AtNiAi))
-					print('\n >>>>>>>>>>>>>>>>>>>>> rms_reconstruct: {0} <<<<<<<<<<<<<<<<<<<<'.format(rms_reconstruct))
-					print('\n >>>>>>>>>>>>>>>>>>>>> mean_reconstruct: {0} <<<<<<<<<<<<<<<<<<<< \n'.format(mean_reconstruct))
+				# Check_Iverse_AtNiA = True
+				# Check_Iverse_AtNiA_threshold = 0.1
+				# if Check_Iverse_AtNiA:
+				# 	if Use_LinalgInv:
+				# 		AtNiA_AtNiAi = np.dot(AtNiA, AtNiAi)
+				# 	else:
+				# 		AtNiA_AtNiAi = AtNiAi.dotv(AtNiA)
+				# 	rms_reconstruct = np.std(np.diagonal(AtNiA_AtNiAi))
+				# 	mean_reconstruct = np.mean(np.diagonal(AtNiA_AtNiAi))
+				# 	print('\n >>>>>>>>>>>>>>>>>>>>> rms_reconstruct: {0} <<<<<<<<<<<<<<<<<<<<'.format(rms_reconstruct))
+				# 	print('\n >>>>>>>>>>>>>>>>>>>>> mean_reconstruct: {0} <<<<<<<<<<<<<<<<<<<< \n'.format(mean_reconstruct))
 				
 				
 				# del (AtNiA)
@@ -10744,6 +10897,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			for id_ps in range(num_ps_fig):
 				point_source_map = fits.HDUList()
 				w_point_sky_full = sol2map(w_point_sky[Re_Mask][:, id_ps], valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+				if Multiply_Beam_PS:
+					w_point_sky_full *= beam_weight/beam_weight.max()
 				point_source_map.append(fits.ImageHDU(data=np.real(w_point_sky_full)))
 				outfile_data_name = script_dir + '/../Output/Point_Spread/results_w-PS-{0}-{1:.4f}MHz-dipole-nubl{2}-nt{3}-mtbin{4}-mfbin{5}-tbin{6}-bnside-{7}-nside_standard-{8}-rescale-{9:.3f}-Deg-unlimit-All-S-{10}-recond-{11}-{12}-{13:.4f}-{14:.4f}.fits' .format(tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', id_ps, random_pix_phi_theta[id_ps, 0], random_pix_phi_theta[id_ps, 1])
 				point_source_map.writeto(outfile_data_name, overwrite=True)
@@ -10829,7 +10984,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 			plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 4, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 			plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
+			plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),bbox_inches='tight')
 			plt.show(block=False)
 		
 		for coord in ['C', 'CG']:
@@ -10839,7 +10994,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 			plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 			#plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-			plt.savefig(script_dir + '/../Output/Results_wGSM-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
+			plt.savefig(script_dir + '/../Output/Results_wGSM-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),bbox_inches='tight')
 			plt.show(block=False)
 		
 			
@@ -10852,7 +11007,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 				plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 				plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 				plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-				plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution))
+				plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-dipole-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unlimit_up_down-S-%s-recond-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),bbox_inches='tight')
 				plt.show(block=False)
 		except:
 			print('Reloaded Data not Plotted.')
@@ -10997,7 +11152,18 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# 	print('No point spread function plotted.')
 	
 	try:
-		
+		Check_Iverse_AtNiA = True
+		Check_Iverse_AtNiA_threshold = 0.1
+		if Check_Iverse_AtNiA:
+			if Use_LinalgInv:
+				AtNiA_AtNiAi = np.dot(AtNiA, AtNiAi)
+			else:
+				AtNiA_AtNiAi = AtNiAi.dotv(AtNiA)
+			rms_reconstruct = np.std(np.diagonal(AtNiA_AtNiAi))
+			mean_reconstruct = np.mean(np.diagonal(AtNiA_AtNiAi))
+			print('\n >>>>>>>>>>>>>>>>>>>>> rms_reconstruct: {0} <<<<<<<<<<<<<<<<<<<<'.format(rms_reconstruct))
+			print('\n >>>>>>>>>>>>>>>>>>>>> mean_reconstruct: {0} <<<<<<<<<<<<<<<<<<<< \n'.format(mean_reconstruct))
+			
 		if not Use_LinalgInv:
 			AtNiAi = sp.linalg.inv(AtNiA).astype(Precision_AtNiAi)
 		try:
