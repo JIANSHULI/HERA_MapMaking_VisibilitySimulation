@@ -3262,6 +3262,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			
 			if Coarse_Pixels and Scale_A_extra:
 				print('\n Scaling extra pixels in A ...')
+				timer_0 = time.time()
 				# index_valid = np.arange(len(valid_pix_mask))[valid_pix_mask]
 				# index_valid_coarse = np.arange(len(valid_pix_mask))[extra_valid_mask]
 				# extra_pixel_list = np.zeros_like(index_valid_coarse)
@@ -3270,6 +3271,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				# 	extra_pixel_list[id_pix] = np.where(index_valid == index_valid_coarse[id_pix])[0][0]
 				A[:, extra_valid_mask] *= Coarse_Pixels_num
 				print('\n >>>>> Scale A extra pixels \n')
+				print('{0} seconds used. \n'.format(time.time() - timer_0))
 			
 			if (Del_A and not NoA_Out) and not ChunkbyChunk_all:
 				try:
@@ -5315,9 +5317,9 @@ def Antenna_Layout_ConeSurface(id_layout=0, nants=19, cone_angle=np.pi/4., cone_
 	
 	return np.array(ant_pos), id_layout
 	
-Frequency_Min = 100.0
-Frequency_Max = 105.0
-Frequency_Step = 10.
+Frequency_Min = 110.0
+Frequency_Max = 190.0
+Frequency_Step = 2.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
 	# if Frequency_Select == 150.:
@@ -5338,7 +5340,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# else:
 	# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 	Num_Pol = int(2)
-	INSTRUMENT = 'hera-vivaldi'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
+	INSTRUMENT = 'hera'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
 	INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol)
 	filetype = 'miriad' # 'miriad', 'uvh5'
 	print (INSTRUMENT)
@@ -5560,7 +5562,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	#
 	#
 	# elif 'hera' in INSTRUMENT:
-	Simulation_For_All = True # Simulate from the very beginning: loading data.
+	Simulation_For_All = False # Simulate from the very beginning: loading data.
 	Use_SimulatedData = True if Simulation_For_All else False
 	
 	
@@ -5797,12 +5799,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
-	Parallel_A_fullsky = False if 'blender' in DATA_PATH else False  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 1 if 'blender' in DATA_PATH else 1 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	Parallel_A_fullsky = False if 'blender' in DATA_PATH else True  # Parallel Computing for Fullsky A matrix.
+	nchunk_A_full = 1 if 'blender' in DATA_PATH else 5 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
-	Coarse_Pixels_num = 4
+	Coarse_Pixels = True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels_num = 16
 	valid_pix_threshold_coarse = 10. ** (-3.) if 'blender' in DATA_PATH else 10. ** (-1.5)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if not Coarse_Pixels else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
@@ -5819,7 +5821,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	RI = True # If use cos/sin instead of exp/real/imag when calculate A_masked.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 3 if 'blender' in DATA_PATH else 9  # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 7 if 'blender' in DATA_PATH else 21 # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -5854,7 +5856,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Frequency_Average_preload = int(sys.argv[8])
 	else:
 		Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-		Frequency_Average_preload = 20  # 16 # Number of Frequencies averaged before loaded for each file (remove tails)'
+		Frequency_Average_preload = 10  # 16 # Number of Frequencies averaged or 1 picked every what frequencies before loaded for each file (remove tails)'
+	
 	Select_freq = True  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
 	Dred_preload = False  # Whether to de-redundancy before each file loaded
@@ -5935,7 +5938,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 128 if 'blender' in DATA_PATH else 128 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 350 if 'blender' in DATA_PATH else 128 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10.** (-6)) for i in range(Num_Pol)])
 		else:
@@ -5946,8 +5949,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 0.8
-			lsts_end = 5.8
+			lsts_start = 2.8
+			lsts_end = 3.8
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6041,9 +6044,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 64 if 'blender' in DATA_PATH else 64  # starting point to calculate dynamic A
-		nside_standard = 64 if 'blender' in DATA_PATH else 64  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 8 if (Simulation_For_All and 'blender' in DATA_PATH) else 8 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
+		nside_start = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
+		nside_standard = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
