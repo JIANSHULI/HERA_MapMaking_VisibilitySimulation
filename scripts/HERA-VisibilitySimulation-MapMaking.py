@@ -615,7 +615,7 @@ def Chunk_Multiply_p(A, Ni, chunk, nchunk, expected_time, i, dot=True):
 	else:
 		C = np.einsum('ji,jk->ik', A_1 * Ni[:, None], A_2)
 	if expected_time >= 1.:
-		print "%i/%i: %.5fmins " % (i, nchunk, (time.time() - ltm) / 60.),
+		print ("%i/%i: %.5fmins " % (i, nchunk, (time.time() - ltm) / 60.))
 		sys.stdout.flush()
 	return C
 
@@ -3269,7 +3269,10 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 				# for id_pix in range(len(index_valid_coarse)):
 				# 	# print(np.where(index_valid == index_valid_coarse[id_pix])[0])
 				# 	extra_pixel_list[id_pix] = np.where(index_valid == index_valid_coarse[id_pix])[0][0]
-				A[:, extra_valid_mask] *= Coarse_Pixels_num
+				scale_factor = np.ones(A.shape[1])
+				scale_factor[extra_valid_mask] = Coarse_Pixels_num
+				A *= scale_factor
+				# A[:, extra_valid_mask] *= Coarse_Pixels_num
 				print('\n >>>>> Scale A extra pixels \n')
 				print('{0} seconds used. \n'.format(time.time() - timer_0))
 			
@@ -3363,7 +3366,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			
 			# Ashape0, Ashape1 = A.shape
 			
-			print ("Memory usage before A Derivants calculated: {0}MB") .format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.)
+			print ("Memory usage before A Derivants calculated: {0}MB") .format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.**2)
 			sys.stdout.flush()
 			
 			##############
@@ -5317,9 +5320,9 @@ def Antenna_Layout_ConeSurface(id_layout=0, nants=19, cone_angle=np.pi/4., cone_
 	
 	return np.array(ant_pos), id_layout
 	
-Frequency_Min = 110.0
-Frequency_Max = 190.0
-Frequency_Step = 2.
+Frequency_Min = 100.0
+Frequency_Max = 105.0
+Frequency_Step = 10.5
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
 	# if Frequency_Select == 150.:
@@ -5340,7 +5343,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# else:
 	# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 	Num_Pol = int(2)
-	INSTRUMENT = 'hera'  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
+	INSTRUMENT = 'hera-vivaldi'  # 'hera-vivaldi'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
 	INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol)
 	filetype = 'miriad' # 'miriad', 'uvh5'
 	print (INSTRUMENT)
@@ -5562,7 +5565,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	#
 	#
 	# elif 'hera' in INSTRUMENT:
-	Simulation_For_All = False # Simulate from the very beginning: loading data.
+	Simulation_For_All = True # Simulate from the very beginning: loading data.
 	Use_SimulatedData = True if Simulation_For_All else False
 	
 	
@@ -5799,13 +5802,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
-	Parallel_A_fullsky = False if 'blender' in DATA_PATH else True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 1 if 'blender' in DATA_PATH else 5 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	Parallel_A_fullsky = True if 'blender' in DATA_PATH else True  # Parallel Computing for Fullsky A matrix.
+	nchunk_A_full = 4 if 'blender' in DATA_PATH else 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
-	Coarse_Pixels_num = 16
-	valid_pix_threshold_coarse = 10. ** (-3.) if 'blender' in DATA_PATH else 10. ** (-1.5)
+	Coarse_Pixels = True if 'blender' in DATA_PATH else True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels_num = 4**3 if 'blender' in DATA_PATH else 4**1
+	valid_pix_threshold_coarse = 10. ** (-1.7) if 'blender' in DATA_PATH else 10. ** (-1.7)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if not Coarse_Pixels else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
@@ -5821,7 +5824,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	RI = True # If use cos/sin instead of exp/real/imag when calculate A_masked.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 7 if 'blender' in DATA_PATH else 21 # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 18 if 'blender' in DATA_PATH else 21 # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk_from_memory_calculation = True # If to use recalculated nchunk at current unused memory.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 	nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -5938,7 +5942,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 350 if 'blender' in DATA_PATH else 128 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 350 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10.** (-6)) for i in range(Num_Pol)])
 		else:
@@ -5949,8 +5953,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.8
-			lsts_end = 3.8
+			lsts_start = 2.8 if 'blender' in DATA_PATH else -6.0
+			lsts_end = 3.8 if 'blender' in DATA_PATH else 6.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6007,7 +6011,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Add_Rcond = True # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
 	# rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
-	rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
+	rcond_list = np.concatenate(([0.], 10. ** np.arange(-25, 10., 1.)))
 	Selected_Diagnal_R = False # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 	diag_threshold = 10. ** (-12.)
 	if Data_Deteriorate:
@@ -6044,8 +6048,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
-		nside_standard = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_start = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
+		nside_standard = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
@@ -8147,6 +8151,15 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 																																																									   Use_memmap_A_full=Use_memmap_A_full, A_path_full=A_path_full, Use_rotated_beampattern_as_beamweight=Use_rotated_beampattern_as_beamweight, Array_Pvec=Array_Pvec_fullsky, Return_phase=Return_phase,
 																																																																				Coarse_Pixels=Coarse_Pixels, Coarse_Pixels_num=Coarse_Pixels_num, valid_pix_threshold_coarse=valid_pix_threshold_coarse)
 	
+	try:
+		maps_valid = np.ones(12*nside_standard**2) * 10.**(-15)
+		maps_valid[valid_pix_mask] = 1.
+		hp.mollview(10.0 * np.log10(maps_valid), title='HERA Beam-East ({0}MHz, nside_standard={1})' .format(freq, nside_standard),
+		            unit='dBi', nest=True)
+		plt.savefig(script_dir + '/../Output/{0}-Maps_Valid-{1:.2f}-nside_standard-{2}.pdf' .format(INSTRUMENT, freq, nside_standard))
+	except:
+		print('Maps_valid not plotted.')
+	
 	# try:
 	# 	if NoA_Out_fullsky or Use_memmap_A_full:
 	# 		beam_weight, fullsim_vis, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution_map_mfreq, fake_solution = get_A_multifreq(vs=vs, fit_for_additive=False, additive_A=None, force_recompute=False, Compute_A=False, Compute_beamweight=True,
@@ -9846,6 +9859,24 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Read_AtNi_Derivants = True
 	Direct_AtNiAi = True if (os.path.isfile(AtNiA_path) and os.path.isfile(AtNi_data_path) and os.path.isfile(AtNi_sim_data_path) and os.path.isfile(AtNi_clean_sim_data_path) and os.path.isfile(AtNi_fullsim_vis_ps_path)) else False
 	Send_AtNi_Derivants = False if Direct_AtNiAi else False if 'blender' in DATA_PATH else False
+	
+	if nchunk_from_memory_calculation:
+		try:
+			prec = np.int(re.findall(r'\d+', Precision_masked)[0]) / 8
+			print('prec successfully calculated from Precision_masked.')
+		except:
+			prec = 8
+		A_size_memory = nUBL * nt_used * Num_Pol * 2 * valid_npix * prec / 1024.**3
+		from psutil import virtual_memory
+		# mem = virtual_memory()
+		# mem.total / 1024. ** 3
+		memory_left = - resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.**3 + virtual_memory().total / 1024.**3
+		print('\n >>>>>>>>>> A_size: {0} GB; Memory Left: {1} GB.'.format(A_size_memory, memory_left))
+		nchunk = np.int(A_size_memory / (memory_left * 0.96 / 3.)) + 1
+		print('>>>>>>>>>>> New nchunk from memory calculation: {0} \n'.format(nchunk))
+		
+		if nchunk == 1:
+			ChunkbyChunk_all = False
 	
 	if not ChunkbyChunk_all and not Direct_AtNiAi:
 		clean_sim_data, AtNi_data, AtNi_sim_data, AtNi_clean_sim_data, AtNiA, Ashape0, Ashape1, beam_weight, gsm_beamweighted, nside_distribution, final_index, thetas, phis, sizes, abs_thresh, npix, valid_pix_mask, valid_npix, fake_solution_map, fake_solution, AtNi_fullsim_vis_ps = \
