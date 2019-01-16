@@ -3366,7 +3366,7 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 			
 			# Ashape0, Ashape1 = A.shape
 			
-			print ("Memory usage before A Derivants calculated: {0}MB") .format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.**2)
+			print ("Memory usage before A Derivants calculated: {0}GB") .format(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.**2)
 			sys.stdout.flush()
 			
 			##############
@@ -5321,8 +5321,8 @@ def Antenna_Layout_ConeSurface(id_layout=0, nants=19, cone_angle=np.pi/4., cone_
 	return np.array(ant_pos), id_layout
 	
 Frequency_Min = 100.0
-Frequency_Max = 105.0
-Frequency_Step = 10.5
+Frequency_Max = 101.0
+Frequency_Step = 11.5
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
 	# if Frequency_Select == 150.:
@@ -5667,7 +5667,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	
 	LST_binned_Data = True  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
-	Delay_Filter = True
+	Delay_Filter = False
 	Observing_Session = ['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 	Filename_Suffix = ('.uvOCRSL' if LST_binned_Data else '.uvOCRS') if not Delay_Filter else ('.uvOCRSDL' if LST_binned_Data else '.uvOCRSD')  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
@@ -5802,13 +5802,14 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_Mulfreq_Visibility = True  # Parallel Computing for Multi-Freq Visibility.
 	Parallel_Mulfreq_Visibility_deep = False  # Parallel Computing for Multi-Freq Visibility in functions, which is more efficient.
 	
-	Parallel_A_fullsky = True if 'blender' in DATA_PATH else True  # Parallel Computing for Fullsky A matrix.
-	nchunk_A_full = 4 if 'blender' in DATA_PATH else 4 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	Parallel_A_fullsky = False if 'blender' in DATA_PATH else True  # Parallel Computing for Fullsky A matrix.
+	nchunk_A_full = (1 if 'blender' in DATA_PATH else 4) if Parallel_A_fullsky else 1 # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
+	nchunk_from_memory_calculation_full = True # IF recalculate nchunk_A_full by comparing memory left and A size
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = True if 'blender' in DATA_PATH else True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels = False if 'blender' in DATA_PATH else True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
 	Coarse_Pixels_num = 4**3 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-1.7) if 'blender' in DATA_PATH else 10. ** (-1.7)
+	valid_pix_threshold_coarse = 10. ** (-1.7) if 'blender' in DATA_PATH else 10. ** (-4.)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if not Coarse_Pixels else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
@@ -5824,7 +5825,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	RI = True # If use cos/sin instead of exp/real/imag when calculate A_masked.
 	
 	Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-	nchunk = 18 if 'blender' in DATA_PATH else 21 # UseDot to Parallel but not Parallel_AtNiA.
+	nchunk = 4 if 'blender' in DATA_PATH else 21 # UseDot to Parallel but not Parallel_AtNiA.
 	nchunk_from_memory_calculation = True # If to use recalculated nchunk at current unused memory.
 	nchunk_AtNiA = 24  # nchunk starting number.
 	nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
@@ -5860,7 +5861,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Frequency_Average_preload = int(sys.argv[8])
 	else:
 		Time_Average_preload = 1  # 12 # Number of Times averaged before loaded for each file (keep tails)'
-		Frequency_Average_preload = 10  # 16 # Number of Frequencies averaged or 1 picked every what frequencies before loaded for each file (remove tails)'
+		Frequency_Average_preload = 8  # 16 # Number of Frequencies averaged or 1 picked every what frequencies before loaded for each file (remove tails)'
 	
 	Select_freq = True  # Use the first frequency as the selected one every Frequency_Average_preload freq-step.
 	Select_time = False  # Use the first time as the selected one every Time_Average_preload time-step.
@@ -5936,13 +5937,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
 	else:
-		Integration_Time = 10.7375 * 2.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 24.  # seconds; * 3., 14
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 350 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 128 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10.** (-6)) for i in range(Num_Pol)])
 		else:
@@ -5953,8 +5954,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.8 if 'blender' in DATA_PATH else -6.0
-			lsts_end = 3.8 if 'blender' in DATA_PATH else 6.0
+			lsts_start = -6. if 'blender' in DATA_PATH else -6.0
+			lsts_end = 6. if 'blender' in DATA_PATH else 6.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6048,9 +6049,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
-		nside_standard = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
+		nside_start = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 64  # starting point to calculate dynamic A
+		nside_standard = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 64  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 64 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
@@ -7375,7 +7376,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	used_common_ubls = common_ubls[la.norm(common_ubls, axis=-1) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor]  # [np.argsort(la.norm(common_ubls, axis=-1))[10:]]     #remove shorted 10
 	nUBL_used = len(used_common_ubls)
 	UBL_used_max = np.max(np.linalg.norm(used_common_ubls, axis=-1))
-	print('\n >>>>>>>>>>> UBL_used_max: {0} meters ; UBL_used_max_wavelength: {1}. \n'.format(UBL_used_max, UBL_used_max / (C / freq)))
+	print('\n>>>>>>>>>>>> UBL_used_max: {0} meters ; UBL_used_max_wavelength: {1}. <<<<<<<<<<<<<<< \n'.format(UBL_used_max, UBL_used_max / (C / freq)))
 	
 	
 	ubl_index = {}  # stored index in each pol's ubl for the common ubls
@@ -8126,6 +8127,39 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	###################################################
 	sys.stdout.flush()
 	# Parallel_A_fullsky = False
+	
+	try:
+		prec = np.int(re.findall(r'\d+', Precision_full)[0]) / 8
+		print('prec successfully calculated from Precision_full.')
+	except:
+		prec = 8
+	A_size_memory = nUBL * nt_used * Num_Pol * nside_beamweight ** 2 * 12 * prec / 1024. ** 3
+	if nchunk_from_memory_calculation_full and Parallel_A_fullsky:
+		from psutil import virtual_memory
+		
+		# mem = virtual_memory()
+		# mem.total / 1024. ** 3
+		memory_left = - resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024. ** 3 + virtual_memory().total / 1024. ** 3
+		print('\n>>>>>>>>>>> A_size: {0} GB; Memory Left: {1} GB.'.format(A_size_memory, memory_left))
+		nchunk_A_full = np.int(A_size_memory / (memory_left * 0.96 / 2.1)) + 1
+		print('>>>>>>>>>>> New nchunk from memory calculation: {0} \n'.format(nchunk_A_full))
+		if nchunk_A_full == 1:
+			Parallel_A_fullsky = False
+			Array_Pvec_fullsky = True
+			
+	elif nchunk_from_memory_calculation_full and not Parallel_A_fullsky:
+		from psutil import virtual_memory
+		
+		# mem = virtual_memory()
+		# mem.total / 1024. ** 3
+		memory_left = - resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024. ** 3 + virtual_memory().total / 1024. ** 3
+		print('\n>>>>>>>>>>> A_size: {0} GB; Memory Left: {1} GB.'.format(A_size_memory, memory_left))
+		nchunk_A_full = np.int(A_size_memory / (memory_left * 0.96 / 2.1)) + 1
+		print('>>>>>>>>>>> New nchunk from memory calculation: {0} \n'.format(nchunk_A_full))
+		if nchunk_A_full > 1:
+			Parallel_A_fullsky = True
+			Array_Pvec_fullsky = False
+	
 	
 	A_path_full = datadir + 'A_full_nt{0}_nubl{1}_nstandard{2}_lst-{3}-{4}.dat'.format(nt_used, nUBL_used, nside_standard, lsts.min(), lsts.max())
 	if NoA_Out_fullsky or Use_memmap_A_full:
@@ -9871,7 +9905,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		# mem = virtual_memory()
 		# mem.total / 1024. ** 3
 		memory_left = - resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.**3 + virtual_memory().total / 1024.**3
-		print('\n >>>>>>>>>> A_size: {0} GB; Memory Left: {1} GB.'.format(A_size_memory, memory_left))
+		print('\n>>>>>>>>>>> A_size: {0} GB; Memory Left: {1} GB.'.format(A_size_memory, memory_left))
 		nchunk = np.int(A_size_memory / (memory_left * 0.96 / 3.)) + 1
 		print('>>>>>>>>>>> New nchunk from memory calculation: {0} \n'.format(nchunk))
 		
