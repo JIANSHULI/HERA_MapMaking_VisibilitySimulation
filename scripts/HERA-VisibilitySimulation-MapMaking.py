@@ -5320,8 +5320,8 @@ def Antenna_Layout_ConeSurface(id_layout=0, nants=19, cone_angle=np.pi/4., cone_
 	
 	return np.array(ant_pos), id_layout
 	
-Frequency_Min = 100.0
-Frequency_Max = 101.0
+Frequency_Min = 80.0
+Frequency_Max = 81.0
 Frequency_Step = 11.5
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
@@ -5807,9 +5807,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	nchunk_from_memory_calculation_full = True # IF recalculate nchunk_A_full by comparing memory left and A size
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = False if 'blender' in DATA_PATH else True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels = False if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
 	Coarse_Pixels_num = 4**3 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-1.7) if 'blender' in DATA_PATH else 10. ** (-4.)
+	valid_pix_threshold_coarse = 10. ** (-1.7) if 'blender' in DATA_PATH else 10. ** (-3.)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if not Coarse_Pixels else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
@@ -5897,7 +5897,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# Frequency_Select_List = np.linspace(Frequency_Select - Freq_Width, Frequency_Select + Freq_Width, 5) * 10.**6 # None # np.linspace(Frequency_Select - Freq_Width, Frequency_Select + Freq_Width, 5)
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
-	badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142] if not Simulation_For_All else [] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
+	antenna_pick_list = [34,35,30,31,32,25,26]
+	badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142] if not Simulation_For_All \
+		else [] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
 	
 	# classic source Confusion limit -- 32: 12.687(0.1), 2.7612(1.)  ;
 	# 040: 3, 74, 277, 368, 526,
@@ -5937,8 +5939,10 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
 	else:
-		Integration_Time = 10.7375 * 24.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 15.  # seconds; * 3., 14
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
+	Integration_Time_original = Integration_Time
+	Frequency_Bin_original = Frequency_Bin
 	
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
@@ -5954,8 +5958,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = -6. if 'blender' in DATA_PATH else -6.0
-			lsts_end = 6. if 'blender' in DATA_PATH else 6.0
+			lsts_start = -12. if 'blender' in DATA_PATH else -6.0
+			lsts_end = 12. if 'blender' in DATA_PATH else 6.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6049,9 +6053,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 64  # starting point to calculate dynamic A
-		nside_standard = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 64  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 64 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
+		nside_start = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
+		nside_standard = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
@@ -6085,11 +6089,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	##################################### Load Visibility Data ###########################################
 	
 	
-	if not Simulation_For_All:
-		Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
-	else:
-		Integration_Time = 10.7375 * 1.  # seconds; * 3., 14
-	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245  # 1.625 * 1.e6  # Hz
+	# if not Simulation_For_All:
+	# 	Integration_Time = 10.7375 if not LST_binned_Data else 10.7375 * 2.  # seconds
+	# else:
+	# 	Integration_Time = 10.7375 * 1.  # seconds; * 3., 14
+	# Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245  # 1.625 * 1.e6  # Hz
 	
 	if Simulation_For_All:
 		index_freq = np.array([np.argsort(np.abs(Frequency_Select - flist[id_p]))[0] for id_p in range(Num_Pol)])
@@ -8883,7 +8887,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			Frequency_Bin = Frequency_gap_real * ((Frequency_Average_preload if not Select_freq else 1) * (Frequency_Average_afterload if not use_select_freq else 1))
 	
 	try:
-		print('>>>>>>>>>>>>>>>Integration_Time: %s\n>>>>>>>>>>>>>>>Frequency_Bin: %s' % (Integration_Time, Frequency_Bin))
+		print('\n>>>>>>>>>>>>>>>Integration_Time: %s\n>>>>>>>>>>>>>>>Frequency_Bin: %s' % (Integration_Time, Frequency_Bin))
 	except:
 		print('>>>>>>>>>>>>>>>Integration_Time and Frequency_Bin are not printed.')
 	
