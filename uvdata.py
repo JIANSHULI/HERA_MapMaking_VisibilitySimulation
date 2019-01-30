@@ -24,7 +24,8 @@ def read_miriad_fromUVData(filepath, correct_lat_lon=True, run_check=True,
                 run_check_acceptability=True, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[]):
     uv2 = UVData()
     uv2.read_miriad(filepath=filepath, correct_lat_lon=correct_lat_lon, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability, phase_type=phase_type)
-    if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+    if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Badants != []:
+        print('select_average starts.')
         uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
     return uv2
 
@@ -42,7 +43,8 @@ def read_uvh5_fromUVData(filename, antenna_nums=None, antenna_names=None,
                    read_data=read_data, run_check=run_check,
                    check_extra=check_extra,
                    run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
-    if Dred is True or Time_Average != 1. or Frequency_Average != 1.:
+    if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Badants != []:
+        print('select_average starts.')
         uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check)
     return uv2
     
@@ -1730,7 +1732,38 @@ class UVData(UVBase):
     
         return blt_inds, freq_inds, pol_inds, history_update_string
 
-    def _select_metadata(self, blt_inds, freq_inds, pol_inds, history_update_string):
+    # def _select_metadata(self, blt_inds, freq_inds, pol_inds, history_update_string):
+    #     """
+    #     Internal function to perform select on everything except the data_array,
+    #     flag_array and nsample_array to allow for re-use in uvfits reading
+    #     """
+    #     if blt_inds is not None:
+    #         self.Nblts = len(blt_inds)
+    #         self.baseline_array = self.baseline_array[blt_inds]
+    #         self.Nbls = len(np.unique(self.baseline_array))
+    #         self.time_array = self.time_array[blt_inds]
+    #         # self.integration_time = self.integration_time[blt_inds]
+    #         self.lst_array = self.lst_array[blt_inds]
+    #         self.uvw_array = self.uvw_array[blt_inds, :]
+    #
+    #         self.ant_1_array = self.ant_1_array[blt_inds]
+    #         self.ant_2_array = self.ant_2_array[blt_inds]
+    #         self.Nants_data = int(
+    #             len(set(self.ant_1_array.tolist() + self.ant_2_array.tolist())))
+    #
+    #         self.Ntimes = len(np.unique(self.time_array))
+    #
+    #     if freq_inds is not None:
+    #         self.Nfreqs = len(freq_inds)
+    #         self.freq_array = self.freq_array[:, freq_inds]
+    #
+    #     if pol_inds is not None:
+    #         self.Npols = len(pol_inds)
+    #         self.polarization_array = self.polarization_array[pol_inds]
+    #
+    #     self.history = self.history + history_update_string
+
+    def _select_metadata(self, blt_inds, freq_inds, pol_inds, history_update_string, keep_all_metadata=False):
         """
         Internal function to perform select on everything except the data_array,
         flag_array and nsample_array to allow for re-use in uvfits reading
@@ -1740,7 +1773,7 @@ class UVData(UVBase):
             self.baseline_array = self.baseline_array[blt_inds]
             self.Nbls = len(np.unique(self.baseline_array))
             self.time_array = self.time_array[blt_inds]
-            # self.integration_time = self.integration_time[blt_inds]
+            self.integration_time = self.integration_time[blt_inds]
             self.lst_array = self.lst_array[blt_inds]
             self.uvw_array = self.uvw_array[blt_inds, :]
         
@@ -1760,8 +1793,6 @@ class UVData(UVBase):
             self.polarization_array = self.polarization_array[pol_inds]
     
         self.history = self.history + history_update_string
-
-    
     
     def select(self, antenna_nums=None, antenna_names=None, ant_str=None,
                ant_pairs_nums=None, frequencies=None, freq_chans=None,
@@ -2230,7 +2261,7 @@ class UVData(UVBase):
         uv_object.Nubls = self.Nbls
         uv_object.redundancy = np.ones(self.Nbls)
         
-        if Dred:
+        if Dred or Badants != []:
             freqs = self.freq_array.squeeze() / 1e6
             times = self.time_array.reshape(self.Ntimes, self.Nbls)[:, 0]
             
@@ -2776,7 +2807,7 @@ class UVData(UVBase):
             else:
                 history_update_string += 'polarizations'
             n_selects += 1
-        
+
             pol_inds = np.zeros(0, dtype=np.int)
             for p in polarizations:
                 if p in uv_object.polarization_array:
@@ -2785,14 +2816,14 @@ class UVData(UVBase):
                 else:
                     raise ValueError(
                         'Polarization {p} is not present in the polarization_array'.format(p=p))
-        
+
             if len(pol_inds) > 2:
                 pol_ind_separation = pol_inds[1:] - pol_inds[:-1]
                 if np.min(pol_ind_separation) < np.max(pol_ind_separation):
                     warnings.warn('Selected polarization values are not evenly spaced. This '
                                   'will make it impossible to write this data out to '
                                   'some file types')
-        
+
             pol_inds = list(sorted(set(list(pol_inds))))
             uv_object.Npols = len(pol_inds)
             uv_object.polarization_array = uv_object.polarization_array[pol_inds]
@@ -2800,7 +2831,41 @@ class UVData(UVBase):
             uv_object.flag_array = uv_object.flag_array[:, :, :, pol_inds]
             uv_object.nsample_array = uv_object.nsample_array[:,
                                       :, :, pol_inds]
-    
+
+        # if polarizations is not None:
+        #     polarizations = uvutils._get_iterable(polarizations)
+        #     if np.array(polarizations).ndim > 1:
+        #         polarizations = np.array(polarizations).flatten()
+        #     if n_selects > 0:
+        #         history_update_string += ', polarizations'
+        #     else:
+        #         history_update_string += 'polarizations'
+        #     n_selects += 1
+        #
+        #     pol_inds = np.zeros(0, dtype=np.int)
+        #     for p in polarizations:
+        #         if isinstance(p, str):
+        #             p_num = uvutils.polstr2num(p)
+        #         else:
+        #             p_num = p
+        #         if p_num in self.polarization_array:
+        #             pol_inds = np.append(pol_inds, np.where(
+        #                 self.polarization_array == p_num)[0])
+        #         else:
+        #             raise ValueError(
+        #                 'Polarization {p} is not present in the polarization_array'.format(p=p))
+        #
+        #     if len(pol_inds) > 2:
+        #         pol_ind_separation = pol_inds[1:] - pol_inds[:-1]
+        #         if np.min(pol_ind_separation) < np.max(pol_ind_separation):
+        #             warnings.warn('Selected polarization values are not evenly spaced. This '
+        #                           'will make it impossible to write this data out to '
+        #                           'some file types')
+        #
+        #     pol_inds = list(sorted(set(list(pol_inds))))
+        # else:
+        #     pol_inds = None
+        
         history_update_string += ' using pyuvdata.'
         uv_object.history = uv_object.history + history_update_string
     
@@ -3053,7 +3118,8 @@ class UVData(UVBase):
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
             if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
-                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
+                print('select_average starts.')
+                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
             
             print('Number of Frequencies after Averaging: %s'%self.Nfreqs)
             # print('Number of Unique baselines after Dred: %s'%self.Nubls)
@@ -3092,7 +3158,8 @@ class UVData(UVBase):
                                         run_check_acceptability=run_check_acceptability,
                                         phase_type=phase_type)
                         if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
-                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
+                            print('select_average starts.')
+                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
                         self += uv2
                         # self.__add__(uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
                         
@@ -3207,6 +3274,7 @@ class UVData(UVBase):
         filepath = filename
         if times is not None:
             print('read_uvh5', times[0])
+        # print('Badants: {0}'.format(Badants))
         if isinstance(filename, (list, tuple)):
             if not read_data and len(filename) > 1:
                 raise ValueError('read_data cannot be False for a list of uvh5 files')
@@ -3219,7 +3287,8 @@ class UVData(UVBase):
                            check_extra=check_extra,
                            run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
             if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
-                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
+                print('select_average starts.')
+                self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
 
             print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
             # print('Number of Unique baselines after Dred: %s' % self.Nubls)
@@ -3270,7 +3339,8 @@ class UVData(UVBase):
                                       run_check=run_check, check_extra=check_extra,
                                       run_check_acceptability=run_check_acceptability)
                         if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
-                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select)
+                            print('select_average starts.')
+                            uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
                         self += uv2
                         # self.__add__(other=uv2, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability)
         
