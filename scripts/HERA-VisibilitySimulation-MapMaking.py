@@ -5434,8 +5434,8 @@ def cmap(i, j, n):
 		return cmap(j, i, n)
 
 	
-Frequency_Min = 100.0 if 'blender' in DATA_PATH else 160.0
-Frequency_Max = 101.0 if 'blender' in DATA_PATH else 215.0
+Frequency_Min = 50.0 if 'blender' in DATA_PATH else 165.0
+Frequency_Max = 51.0 if 'blender' in DATA_PATH else 195.0
 Frequency_Step = 1. if 'blender' in DATA_PATH else 1.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
@@ -5456,8 +5456,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# 	INSTRUMENT = 'hera'
 	# else:
 	# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
-	filetype = 'uvh5' if 'blender' in DATA_PATH else 'uvh5' # 'miriad', 'uvh5'
-	Num_Pol = 1 if filetype == 'uvh5' else 2 # int(2)
+	filetype = 'miriad' if 'blender' in DATA_PATH else 'uvh5' # 'miriad', 'uvh5'
+	Num_Pol = 2 if filetype == 'uvh5' else 2 # int(2)
 	
 	INSTRUMENT = 'hera-vivaldi' if 'blender' in DATA_PATH else 'hera-vivaldi'  # 'hera-vivaldi'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
 	INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol)
@@ -5799,8 +5799,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
-		Specific_FileIndex_start = ([6 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [5 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [0 for id_p in range(Num_Pol)] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
-		Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [20 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+		Specific_FileIndex_start = ([6 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [0 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [0 for id_p in range(Num_Pol)] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
+		Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [40 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[id_p], Specific_FileIndex_end[id_p], 1) for id_p in range(Num_Pol)] # [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if (Specific_Files and not Simulation_For_All) else False
@@ -6019,6 +6019,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# Freq_High = [Frequency_Select + Freq_Width, Frequency_Select + Freq_Width]
 	# Frequency_Select_List = np.linspace(Frequency_Select - Freq_Width, Frequency_Select + Freq_Width, 5) * 10.**6 # None # np.linspace(Frequency_Select - Freq_Width, Frequency_Select + Freq_Width, 5)
 	Bad_Freqs = [[], []]  # [[137.5, 182.421875, 183.10546875], [137.5, 182.421875, 183.10546875]]
+	Bad_Freqs_Channels = np.array([[], []])
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	antenna_pick_list = [34,35,30,31,32,25,26]
 	badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142] if (not Simulation_For_All and filetype == 'miriad') \
@@ -6062,7 +6063,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = (10.7375 if not LST_binned_Data else 10.7375 * 2.) if filetype == 'miriad' else (8.61345 if not LST_binned_Data else 8.61345 * 2.) # seconds
 	else:
-		Integration_Time = 10.7375 * 6. if filetype == 'miriad' else 8.61345 * 8.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 24. if filetype == 'miriad' else 8.61345 * 24.  # seconds; * 3., 14
 		
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	Integration_Time_original = Integration_Time
@@ -6082,8 +6083,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.3 if 'blender' in DATA_PATH else 2.0
-			lsts_end = 4.3 if 'blender' in DATA_PATH else 6.0
+			lsts_start = 1.8 if 'blender' in DATA_PATH else -12.0
+			lsts_end = 4.8 if 'blender' in DATA_PATH else 12.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6179,7 +6180,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	else:
 		nside_start = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
 		nside_standard = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 32   # undynamic A matrix shape
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
@@ -6800,7 +6801,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 					autocorr_data_mfreq_origin[i] = np.abs(np.mean(np.abs(np.array(data_origin[i].values())), axis=0))
 					Integration_Time = 1.
 					Frequency_Bin = 1.
-			
+					
+		for id_p in range(Num_Pol):
+			print('data_original baselines: {0}'.format(data_origin[id_p].keys()))
 		# RFI_Free_Thresh = 0.8
 		# RFI_AlmostFree_Thresh = 0.6
 		data = copy.deepcopy(data_origin)
@@ -6861,6 +6864,33 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 				Freq_RFI_AlmostFree_bool[i] = Freq_RFI_AlmostFree_bool[i] * (flist[i] >= Freq_Low[i]) * (flist[i] <= Freq_High[i])
 				for bq in Bad_Freqs[i]:
 					Freq_RFI_AlmostFree_bool[i] *= (flist[i] != bq)
+				if len(Bad_Freqs_Channels[i]) >= 1:
+					for id_f in Bad_Freqs_Channels[i]:
+						Freq_RFI_AlmostFree_bool[i][id_f] = False
+				if Use_External_Vis:
+					good_freq_bins = np.ones(len(Freq_RFI_AlmostFree_bool[i]), dtype=bool)
+					# Start and end of band
+					good_freq_bins[:20] = False
+					good_freq_bins[-20:] = False
+					# RFI and other spikes
+					good_freq_bins[123:133] = False
+					good_freq_bins[330:500] = False
+					good_freq_bins[595:605] = False
+					good_freq_bins[635:645] = False
+					good_freq_bins[725:750] = False
+					good_freq_bins[1113:1123] = False
+					good_freq_bins[1147:1157] = False
+					good_freq_bins[1161:1171] = False
+					good_freq_bins[1177:1187] = False
+					good_freq_bins[1226:1236] = False
+					good_freq_bins[1309:1319] = False
+					good_freq_bins[1358:1368] = False
+					good_freq_bins[1375:1385] = False
+					good_freq_bins[1440:1450] = False
+					good_freq_bins[1505:1515] = False
+					good_freq_bins[1150:1200] = False
+					good_freq_bins[1045:1055] = False
+					Freq_RFI_AlmostFree_bool[i] = Freq_RFI_AlmostFree_bool[i]*good_freq_bins
 				flist[i] = np.array(data_freqs[i][Freq_RFI_AlmostFree_bool[i]]) / 10. ** 6
 				flist[i] = flist[i][(flist[i] >= Freq_Low[i]) * (flist[i] <= Freq_High[i])]
 			except:
@@ -7161,6 +7191,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 					pass
 			
 			else:
+				num_times_per_file = 21
 				ants_nobad[i] = [ant for id_ant, ant in enumerate(ants[i]) if ant not in badants]
 				num_ants = len(ants[i])
 				print('num_ants: {0}'.format(num_ants))
@@ -7172,16 +7203,24 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						re_order_external.append(cmap(id_1, id_2, num_ants))
 				print('\nReOrder in external vis_file: {0}; {1}\n'.format(re_order_external, len(re_order_external)))
 				print('Length of Freq_RFI_AlmostFree_bool[0]: {0}\n'.format(len(Freq_RFI_AlmostFree_bool[i])))
-				vis_data_mfreq[i] = np.load(External_Vis_Directory[i])[Freq_RFI_AlmostFree_bool[i]][ :, re_order_external, :].transpose((0, 2, 1)) # vis_map_*.npy.shape: (freq, nbsl, nt)
-			
-			
+
+				if Specific_Files:
+					vis_data_mfreq[i] = np.load(External_Vis_Directory[i])[Freq_RFI_AlmostFree_bool[i]][:, re_order_external, num_times_per_file * Specific_FileIndex_start[i]:num_times_per_file * Specific_FileIndex_end[i]].transpose((0, 2, 1))  # vis_map_*.npy.shape: (freq, nbsl, nt)
+				else:
+					vis_data_mfreq[i] = np.load(External_Vis_Directory[i])[Freq_RFI_AlmostFree_bool[i]][:, re_order_external, :].transpose((0, 2, 1))  # vis_map_*.npy.shape: (freq, nbsl, nt)
+				
+				for id_bsl, bsl_enu in enumerate(data[i].keys()):
+					if bsl_enu[0] > bsl_enu[1]:
+						print('bsl to be conjugated: {0}'.format(bsl_enu))
+						vis_data_mfreq[i][:, :, id_bsl] = vis_data_mfreq[i][:, :, id_bsl].conj()
+		
 		# vis_freq_selected = freq = flist[0][index_freq[0]]  # MHz For Omni:  0:100, 16:125, 32:150, 48:175;;; For Model:  512:150MHz   Choose xx as reference
 		# vis_data = np.zeros((2,vis_data_mfreq.shape[2], vis_data_xx_mfreq.shape[3]), dtype='complex128')
 		vis_data = {}
 		for i in range(Num_Pol):
 			vis_data[i] = vis_data_mfreq[i][index_freq[i], :, :]  # [pol][ freq, time, bl]
-		
-		# del(vis_data_mfreq)
+	
+	# del(vis_data_mfreq)
 	
 	######################################### Calculate Baseline Coordinates #############################################
 	# bls = odict([(x, antpos[x[0]] - antpos[x[1]]) for x in model.keys()])
@@ -7219,16 +7258,16 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
 					
 					bls[i][x][0] = - bls[i][x][0]  # [S, E, U]
-	
+		
 		else:
 			for ant1 in range(antenna_num - 1):
-				for ant2 in range(ant1+1, antenna_num):
+				for ant2 in range(ant1 + 1, antenna_num):
 					x = (ants[i][ant1], ants[i][ant2])
 					if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
 							and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
 						bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
 						bls[i][x][0] = - bls[i][x][0]
-		
+	
 	bls = np.array(bls)
 	
 	bsl_coord = [[] for id_p in range(Num_Pol)]
@@ -7459,6 +7498,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			tag = '{0}-{1:.2f}' .format(INSTRUMENT, freq) + '-{0}-{1:.6f}' .format('bW' if Use_BeamWeight else 'gW', valid_pix_thresh) + tag
 		else:
 			tag = '{0}-{1:.2f}' .format(INSTRUMENT, freq) + '-{0}-{1:.6f}' .format('bW' if Use_BeamWeight else 'gW', valid_pix_thresh)
+		
 		tmasks = {}
 		for id_p, p in enumerate(pol_list):
 			# tmasks[p] = np.ones_like(tlist).astype(bool)
@@ -7611,7 +7651,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		print(flist[2])
 	
 	print('Selected Single Frequency: {0} MHz' .format(freq))
-	
+	print('\n lsts[0]: {0} in seconds.\n'.format(lsts))
 	print ('\n>>>>>>>>>>Used nUBL = {0}, nt = {1}, nf = {2}, Num_Pol = {3}.\n' .format(nUBL_used, nt_used, nf_used, Num_Pol))
 	sys.stdout.flush()
 	
@@ -10188,7 +10228,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		# mem.total / 1024. ** 3
 		memory_left = - resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.**3 + virtual_memory().total / 1024.**3
 		print('\n>>>>>>>>>>> A_size: {0} GB; Memory Left: {1} GB.'.format(A_size_memory, memory_left))
-		nchunk = np.int(A_size_memory / (memory_left * 0.9 / 3.)) + 1
+		nchunk = np.int(A_size_memory / (memory_left * 0.9 / 3.)) + 2
 		print('>>>>>>>>>>> New nchunk from memory calculation: {0} \n'.format(nchunk))
 		
 		if nchunk == 1:

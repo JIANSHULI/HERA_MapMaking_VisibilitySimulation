@@ -28,7 +28,7 @@ import astropy
 # from aipy.miriad import pol2str
 from astropy.io import fits
 import HERA_MapMaking_VisibilitySimulation as mmvs
-from pyuvdata import UVData, UVCal, UVFITS
+from pyuvdata import UVData, UVCal, uvfits
 from HERA_MapMaking_VisibilitySimulation import UVData as UVData_HR
 from HERA_MapMaking_VisibilitySimulation import UVCal as UVCal_HR
 from HERA_MapMaking_VisibilitySimulation import UVFITS as UVFITS_HR
