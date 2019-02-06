@@ -2148,6 +2148,9 @@ class UVData(UVBase):
             inplace: Option to perform the select directly on self (True, default) or return
                 a new UVData object, which is a subselection of self (False)
         """
+        # if Dred:
+        #     print('Dred')
+        # print('Time_Average: {0}; Freq_Average: {1}'.format(Time_Average, Frequency_Average))
         # if inplace:
         #     uv_object = self
         # else:
@@ -3097,7 +3100,7 @@ class UVData(UVBase):
 
     def read_miriad(self, filepath, correct_lat_lon=True, run_check=False,
                     check_extra=False,
-                    run_check_acceptability=False, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], antenna_nums=None, ant_str=None, ant_pairs_nums=None,
+                    run_check_acceptability=False, phase_type=None, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=False, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], antenna_nums=None, ant_str=None, ant_pairs_nums=None,
                     polarizations=None, time_range=None, Frequency_Select=None):
         """
         Read in data from a miriad file.
@@ -3118,6 +3121,9 @@ class UVData(UVBase):
                              run_check_acceptability=run_check_acceptability,
                              phase_type=phase_type)
             if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                if Dred:
+                    print('Dred')
+                print('Time_Average: {0}; Freq_Average: {1}'.format(Time_Average, Frequency_Average))
                 print('select_average starts.')
                 self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
             
@@ -3158,6 +3164,9 @@ class UVData(UVBase):
                                         run_check_acceptability=run_check_acceptability,
                                         phase_type=phase_type)
                         if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                            if Dred:
+                                print('Dred')
+                            print('Time_Average: {0}; Freq_Average: {1}'.format(Time_Average, Frequency_Average))
                             print('select_average starts.')
                             uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
                         self += uv2
@@ -3214,7 +3223,7 @@ class UVData(UVBase):
     def read_uvh5(self, filename, antenna_nums=None, antenna_names=None,
                   ant_str=None, bls=None, frequencies=None, freq_chans=None,
                   times=None, polarizations=None, blt_inds=None, read_data=True,
-                  run_check=False, check_extra=False, run_check_acceptability=False, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], Frequency_Select=None):
+                  run_check=False, check_extra=False, run_check_acceptability=False, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=False, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], Frequency_Select=None):
         """
         Read a UVH5 file.
 
@@ -3270,6 +3279,10 @@ class UVData(UVBase):
         Returns:
             None
         """
+        if Dred:
+            print('Dred_sub')
+        print('\nTime_Average_sub: {0}; Freq_Average_sub: {1}\n'.format(Time_Average, Frequency_Average))
+        
         from . import uvh5
         filepath = filename
         if times is not None:
@@ -3287,7 +3300,10 @@ class UVData(UVBase):
                            check_extra=check_extra,
                            run_check_acceptability=run_check_acceptability, Parallel_Files=False, Time_Average=1, Frequency_Average=1, Dred=True, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[])
             if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
-                print('select_average starts.')
+                if Dred:
+                    print('Dred')
+                print('Time_Average: {0}; Freq_Average: {1}'.format(Time_Average, Frequency_Average))
+                print('\n>>> select_average starts.\n')
                 self.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
 
             print('Number of Frequencies after Averaging: %s' % self.Nfreqs)
@@ -3339,6 +3355,9 @@ class UVData(UVBase):
                                       run_check=run_check, check_extra=check_extra,
                                       run_check_acceptability=run_check_acceptability)
                         if Dred is True or Time_Average != 1. or Frequency_Average != 1. or Frequency_Select is not None:
+                            if Dred:
+                                print('Dred')
+                            print('Time_Average: {0}; Freq_Average: {1}'.format(Time_Average, Frequency_Average))
                             print('select_average starts.')
                             uv2.select_average(Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, run_check=run_check, frequencies=Frequency_Select, polarizations=polarizations)
                         self += uv2

@@ -633,7 +633,7 @@ def Chunk_Multiply_small_p(A_1, A_2, Ni, chunk, nchunk, expected_time, i, j, dot
 	else:
 		C = np.einsum('ji,jk->ik', A_1 * Ni[:, None], A_2)
 	if expected_time >= 1.:
-		print "%i-%i/%i: %.5fmins " % (i, j, nchunk, (time.time() - ltm) / 60.),
+		print ("%i-%i/%i: %.5fmins " % (i, j, nchunk, (time.time() - ltm) / 60.))
 		sys.stdout.flush()
 	return C
 
@@ -1114,6 +1114,9 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 	lsts : ndarray containing LST bins of data (radians)
 	pols : ndarray containing list of polarization index integers
 	"""
+	if Dred:
+		print('Dred_main')
+	print('\nTime_Average_main: {0}; Freq_Average_main: {1}\n'.format(Time_Average, Frequency_Average))
 	# check datanames is not a list
 	if type(datanames) is not list and type(datanames) is not np.ndarray:
 		if type(datanames) is str:
@@ -1257,6 +1260,8 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 			autos_pro, autos_flags_pro = DataContainer(autos), DataContainer(autos_flags)
 			print('Data_Contained.')
 	except:
+		autos_pro = []
+		autos_flags_pro = []
 		print('Not Data_Contained.')
 	
 	# get meta
@@ -1485,7 +1490,10 @@ def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_A
 		if id_key == 0:
 			print ('rawData_Shape-{0}: {1}' .format(key, data[key].shape))
 			print ('rawDflags_Shape-{0}: {1}' .format(key, dflags[key].shape))
-			print ('rawAutocorr_Shape: {0}' .format(autocorr_data_mfreq.shape))
+			try:
+				print ('rawAutocorr_Shape: {0}' .format(autocorr_data_mfreq.shape))
+			except:
+				pass
 			print ('rawData_Freqs: {0}' .format(len(data_freqs)))
 			print ('rawData_Times: {0}' .format(len(data_times)))
 			print ('rawData_Lsts: {0}' .format(len(data_lsts)))
@@ -1514,17 +1522,20 @@ def Compress_Data_by_Average(data=None, dflags=None, Time_Average=1, Frequency_A
 	data_lsts = copy.deepcopy(data_lsts_ff)
 	
 	if Contain_Autocorr:
-		autocorr_data_mfreq = autocorr_data_mfreq[: -remove_times, : -remove_freqs]
-		if use_RFI_AlmostFree_Freq:
-			autocorr_data_mfreq = autocorr_data_mfreq[:, Freq_RFI_AlmostFree_bool]
-		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1]), axis=1) if not use_select_time else autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1])[:, 0, :]
-		autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average), axis=-1) if not use_select_freq else autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average)[:, :, 0]
-		autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
-		del (autocorr_data_mfreq_ff)
 		try:
-			print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq.shape)
+			autocorr_data_mfreq = autocorr_data_mfreq[: -remove_times, : -remove_freqs]
+			if use_RFI_AlmostFree_Freq:
+				autocorr_data_mfreq = autocorr_data_mfreq[:, Freq_RFI_AlmostFree_bool]
+			autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1]), axis=1) if not use_select_time else autocorr_data_mfreq.reshape(autocorr_data_mfreq.shape[0] / Time_Average, Time_Average, autocorr_data_mfreq.shape[1])[:, 0, :]
+			autocorr_data_mfreq_ff = np.mean(autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average), axis=-1) if not use_select_freq else autocorr_data_mfreq_ff.reshape(autocorr_data_mfreq.shape[0] / Time_Average, autocorr_data_mfreq.shape[1] / Frequency_Average, Frequency_Average)[:, :, 0]
+			autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_ff)
+			del (autocorr_data_mfreq_ff)
+			try:
+				print ('Autocorr_Shape: (%s, %s)' % autocorr_data_mfreq.shape)
+			except:
+				print('Shape of autocorr results printing not complete.')
 		except:
-			print('Shape of autocorr results printing not complete.')
+			print('Autocorrelation not processed.')
 	
 	del (data_ff)
 	del (dflags_ff)
@@ -5434,8 +5445,8 @@ def cmap(i, j, n):
 		return cmap(j, i, n)
 
 	
-Frequency_Min = 50.0 if 'blender' in DATA_PATH else 165.0
-Frequency_Max = 51.0 if 'blender' in DATA_PATH else 195.0
+Frequency_Min = 50.0 if 'blender' in DATA_PATH else 195.0
+Frequency_Max = 51.0 if 'blender' in DATA_PATH else 235.0
 Frequency_Step = 1. if 'blender' in DATA_PATH else 1.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
@@ -5791,16 +5802,16 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	LST_binned_Data = True if filetype == 'miriad' else False if filetype == 'uvh5' else False  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 	# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 	Delay_Filter = False
-	Observing_Session = (['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/']) if filetype != 'uvh5' else ['/ObservingSession1232039492/2458504/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
+	Observing_Session = (['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/']) if filetype != 'uvh5' else ['/ObservingSession1232039492/2458504/'] if Use_External_Vis else ['/OmnicaledVivaldi6/'] # ['/ObservingSession1232039492/2458504/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 	Filename_Suffix = (('.uvOCRSL' if LST_binned_Data else '.uvOCRS') if not Delay_Filter else ('.uvOCRSDL' if LST_binned_Data else '.uvOCRSD')) if filetype == 'miriad' else ('.uvh5' if filetype == 'uvh5' else '')  # '.uvOCRS' '.uvOCRSD'
 	Nfiles_temp = 7300
-	Specific_Files = (True if 'blender' in DATA_PATH else False) if not Use_External_Vis else False # Choose a list of Specific Data Sets.
+	Specific_Files = (True if 'blender' in DATA_PATH else False) if not Use_External_Vis else True # Choose a list of Specific Data Sets.
 	if len(sys.argv) > 2:
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
 		Specific_FileIndex_start = ([6 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [0 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [0 for id_p in range(Num_Pol)] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
-		Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [40 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+		Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [120 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[id_p], Specific_FileIndex_end[id_p], 1) for id_p in range(Num_Pol)] # [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if (Specific_Files and not Simulation_For_All) else False
@@ -5932,7 +5943,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Coarse_Pixels = True if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
 	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-1.6) if 'blender' in DATA_PATH else 10. ** (-3.)
+	valid_pix_threshold_coarse = 10. ** (-1.3) if 'blender' in DATA_PATH else 10. ** (-3.)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
@@ -6023,7 +6034,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Comply2RFI = True  # Use RFI_Best as selected frequency.
 	antenna_pick_list = [34,35,30,31,32,25,26]
 	badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142] if (not Simulation_For_All and filetype == 'miriad') \
-		else [14] if (not Simulation_For_All and filetype == 'uvh5') else [] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
+		else [14] if (not Simulation_For_All and filetype == 'uvh5' and Use_External_Vis) else [] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
 	
 	# classic source Confusion limit -- 32: 12.687(0.1), 2.7612(1.)  ;
 	# 040: 3, 74, 277, 368, 526,
@@ -6063,7 +6074,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = (10.7375 if not LST_binned_Data else 10.7375 * 2.) if filetype == 'miriad' else (8.61345 if not LST_binned_Data else 8.61345 * 2.) # seconds
 	else:
-		Integration_Time = 10.7375 * 24. if filetype == 'miriad' else 8.61345 * 24.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 30. if filetype == 'miriad' else 8.61345 * 30.  # seconds; * 3., 14
 		
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	Integration_Time_original = Integration_Time
@@ -6141,7 +6152,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Add_Rcond = True # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
 	# rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
-	rcond_list = np.concatenate(([0.], 10. ** np.arange(-25, 10., 1.)))
+	rcond_list = np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))
 	Selected_Diagnal_R = False # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 	diag_threshold = 10. ** (-12.)
 	if Data_Deteriorate:
@@ -6251,10 +6262,17 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		
 		elif filetype == 'uvh5':
 			for session in Observing_Session:
-				for fname_x in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH + session) + Filename_Suffix))):
-					data_fnames_full[0].append(fname_x)
-				for fname_y in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH + session) + Filename_Suffix))):
-					data_fnames_full[1].append(fname_y)
+				if not Use_External_Vis:
+					for fname_x in sorted((glob.glob("{0}/zen.*.*.HH.omni_vis".format(DATA_PATH + session) + Filename_Suffix))):
+						data_fnames_full[0].append(fname_x)
+					for fname_y in sorted((glob.glob("{0}/zen.*.*.HH.omni_vis".format(DATA_PATH + session) + Filename_Suffix))):
+						data_fnames_full[1].append(fname_y)
+				else:
+					for fname_x in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH + session) + Filename_Suffix))):
+						data_fnames_full[0].append(fname_x)
+					for fname_y in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH + session) + Filename_Suffix))):
+						data_fnames_full[1].append(fname_y)
+						
 			data_fnames_full[0] = sorted(data_fnames_full[0])
 			data_fnames_full[1] = sorted(data_fnames_full[1])
 		
@@ -6688,7 +6706,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
 							findex_list[i] = np.unique(np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))]))
 							
-							autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos[i][data_autos[i].keys()[k]]) for k in range(len(data_autos[i].keys()))]), axis=0)
+							try:
+								autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos[i][data_autos[i].keys()[k]]) for k in range(len(data_autos[i].keys()))]), axis=0)
+							except:
+								autocorr_data_mfreq_origin[i] = np.ones_like(data_origin[i].values()[0])
+								print('autocorr_data_mfreq_origin shape: {0}'.format(autocorr_data_mfreq_origin[i].shape))
+								Noise_from_Diff_Freq = True
 							print('raw_Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 							# autocorr_data_mfreq[1] = np.mean(np.array([np.abs(uvd_yy.get_data((ants[k], ants[k]))) for k in range(Nants)]), axis=0)
 							
@@ -6746,7 +6769,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 																																																	   Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
 																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants, Parallel_Files=Parallel_Files, run_check=Run_Check,
 																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
-						autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
+						try:
+							autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
+						except:
+							autocorr_data_mfreq_origin[i] = np.ones_like(data_origin[i].values()[0])
+							print('autocorr_data_mfreq_origin shape: {0}'.format(autocorr_data_mfreq_origin[i].shape))
+							Noise_from_Diff_Freq = True
 						
 						print('Pol_%s is done. %s seconds used.' % (['xx', 'yy'][i], time.time() - timer))
 					
@@ -6781,7 +6809,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 					data_autos_flags_origin[i] = PolsData[i][9]
 					redundancy_origin[i] = PolsData[i][10]
 					
-					autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
+					try:
+						autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
+					except:
+						autocorr_data_mfreq_origin[i] = np.ones_like(data_origin[i].values()[0])
+						print('autocorr_data_mfreq_origin shape: {0}'.format(autocorr_data_mfreq_origin[i].shape))
+						Noise_from_Diff_Freq = True
 					
 					if Lst_Hourangle:
 						# for i in range(2):
@@ -6939,9 +6972,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		else:
 			pass
 		
-		for i in range(Num_Pol):
-			autocorr_data[i] = autocorr_data_mfreq[i][:, index_freq[i]]
-		
+		try:
+			for i in range(Num_Pol):
+				autocorr_data[i] = autocorr_data_mfreq[i][:, index_freq[i]]
+		except:
+			pass
 		# Synthesize_MultiFreq_start = [[], []]
 		# Synthesize_MultiFreq_end = [[], []]
 		# Flist_select = [[], []]
@@ -7173,9 +7208,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		jansky2kelvin_multifreq = np.ones_like(jansky2kelvin_multifreq)
 	
 	if not Simulation_For_All:
-		for i in range(Num_Pol):
-			autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
-			autocorr_data[i] = autocorr_data[i] * jansky2kelvin
+		try:
+			for i in range(Num_Pol):
+				autocorr_data_mfreq[i] = autocorr_data_mfreq[i] * jansky2kelvin_multifreq
+				autocorr_data[i] = autocorr_data[i] * jansky2kelvin
+		except:
+			print('auto not janskied.')
 		
 		vis_data_mfreq = {}
 		ants_nobad = {}
