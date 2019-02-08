@@ -5445,8 +5445,8 @@ def cmap(i, j, n):
 		return cmap(j, i, n)
 
 	
-Frequency_Min = 50.0 if 'blender' in DATA_PATH else 195.0
-Frequency_Max = 51.0 if 'blender' in DATA_PATH else 235.0
+Frequency_Min = 50.0 if 'blender' in DATA_PATH else 55.0
+Frequency_Max = 51.0 if 'blender' in DATA_PATH else 115.0
 Frequency_Step = 1. if 'blender' in DATA_PATH else 1.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
@@ -5698,7 +5698,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# elif 'hera' in INSTRUMENT:
 	Simulation_For_All = True if 'blender' in DATA_PATH else False # Simulate from the very beginning: loading data.
 	Use_SimulatedData = True if Simulation_For_All else False
-	Use_External_Vis = False if filetype == 'miriad' else True if (filetype == 'uvh5' and not Simulation_For_All) else False
+	Use_External_Vis = False if filetype == 'miriad' else False if (filetype == 'uvh5' and not Simulation_For_All) else False
 	External_Vis_Directory = [DATA_PATH + '/vis_map_xx.npy', DATA_PATH + '/vis_map_yy.npy'] if Num_Pol == 2 else [DATA_PATH + '/vis_map_xx.npy'] if Num_Pol == 1 else []
 	
 	
@@ -5943,7 +5943,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Coarse_Pixels = True if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
 	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-1.3) if 'blender' in DATA_PATH else 10. ** (-3.)
+	valid_pix_threshold_coarse = 10. ** (-1.25) if 'blender' in DATA_PATH else 10. ** (-3.)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
@@ -6083,7 +6083,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 350 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 243 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10.** (-6)) for i in range(Num_Pol)])
 		else:
@@ -6094,8 +6094,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 1.8 if 'blender' in DATA_PATH else -12.0
-			lsts_end = 4.8 if 'blender' in DATA_PATH else 12.0
+			lsts_start = -6.0 if 'blender' in DATA_PATH else -12.0
+			lsts_end = 6.0 if 'blender' in DATA_PATH else 12.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6152,7 +6152,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Add_Rcond = True # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
 	# rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
-	rcond_list = np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))
+	rcond_list = np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.)))
 	Selected_Diagnal_R = False # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 	diag_threshold = 10. ** (-12.)
 	if Data_Deteriorate:
@@ -6189,8 +6189,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
-		nside_standard = 512 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_start = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
+		nside_standard = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
