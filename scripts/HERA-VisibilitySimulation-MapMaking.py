@@ -1726,12 +1726,12 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 				if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
 						and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
 					try:
-						if np.prod([np.mean(np.array(dflags[i][antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % Pol_list[i]][:, Flist_select_index[i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) for id_p in range(Num_Pol)]): # \
+						if np.prod([np.mean(np.array(dflags[id_p][antpos[id_p].keys()[Ubl_list_raw[id_p][i_ubl][i_ubl_pair][0]], antpos[id_p].keys()[Ubl_list_raw[id_p][i_ubl][i_ubl_pair][1]], '%s' % Pol_list[id_p]][:, Flist_select_index[id_p]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) for id_p in range(Num_Pol)]): # \
 								# and np.mean(np.array(dflags[1 - i][antpos[1 - i].keys()[Ubl_list_raw[1 - i][i_ubl][i_ubl_pair][0]], antpos[1 - i].keys()[Ubl_list_raw[1 - i][i_ubl][i_ubl_pair][1]], '%s' % Pol_list[1 - i]][:, Flist_select_index[1 - i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen):
 							list_bsl.append(data[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], '%s' % Pol_list[i])))
 					except:
 						try:
-							if np.prod([np.mean(np.array(dflags[i][antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % Pol_list[i]][:, Flist_select_index[i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) for id_p in range(Num_Pol)]): # \
+							if np.prod([np.mean(np.array(dflags[id_p][antpos[id_p].keys()[Ubl_list_raw[id_p][i_ubl][i_ubl_pair][1]], antpos[id_p].keys()[Ubl_list_raw[id_p][i_ubl][i_ubl_pair][0]], '%s' % Pol_list[id_p]][:, Flist_select_index[id_p]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen) for id_p in range(Num_Pol)]): # \
 									# and np.mean(np.array(dflags[1 - i][antpos[1 - i].keys()[Ubl_list_raw[1 - i][i_ubl][i_ubl_pair][1]], antpos[1 - i].keys()[Ubl_list_raw[1 - i][i_ubl][i_ubl_pair][0]], '%s' % Pol_list[1 - i]][:, Flist_select_index[1 - i]])) <= (RFI_Free_Thresh * RFI_Free_Thresh_bslStrengthen):
 								list_bsl.append(data[i].keys().index((antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][1]], antpos[i].keys()[Ubl_list_raw[i][i_ubl][i_ubl_pair][0]], '%s' % Pol_list[i])))
 						except:
@@ -1764,7 +1764,7 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 			dflags_dred[i] = LastUpdatedOrderedDict()
 			pol = pol_list[i]
 			
-			for i_ubl in range(Nubl_raw[0]):
+			for i_ubl in range(Nubl_raw[i]):
 				vis_data_dred[i][:, i_ubl] = np.mean(vis_data[i].transpose()[Ubl_list[i][i_ubl]].transpose(), axis=1)
 				bsl_coord_dred[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
 				dflags_dred[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][0]]] = np.mean(np.array([dflags_sf[i][dflags_sf[i].keys()[Ubl_list[i][i_ubl][k]]] for k in range(len(Ubl_list[i][i_ubl]))]), axis=0) != 0
@@ -1777,7 +1777,7 @@ def De_Redundancy(dflags=None, antpos=None, ants=None, SingleFreq=True, MultiFre
 			dflags_dred_mfreq[i] = LastUpdatedOrderedDict()
 			pol = pol_list[i]
 			
-			for i_ubl in range(Nubl_raw[0]):
+			for i_ubl in range(Nubl_raw[i]):
 				vis_data_dred_mfreq[i][:, :, i_ubl] = np.mean(vis_data_mfreq[i][:, :, Ubl_list[i][i_ubl]], axis=-1)
 				bsl_coord_dred_mfreq[i][i_ubl] = np.mean(bsl_coord[i][Ubl_list[i][i_ubl]], axis=0)
 				dflags_dred_mfreq[i][dflags[i].keys()[Ubl_list[i][i_ubl][0]]] = np.mean(np.array([dflags[i][dflags[i].keys()[Ubl_list[i][i_ubl][k]]] for k in range(len(Ubl_list[i][i_ubl]))]), axis=0) != 0
@@ -5810,7 +5810,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Specific_FileIndex_start = [int(sys.argv[2]), int(sys.argv[2])]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
-		Specific_FileIndex_start = ([6 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [0 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [0 for id_p in range(Num_Pol)] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
+		Specific_FileIndex_start = ([4 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [0 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [0 for id_p in range(Num_Pol)] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
 		Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [120 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[id_p], Specific_FileIndex_end[id_p], 1) for id_p in range(Num_Pol)] # [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
@@ -5855,7 +5855,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		# TGSSADR J045826.4-300720	[ra:74.61041, dec:-30.12238] Flux:15692.2 mJy, 911.9 mJy, 32:8662; Map: 35.2429 Jy
 		# TGSSADR J045514.2-300650	[ra:73.80946, dec:-30.11399] Flux:20822.9 mJy, 9501.2 mJy, 32:8662; Map: 35.2429 Jy
 		# TGSSADR J042940.1-363053	[ra:67.41748, dec:-36.51481] Flux:17746.0 mJy, 14607.4 mJy; 32:8643 Map: 27.0642 Jy
-		# TGSSADR J052257.7-362735	[ra:80.74076, dec:-36.45975] Flux:62750.3 mJy, 41460.5 mJy; 64:34264 Map: 31.8555 Jy
+		# TGSSADR J052257.7-362735	[ra:80.74076, dec:-36.45975] Flux:62750.3 mJy, 41460.5 mJy; 64:34264 Map: 31.8555 Jy; 32: 8566
 		# TGSSADR J062706.4-352908	[ra:96.77693, dec:-35.48578] Flux:18110.7 mJy, 4117.4 mJy; 32:9914 Map: 24.3569 Jy
 		# TGSSADR J093801.0-291246	[ra:144.50452, dec:-29.21283] Flux:14016.6 mJy, 1482.9 mJy; 32:10005 Map: 73.0347 Jy
 		# TGSSADR J090147.5-255520	[ra:135.44815, dec:-25.92238] Flux:49615.9 mJy, 18238.5 mJy; 32:10035 Map: 31.7665 Jy
@@ -5941,11 +5941,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	nchunk_from_memory_calculation_full = True # IF recalculate nchunk_A_full by comparing memory left and A size
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = True if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels = False if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
 	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-1.25) if 'blender' in DATA_PATH else 10. ** (-3.)
+	valid_pix_threshold_coarse = 10. ** (-2.) if 'blender' in DATA_PATH else 10. ** (-3.)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
-	Use_rotated_beampattern_as_beamweight = True if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
+	Use_rotated_beampattern_as_beamweight = False if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
 	NoA_Out_fullsky = False if Use_memmap_A_full else True # Whether or not to calculate full A matrix
 	
@@ -6035,6 +6035,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	antenna_pick_list = [34,35,30,31,32,25,26]
 	badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142] if (not Simulation_For_All and filetype == 'miriad') \
 		else [14] if (not Simulation_For_All and filetype == 'uvh5' and Use_External_Vis) else [] # All-IDR2.1: [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
+	badants_pre = [14] if (filetype == 'uvh5' and Use_External_Vis) else []
 	
 	# classic source Confusion limit -- 32: 12.687(0.1), 2.7612(1.)  ;
 	# 040: 3, 74, 277, 368, 526,
@@ -6094,7 +6095,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = -6.0 if 'blender' in DATA_PATH else -12.0
+			lsts_start = -0.0 if 'blender' in DATA_PATH else -12.0
 			lsts_end = 6.0 if 'blender' in DATA_PATH else 12.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
@@ -6152,7 +6153,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Add_Rcond = True # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
 	# rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
-	rcond_list = np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.)))
+	rcond_list = np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))
 	Selected_Diagnal_R = False # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 	diag_threshold = 10. ** (-12.)
 	if Data_Deteriorate:
@@ -6169,7 +6170,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.)
 		else:
-			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10.**(-1.5)
+			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-1.5) if 'blender' in DATA_PATH else 10.**(-1.5)
 	
 	Narrow_Beam = True if Simulation_For_All else False # Narrow the beam to primary beam.
 	Narrow_Beam_threshold = valid_pix_thresh # 10. ** (-6.)  # Threshold for Primary Beam.
@@ -6199,7 +6200,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	WaterFall_Plot = False
 	WaterFall_Plot_with_MultiFreqSimulation = False
 	
-	Old_BeamPattern = False  # Whether to use the 2017 beam pattern files or not (2018 has other unnits but from same CST simulation).
+	Old_BeamPattern = True  # Whether to use the 2017 beam pattern files or not (2018 has other units but from same CST simulation).
 	Beam_Normalization = True #
 	bnside = 64 if 'spar' not in INSTRUMENT else nside_standard # beam pattern data resolution
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
@@ -6653,7 +6654,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 									pass
 							(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																						  Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
-																																																						  Select_freq=Select_freq, Select_time=Select_time, Badants=badants, Parallel_Files=Parallel_Files, run_check=Run_Check,
+																																																						  Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
 																																																						  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
 							print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 						# specify data file and load into UVData, load into dictionary
@@ -6670,7 +6671,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						# (data[i], dflags[i], antpos[i], ants[i], data_freqs[i], data_times[i], data_lsts[i], data_pols[i]) = hc.abscal.UVData2AbsCalDict(data_fname[i], return_meta=True)
 						(data_origin[i], dflags_origin[i], antpos_origin[i], ants_origin[i], data_freqs_origin[i], data_times_origin[i], data_lsts_origin[i], data_pols_origin[i], data_autos_origin[i], data_autos_flags_origin[i], redundancy_origin[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																	   Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
-																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants, Parallel_Files=Parallel_Files, run_check=Run_Check,
+																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
 																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
 						print('small_Pol_%s is done.' % ['xx', 'yy'][i])
 						
@@ -6700,7 +6701,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							timer = time.time()
 							(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																									Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
-																																																									Select_freq=Select_freq, Select_time=Select_time, Badants=badants, Parallel_Files=Parallel_Files, run_check=Run_Check,
+																																																									Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
 																																																									Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
 							data_freqs_full[i] = data_freqs_full[i] / 1.e6
 							# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
@@ -6759,7 +6760,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							model_fname[i] = "/Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/ObservingSession-1192115507/2458042/zen.2458042.12552.%s.HH.uv" % ['xx', 'yy'][i]  # /Users/JianshuLi/Documents/Miracle/Research/Cosmology/21cm Cosmology/Algorithm-Data/Data/HERA-47/Observation-1192115507/2458042/zen.2458042.13298.xx.HH.uv
 							(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																						  Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
-																																																						  Select_freq=Select_freq, Select_time=Select_time, Badants=badants, Parallel_Files=Parallel_Files, run_check=Run_Check,
+																																																						  Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
 																																																						  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
 							print('model_Pol_%s is done.' % Pol_list[i])
 						# specify data file and load into UVData, load into dictionary
@@ -6767,7 +6768,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						timer = time.time()
 						(data_origin[i], dflags_origin[i], antpos_origin[i], ants_origin[i], data_freqs_origin[i], data_times_origin[i], data_lsts_origin[i], data_pols_origin[i], data_autos_origin[i], data_autos_flags_origin[i], redundancy_origin[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																	   Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
-																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants, Parallel_Files=Parallel_Files, run_check=Run_Check,
+																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
 																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
 						try:
 							autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
@@ -6790,7 +6791,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			else:
 				timer = time.time()
 				pool = Pool()
-				PolsData_process = [pool.apply_async(UVData2AbsCalDict_Auto, args=(data_fnames[p], None, True, True, filetype, True, True, Time_Average_preload, Frequency_Average_preload, Dred_preload, True, Tolerance, Select_freq, Select_time, badants, Parallel_Files, Run_Check, False, False, None, None,
+				PolsData_process = [pool.apply_async(UVData2AbsCalDict_Auto, args=(data_fnames[p], None, True, True, filetype, True, True, Time_Average_preload, Frequency_Average_preload, Dred_preload, True, Tolerance, Select_freq, Select_time, badants_pre, Parallel_Files, Run_Check, False, False, None, None,
 																					None, None, None, None, [Pol_num_list[i]], None, True, Frequency_Select)) for p in range(Num_Pol)]
 				PolsData = [poldata.get() for poldata in PolsData_process]
 				pool.close()
@@ -8105,7 +8106,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	
 	
 	elif Old_BeamPattern:
-		filename_pre = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
+		filename_pre = script_dir + '/../data/HERA-47/HERA dipole - beams/healpix_beam.fits'
+		# filename_pre = script_dir + '/../data/HERA-47/Beam-Dipole/healpix_beam.fits'
 		beam_E = fits.getdata(filename_pre, extname='BEAM_E').T  # E is east corresponding to X polarization
 		if Beam_Normalization:
 			for id_f in range(beam_E.shape[0]):
@@ -9809,28 +9811,43 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 				#			data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
 				data[pol] = (data[pol].flatten()).conjugate()  # there's a conjugate convention difference
 			elif 'hera' in INSTRUMENT:
+				# if From_File_Data:
+				# 	if Use_PsAbsCal:
+				# 		Ni[pol] = 1. / (np.fromfile(data_var_filename_pscal, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+				# 	elif Use_Fullsim_Noise:
+				# 		Ni[pol] = 1. / (np.fromfile(sim_var_filename, dtype='float64').reshape((nt_used, nUBL_used)).transpose().flatten())
+				# 	else:
+				# 		Ni[pol] = 1. / (np.fromfile(data_var_filename, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+				# else:
+				# 	if Use_PsAbsCal:
+				# 		Ni[pol] = 1. / N_data_pscal[p].reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+				# 	elif Use_Fullsim_Noise:
+				# 		Ni[pol] = 1. / (np.fromfile(sim_var_filename, dtype='float64').reshape((nt_used, nUBL_used)).transpose().flatten())
+				# 	else:
+				# 		Ni[pol] = 1. / N_data[p].reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 				if From_File_Data:
 					if Use_PsAbsCal:
-						Ni[pol] = 1. / (np.fromfile(data_var_filename_pscal, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+						Ni[pol] = 1. / (np.fromfile(data_var_filename_pscal, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose().flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 					elif Use_Fullsim_Noise:
 						Ni[pol] = 1. / (np.fromfile(sim_var_filename, dtype='float64').reshape((nt_used, nUBL_used)).transpose().flatten())
 					else:
-						Ni[pol] = 1. / (np.fromfile(data_var_filename, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+						Ni[pol] = 1. / (np.fromfile(data_var_filename, dtype='float64').reshape((nt, nUBL_used))[tmask].transpose().flatten())  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 				else:
 					if Use_PsAbsCal:
-						Ni[pol] = 1. / N_data_pscal[p].reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+						Ni[pol] = 1. / N_data_pscal[p].reshape((nt, nUBL_used))[tmask].transpose().flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
 					elif Use_Fullsim_Noise:
 						Ni[pol] = 1. / (np.fromfile(sim_var_filename, dtype='float64').reshape((nt_used, nUBL_used)).transpose().flatten())
 					else:
-						Ni[pol] = 1. / N_data[p].reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1].flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+						Ni[pol] = 1. / N_data[p].reshape((nt, nUBL_used))[tmask].transpose().flatten()  # var_data[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1].flatten()
+				
 				if From_File_Data:
 					if Use_PsAbsCal:
-						data[pol] = np.fromfile(globals()['pscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]
+						data[pol] = np.fromfile(globals()['pscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, len(ubls[p])))[tmask].transpose()[abs(ubl_index[p]) - 1]
 					elif Use_AbsCal:
-						data[pol] = np.fromfile(globals()['abscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]
+						data[pol] = np.fromfile(globals()['abscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, len(ubls[p])))[tmask].transpose()[abs(ubl_index[p]) - 1]
 					else:
 						# data[pol] = jansky2kelvin * np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
-						data[pol] = np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
+						data[pol] = np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, len(ubls[p])))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
 				else:
 					if Use_PsAbsCal:
 						if vis_data_dred_pscal[pol_index].shape[0] == len(tmask):
@@ -9852,6 +9869,36 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							data[pol] = vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
 						else:
 							data[pol] = vis_data_dred[pol_index].transpose()[abs(ubl_index[p]) - 1]
+				
+				# if From_File_Data:
+				# 	if Use_PsAbsCal:
+				# 		data[pol] = np.fromfile(globals()['pscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]
+				# 	elif Use_AbsCal:
+				# 		data[pol] = np.fromfile(globals()['abscal_data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]
+				# 	else:
+				# 		# data[pol] = jansky2kelvin * np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
+				# 		data[pol] = np.fromfile(globals()['data_vis_dred_' + pol + '_filename'], dtype='complex128').reshape((nt, nUBL_used))[tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()
+				# else:
+				# 	if Use_PsAbsCal:
+				# 		if vis_data_dred_pscal[pol_index].shape[0] == len(tmask):
+				# 			data[pol] = vis_data_dred_pscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+				# 		else:
+				# 			data[pol] = vis_data_dred_pscal[pol_index].transpose()[abs(ubl_index[p]) - 1]
+				# 		# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
+				# 		data[pol] = data[pol].flatten()  # .conjugate()  # there's a conjugate convention difference
+				# 	elif Use_AbsCal:
+				# 		if vis_data_dred_abscal[pol_index].shape[0] == len(tmask):
+				# 			data[pol] = vis_data_dred_abscal[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+				# 		else:
+				# 			data[pol] = vis_data_dred_abscal[pol_index].transpose()[abs(ubl_index[p]) - 1]
+				# 		# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
+				# 		data[pol] = data[pol].flatten()  # .conjugate()  # there's a conjugate convention difference
+				# 	else:
+				# 		if vis_data_dred[pol_index].shape == len(tmask):
+				# 			# data[pol] = jansky2kelvin * vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+				# 			data[pol] = vis_data_dred[pol_index][tmask].transpose()[abs(ubl_index[p]) - 1]  # .conjugate()  # = (time_vis_data[:,1:,1::3] + time_vis_data[:,1:,2::3] * 1j).astype('complex64')
+				# 		else:
+				# 			data[pol] = vis_data_dred[pol_index].transpose()[abs(ubl_index[p]) - 1]
 		# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0].conjugate()
 		# data[pol] = (data[pol].flatten() * jansky2kelvin).conjugate()  # there's a conjugate convention difference
 		# data[pol][ubl_index[p] < 0] = data[pol][ubl_index[p] < 0]#.conjugate()
@@ -10857,8 +10904,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		for rcond in rcond_list:
 			# add Si on top of AtNiA without renaming AtNiA to save memory
 			maxAtNiA = np.max(AtNiA)
+			minAtNiA = np.min(AtNiA)
 			print ('Shape of AtNiA before Inverting it: {0}'.format(AtNiA.shape))
-			print ('Maximum in AtNiA: {0}'.format(maxAtNiA))
+			print ('Maximum in AtNiA: {0}; \nMinimum in AtNiA: {1}\n'.format(maxAtNiA, minAtNiA))
 			AtNiA.shape = (valid_npix ** 2)
 			if Add_S_diag:
 				if not Only_AbsData:

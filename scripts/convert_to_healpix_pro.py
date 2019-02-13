@@ -12,7 +12,7 @@ import re
 from HERA_MapMaking_VisibilitySimulation import DATA_PATH
 import glob
 
-FEED = 'dipole'
+FEED = 'vivaldi' # 'dipole'
 
 o = optparse.OptionParser()
 o.add_option('-n', '--nside', dest='nside', default=64,
@@ -31,9 +31,12 @@ else:
         filenames = glob.glob(DATA_PATH + '/HERA-47/HERA dipole - beams/HERA 4.9m + FEM - Realised gain/farfield*.txt')
     elif FEED == 'vivaldi':
         outfile = DATA_PATH + '/HERA-47/Vivaldi-18/Vivaldi-18-RealisedGain-FEMload-X.fits'
-        filenames = glob.glob(DATA_PATH + '/HERA-47/Vivaldi-18/Vivaldi 1.8m - detailed mecha design - E-field - FEM load - Pol X/*.txt')
-    
-freqs = np.array([float(re.findall(r'\d+', f.split()[-2])[0]) for f in filenames])
+        filenames = glob.glob(DATA_PATH + '/HERA-47/Vivaldi-18/Vivaldi-18-RealisedGain-FEMload-X/*.txt')
+
+if FEED == 'dipole':
+    freqs = np.array([float(re.findall(r'\d+', f.split()[-2])[0]) for f in filenames])
+elif FEED == 'vivaldi':
+    freqs = np.array([float(re.findall(r'\d+', f.split('/')[-1])[0]) for f in filenames])
 order = np.argsort(freqs)
 freqs = freqs[order]
 filenames = np.array(filenames)[order]
