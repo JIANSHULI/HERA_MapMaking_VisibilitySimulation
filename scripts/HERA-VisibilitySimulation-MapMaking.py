@@ -6170,7 +6170,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.)
 		else:
-			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-1.5) if 'blender' in DATA_PATH else 10.**(-1.5)
+			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-1.3) if 'blender' in DATA_PATH else 10.**(-1.5)
 	
 	Narrow_Beam = True if Simulation_For_All else False # Narrow the beam to primary beam.
 	Narrow_Beam_threshold = valid_pix_thresh # 10. ** (-6.)  # Threshold for Primary Beam.
@@ -10903,10 +10903,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			
 		for rcond in rcond_list:
 			# add Si on top of AtNiA without renaming AtNiA to save memory
-			maxAtNiA = np.max(AtNiA)
-			minAtNiA = np.min(AtNiA)
+			maxAtNiA = np.max(np.abs(AtNiA))
+			minAtNiA = np.min(np.abs(AtNiA))
+			maxAtNiA_diag = np.max(np.diagonal(AtNiA))
+			minAtNiA_diag = np.min(np.diagonal(AtNiA))
 			print ('Shape of AtNiA before Inverting it: {0}'.format(AtNiA.shape))
 			print ('Maximum in AtNiA: {0}; \nMinimum in AtNiA: {1}\n'.format(maxAtNiA, minAtNiA))
+			print ('Maximum in diagonal AtNiA: {0}; \nMinimum in diagonal AtNiA: {1}\n'.format(maxAtNiA_diag, minAtNiA_diag))
 			AtNiA.shape = (valid_npix ** 2)
 			if Add_S_diag:
 				if not Only_AbsData:
