@@ -29,6 +29,7 @@ import scipy.interpolate as si
 import glob
 import astropy
 import hera_qm as hqm
+# hqm.xrfi.xrfi_h1c_run()
 # from aipy.miriad import pol2str
 from astropy.io import fits
 import HERA_MapMaking_VisibilitySimulation as mmvs
@@ -3497,8 +3498,8 @@ def get_A_multifreq(vs, fit_for_additive=False, additive_A=None, force_recompute
 								
 								print('Time used for this chunk: {0} seconds . \n'.format(time.time() - id_time_stamp))
 							
-						if Use_rotated_beampattern_as_beamweight:
-							Csim_data = (clean_sim_data + np.random.randn(len(clean_sim_data)) / CNi ** .5) #if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / CNi ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
+						# if Use_rotated_beampattern_as_beamweight:
+						Csim_data = (clean_sim_data + np.random.randn(len(clean_sim_data)) / CNi ** .5) #if not Only_AbsData else (fullsim_vis.flatten() + np.random.randn(len(data)) / CNi ** .5)  # Full Simulated, being Normalized (abs calibration), Noise
 						
 						for id_pix_chunk in range(0, valid_npix, np.max((valid_npix / nchunk_A_valid, 1))):
 							id_time_stamp = time.time()
@@ -5941,9 +5942,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	nchunk_from_memory_calculation_full = True # IF recalculate nchunk_A_full by comparing memory left and A size
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = False if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
-	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-2.) if 'blender' in DATA_PATH else 10. ** (-3.)
+	Coarse_Pixels = True if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels_num = 4**3 if 'blender' in DATA_PATH else 4**1
+	valid_pix_threshold_coarse = 10. ** (-1.25) if 'blender' in DATA_PATH else 10. ** (-3.)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = False if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
@@ -6075,7 +6076,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = (10.7375 if not LST_binned_Data else 10.7375 * 2.) if filetype == 'miriad' else (8.61345 if not LST_binned_Data else 8.61345 * 2.) # seconds
 	else:
-		Integration_Time = 10.7375 * 30. if filetype == 'miriad' else 8.61345 * 30.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 1. if filetype == 'miriad' else 8.61345 * 30.  # seconds; * 3., 14
 		
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	Integration_Time_original = Integration_Time
@@ -6095,7 +6096,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = -0.0 if 'blender' in DATA_PATH else -12.0
+			lsts_start = 2.0 if 'blender' in DATA_PATH else -12.0
 			lsts_end = 6.0 if 'blender' in DATA_PATH else 12.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
@@ -6170,7 +6171,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.)
 		else:
-			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-1.3) if 'blender' in DATA_PATH else 10.**(-1.5)
+			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10.**(-1.5)
 	
 	Narrow_Beam = True if Simulation_For_All else False # Narrow the beam to primary beam.
 	Narrow_Beam_threshold = valid_pix_thresh # 10. ** (-6.)  # Threshold for Primary Beam.
