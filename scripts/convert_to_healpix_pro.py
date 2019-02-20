@@ -66,3 +66,4 @@ new_hdul.append(fits.ImageHDU(data=hmap, name='BEAM_E'))
 new_hdul.append(fits.ImageHDU(data=freqs, name='FREQS'))
 new_hdul.writeto(outfile)
 
+

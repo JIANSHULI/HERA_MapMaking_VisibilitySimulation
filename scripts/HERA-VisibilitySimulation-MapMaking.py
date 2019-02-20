@@ -644,7 +644,7 @@ def Chunk_Multiply(i=0):
 	print('Process Starts at: %s' % str(datetime.datetime.now()))
 	C[i * chunk:(i + 1) * chunk] = np.einsum('ji,jk->ik', A[:, i * chunk:(i + 1) * chunk] * Ni[:, None], A)
 	if expected_time >= 1.:
-		print "%i/%i: %.5fmins " % (i, nchunk ** 2, (time.time() - ltm) / 60.),
+		print ("%i/%i: %.5fmins " % (i, nchunk ** 2, (time.time() - ltm) / 60.))
 		sys.stdout.flush()
 	return C[i * chunk:(i + 1) * chunk]
 
@@ -655,7 +655,7 @@ def ATNIA_parallel(A, Ni, C, nchunk=48, dot=True, maxtasksperchild=100):  # C=At
 	
 	print('Processes Starts at: %s' % str(datetime.datetime.now()))
 	expected_time = 1.3e-11 * (A.shape[0]) * (A.shape[1]) ** 2
-	print " >>>>>>>>>> Estimated time for A %i by %i <<<<<<<<<<<<" % (A.shape[0], A.shape[1]), expected_time, "minutes",
+	print (" >>>>>>>>>> Estimated time for A %i by %i <<<<<<<<<<<<" % (A.shape[0], A.shape[1]), expected_time, "minutes")
 	sys.stdout.flush()
 	
 	# nchunk = np.min((nchunk, multiprocessing.cpu_count()))
@@ -5446,8 +5446,8 @@ def cmap(i, j, n):
 		return cmap(j, i, n)
 
 	
-Frequency_Min = 50.0 if 'blender' in DATA_PATH else 55.0
-Frequency_Max = 51.0 if 'blender' in DATA_PATH else 115.0
+Frequency_Min = 50.0 if 'blender' in DATA_PATH else 50.0
+Frequency_Max = 51.0 if 'blender' in DATA_PATH else 51.0
 Frequency_Step = 1. if 'blender' in DATA_PATH else 1.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
@@ -5468,7 +5468,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# 	INSTRUMENT = 'hera'
 	# else:
 	# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
-	filetype = 'miriad' if 'blender' in DATA_PATH else 'uvh5' # 'miriad', 'uvh5'
+	filetype = 'uvh5' if 'blender' in DATA_PATH else 'uvh5' # 'miriad', 'uvh5'
 	Num_Pol = 2 if filetype == 'uvh5' else 2 # int(2)
 	
 	INSTRUMENT = 'hera-vivaldi' if 'blender' in DATA_PATH else 'hera-vivaldi'  # 'hera-vivaldi'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
@@ -5697,7 +5697,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	#
 	#
 	# elif 'hera' in INSTRUMENT:
-	Simulation_For_All = True if 'blender' in DATA_PATH else False # Simulate from the very beginning: loading data.
+	Simulation_For_All = True if 'blender' in DATA_PATH else True # Simulate from the very beginning: loading data.
 	Use_SimulatedData = True if Simulation_For_All else False
 	Use_External_Vis = False if filetype == 'miriad' else False if (filetype == 'uvh5' and not Simulation_For_All) else False
 	External_Vis_Directory = [DATA_PATH + '/vis_map_xx.npy', DATA_PATH + '/vis_map_yy.npy'] if Num_Pol == 2 else [DATA_PATH + '/vis_map_xx.npy'] if Num_Pol == 1 else []
@@ -5942,11 +5942,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	nchunk_from_memory_calculation_full = True # IF recalculate nchunk_A_full by comparing memory left and A size
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-	Coarse_Pixels = True if 'blender' in DATA_PATH else False # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
-	Coarse_Pixels_num = 4**3 if 'blender' in DATA_PATH else 4**1
-	valid_pix_threshold_coarse = 10. ** (-1.25) if 'blender' in DATA_PATH else 10. ** (-3.)
+	Coarse_Pixels = True if 'blender' in DATA_PATH else True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**3
+	valid_pix_threshold_coarse = 10. ** (-1.1) if 'blender' in DATA_PATH else 10. ** (-1.1)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
-	Use_rotated_beampattern_as_beamweight = False if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
+	Use_rotated_beampattern_as_beamweight = True if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 	Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False # If to use np.memmap for A for A_masked calculation in the future.
 	NoA_Out_fullsky = False if Use_memmap_A_full else True # Whether or not to calculate full A matrix
 	
@@ -6076,7 +6076,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	if not Simulation_For_All:
 		Integration_Time = (10.7375 if not LST_binned_Data else 10.7375 * 2.) if filetype == 'miriad' else (8.61345 if not LST_binned_Data else 8.61345 * 2.) # seconds
 	else:
-		Integration_Time = 10.7375 * 1. if filetype == 'miriad' else 8.61345 * 30.  # seconds; * 3., 14
+		Integration_Time = 10.7375 * 2. if filetype == 'miriad' else 8.61345 * 2.  # seconds; * 3., 14
 		
 	Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245 # 1.625 * 1.e6  # Hz
 	Integration_Time_original = Integration_Time
@@ -6085,7 +6085,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	###################################################################################################################################################################
 	################################################################# All Simulation Setup ############################################################################
 	if Simulation_For_All:
-		antenna_num = 243 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
+		antenna_num = 37 if 'blender' in DATA_PATH else 37 # number of antennas that enter simulation: 37,128,243,350
 		if 'vivaldi' in INSTRUMENT:
 			flist = np.array([np.arange(50., 250., Frequency_Bin * 10.** (-6)) for i in range(Num_Pol)])
 		else:
@@ -6096,8 +6096,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 			lsts_start = np.float(sys.argv[10])
 			lsts_end = np.float(sys.argv[11])
 		else:
-			lsts_start = 2.0 if 'blender' in DATA_PATH else -12.0
-			lsts_end = 6.0 if 'blender' in DATA_PATH else 12.0
+			lsts_start = 2.0 if 'blender' in DATA_PATH else 2.0
+			lsts_end = 6.0 if 'blender' in DATA_PATH else 4.0
 			# lsts_full = np.arange(2., 5., Integration_Time / aipy.const.sidereal_day * 24.)
 		lsts_step = Integration_Time / aipy.const.sidereal_day * 24.
 		lsts_full = np.arange(lsts_start, lsts_end, lsts_step)
@@ -6154,9 +6154,13 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Add_Rcond = True # Add R_matrix onto AtNiA to calculate inverse or not.
 	S_type = 'dyS_lowadduniform_min4I' if Add_S_diag else 'non'  # 'dyS_lowadduniform_minI', 'dyS_lowadduniform_I', 'dyS_lowadduniform_lowI', 'dyS_lowadduniform_lowI'#'none'#'dyS_lowadduniform_Iuniform'  #'none'# dynamic S, addlimit:additive same level as max data; lowaddlimit: 10% of max data; lowadduniform: 10% of median max data; Iuniform median of all data
 	# rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
-	rcond_list = np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))
+	
+	Fine_Add = True  # If to add rcond only onto selected diags according to to its value.
+	Fine_Add_Scale_list = 10. ** np.arange(-3., 0.1, 0.5) if Fine_Add else [1.]
+	rcond_list = (np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))) if not Fine_Add else np.concatenate(([0.], 10. ** np.arange(-12, -2., 0.2)))
 	Selected_Diagnal_R = False # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 	diag_threshold = 10. ** (-12.)
+	
 	if Data_Deteriorate:
 		S_type += '-deteriorated-'
 	else:
@@ -6171,7 +6175,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		if 'spar' in INSTRUMENT:
 			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.)
 		else:
-			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10.**(-1.5)
+			valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10.**(-6.)
 	
 	Narrow_Beam = True if Simulation_For_All else False # Narrow the beam to primary beam.
 	Narrow_Beam_threshold = valid_pix_thresh # 10. ** (-6.)  # Threshold for Primary Beam.
@@ -6191,9 +6195,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 		nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 	else:
-		nside_start = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
-		nside_standard = 256 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
-		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8   # undynamic A matrix shape
+		nside_start = 128 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 128  # starting point to calculate dynamic A
+		nside_standard = 128 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 128  # resolution of sky, dynamic A matrix length of a row before masking.
+		nside_beamweight = nside_standard if Use_memmap_A_full else 32 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 64   # undynamic A matrix shape
 	
 	Use_nside_bw_forFullsim = True # Use nside_beamweight to simulatie fullsim_sim
 	Inter_from_standard = True # If to interpolate equatorial_GSM_beamweight(mfreq) from nside_standerd.
@@ -6207,7 +6211,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Add_GroundPlane2BeamPattern = True  # Whether to SET Theta>0 in beam pattern to zero or not, as adding a ground plane.
 	INSTRUMENT = INSTRUMENT + ('-CS' if Constrain_Stripe else '') + ('-OB' if Old_BeamPattern else '-NB') + ('-UP' if Uniform_Beam else '') + ('-NP{0:.6f}'.format(Narrow_Beam_threshold) if Narrow_Beam else '') + ('-AG' if Add_GroundPlane2BeamPattern else '-NG') + ('-BN' if Beam_Normalization else '') \
 				 + ('-LST' if LST_binned_Data else '') + ('-DF'if Delay_Filter else '') + ('-li' if Use_LinalgInv else '') + ('-CP-{0}-{1:.6f}'.format(Coarse_Pixels_num, valid_pix_threshold_coarse) if Coarse_Pixels else '') + ('-SE' if Scale_A_extra else '') + ('-RB' if Use_rotated_beampattern_as_beamweight else '') \
-					+ ('-DR{0}'.format(diag_threshold) if Selected_Diagnal_R else '')
+					+ ('-DR{0}'.format(diag_threshold) if Selected_Diagnal_R else '') + ('-FA' if Fine_Add else '')
 	
 	
 	#	# tag = "q3AL_5_abscal"  #"q0AL_13_abscal"  #"q1AL_10_abscal"'q3_abscalibrated'#"q4AL_3_abscal"# L stands for lenient in flagging
@@ -10901,80 +10905,121 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		else:
 			# AtNiAi = np.zeros((valid_npix, valid_npix), dtype=Precision_AtNiAi)
 			AtNiAi = None
-			
+		AtNiA_calculated = False
+		maxAtNiA = np.max(np.abs(AtNiA))
+		minAtNiA = np.min(np.abs(AtNiA))
+		maxAtNiA_diag = np.max(AtNiA_diag)
+		minAtNiA_diag = np.min(AtNiA_diag)
+		print ('Shape of AtNiA before Inverting it: {0}'.format(AtNiA.shape))
+		print ('Maximum in AtNiA: {0}; \nMinimum in AtNiA: {1}\n'.format(maxAtNiA, minAtNiA))
+		print ('Maximum in diagonal AtNiA: {0}; \nMinimum in diagonal AtNiA: {1}\n'.format(maxAtNiA_diag, minAtNiA_diag))
 		for rcond in rcond_list:
-			# add Si on top of AtNiA without renaming AtNiA to save memory
-			maxAtNiA = np.max(np.abs(AtNiA))
-			minAtNiA = np.min(np.abs(AtNiA))
-			maxAtNiA_diag = np.max(np.diagonal(AtNiA))
-			minAtNiA_diag = np.min(np.diagonal(AtNiA))
-			print ('Shape of AtNiA before Inverting it: {0}'.format(AtNiA.shape))
-			print ('Maximum in AtNiA: {0}; \nMinimum in AtNiA: {1}\n'.format(maxAtNiA, minAtNiA))
-			print ('Maximum in diagonal AtNiA: {0}; \nMinimum in diagonal AtNiA: {1}\n'.format(maxAtNiA_diag, minAtNiA_diag))
-			AtNiA.shape = (valid_npix ** 2)
-			if Add_S_diag:
-				if not Only_AbsData:
-					AtNiA[::valid_npix + 1] += 1. / S_diag
-				else:
-					AtNiA[::valid_npix + 1] += (1. / S_diag + 1.j / S_diag)
-			
-			print ('trying', rcond)
-			sys.stdout.flush()
-			print(datetime.datetime.now())
-			try:
-				if rcond == 0:
-					AtNiAi_filename = AtNiAi_tag + '_S{0}_RE-N_N{1}_v{2:.1f}' .format(S_type, vartag, AtNiAi_version) + A_filename
-				else:
-					AtNiAi_filename = AtNiAi_tag + '_S{0}_RE{1:.1f}_N{2}_v{3:.1f}' .format(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
-				AtNiAi_path = datadir + tag + AtNiAi_filename
-				if Add_Rcond:
+
+			for Fine_Add_Scale in Fine_Add_Scale_list:
+				# add Si on top of AtNiA without renaming AtNiA to save memory
+				# maxAtNiA = np.max(np.abs(AtNiA))
+				# minAtNiA = np.min(np.abs(AtNiA))
+				# maxAtNiA_diag = np.max(AtNiA_diag)
+				# minAtNiA_diag = np.min(AtNiA_diag)
+				# print ('Shape of AtNiA before Inverting it: {0}'.format(AtNiA.shape))
+				# print ('Maximum in AtNiA: {0}; \nMinimum in AtNiA: {1}\n'.format(maxAtNiA, minAtNiA))
+				# print ('Maximum in diagonal AtNiA: {0}; \nMinimum in diagonal AtNiA: {1}\n'.format(maxAtNiA_diag, minAtNiA_diag))
+				AtNiA.shape = (valid_npix ** 2)
+				if Add_S_diag:
 					if not Only_AbsData:
-						if Selected_Diagnal_R:
-							print('\n Max_AtNiA_diag: {0} ; Min_AtNiA_diag: {1}'.format(np.max(AtNiA[::valid_npix + 1]), np.min(AtNiA[::valid_npix + 1])))
-							print('Number of diagnal elements adding rond: {0} \n'.format(np.sum(AtNiA[::valid_npix + 1] < np.max(AtNiA[::valid_npix + 1]) * diag_threshold)))
-							AtNiA[::valid_npix + 1][AtNiA[::valid_npix + 1] < np.max(AtNiA[::valid_npix + 1]) * diag_threshold] += maxAtNiA * rcond
-							
-						else:
-							AtNiA[::valid_npix + 1] += maxAtNiA * rcond
+						AtNiA[::valid_npix + 1] += 1. / S_diag
 					else:
-						AtNiA[::valid_npix + 1] += (maxAtNiA * rcond + 1.j * maxAtNiA * rcond)
+						AtNiA[::valid_npix + 1] += (1. / S_diag + 1.j / S_diag)
 				
-				AtNiA.shape = (valid_npix, valid_npix)
-				timer_AtNiAi = time.time()
-				if Use_LinalgInv:
-					AtNiAi = sp.linalg.inv(AtNiA.astype(Precision_AtNiAi)).astype(Precision_AtNiAi)
-				else:
-					AtNiAi = sv.InverseCholeskyMatrix(AtNiA.astype(Precision_AtNiAi)).astype(Precision_AtNiAi)         # Use scipy.solve_triangle, scipy.linalg.lapack.dtrtrs for triangle matrix. more stable than np.linalg.inv
-				print('Time used for inverting AtNiA: {0} seconds'.format(time.time() - timer_AtNiAi))
+				print ('trying', rcond)
+				sys.stdout.flush()
+				print(datetime.datetime.now())
 				
-				# Check Whether the matrix is well-inverse or not using two methods - Mean and RMS.
-				# Check_Iverse_AtNiA = True
-				# Check_Iverse_AtNiA_threshold = 0.1
-				# if Check_Iverse_AtNiA:
-				# 	if Use_LinalgInv:
-				# 		AtNiA_AtNiAi = np.dot(AtNiA, AtNiAi)
-				# 	else:
-				# 		AtNiA_AtNiAi = AtNiAi.dotv(AtNiA)
-				# 	rms_reconstruct = np.std(np.diagonal(AtNiA_AtNiAi))
-				# 	mean_reconstruct = np.mean(np.diagonal(AtNiA_AtNiAi))
-				# 	print('\n >>>>>>>>>>>>>>>>>>>>> rms_reconstruct: {0} <<<<<<<<<<<<<<<<<<<<'.format(rms_reconstruct))
-				# 	print('\n >>>>>>>>>>>>>>>>>>>>> mean_reconstruct: {0} <<<<<<<<<<<<<<<<<<<< \n'.format(mean_reconstruct))
+				# Fine_Add = True
 				
-				
-				# del (AtNiA)
-				if not Use_memmap_AtNiAi:
-					try:
-						AtNiAi.tofile(AtNiAi_path, overwrite=True)
-					except:
-						print('AtNiAi cannot be saved to file via AiNiAi_path.')
-				# del (AtNiA)
-				print ("{0} minutes used" .format((time.time() - timer) / 60.))
-				print ("regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes))
+				if Fine_Add and rcond != 0.:
+					Diag_Select = np.arange(valid_npix)[AtNiA_diag < rcond * AtNiA_diag.max()]
+					if len(Diag_Select) == 0:
+						continue
+					
+				try:
+					if rcond == 0:
+						AtNiAi_filename = AtNiAi_tag + '_S{0}_RE-N_N{1}_v{2:.1f}' .format(S_type, vartag, AtNiAi_version) + A_filename
+					else:
+						AtNiAi_filename = AtNiAi_tag + '_S{0}_RE{1:.1f}_N{2}_v{3:.1f}' .format(S_type, np.log10(rcond), vartag, AtNiAi_version) + A_filename
+					AtNiAi_path = datadir + tag + AtNiAi_filename
+					if Add_Rcond:
+						
+						if not Only_AbsData:
+							if Selected_Diagnal_R:
+								print('\n Max_AtNiA_diag: {0} ; Min_AtNiA_diag: {1}'.format(np.max(AtNiA[::valid_npix + 1]), np.min(AtNiA[::valid_npix + 1])))
+								print('Number of diagnal elements adding rond: {0} \n'.format(np.sum(AtNiA[::valid_npix + 1] < np.max(AtNiA[::valid_npix + 1]) * diag_threshold)))
+								Diag_Select = AtNiA[::valid_npix + 1] < np.max(AtNiA[::valid_npix + 1]) * diag_threshold
+								AtNiA[::valid_npix + 1][Diag_Select] += maxAtNiA * rcond
+							elif Fine_Add and rcond != 0.:
+								Diag_Order = np.argsort(AtNiA_diag)
+								Diag_Select = np.arange(valid_npix)[AtNiA_diag < rcond * AtNiA_diag.max()]
+								# if len(Diag_Select) == 0:
+								# 	continue
+								print('Length of Diag_Select: {0}'.format(len(Diag_Select)))
+								print('Fine_Add_Scale: {0}'.format(Fine_Add_Scale))
+								# Diag_Add = np.random.rand(len(Diag_Select)) * AtNiA_diag[Diag_Select].flatten() * Fine_Add_Scale
+								Diag_Add = AtNiA_diag[Diag_Select].flatten() * Fine_Add_Scale
+								Diag_Add[Diag_Add==0] = rcond*maxAtNiA*Fine_Add_Scale
+								AtNiA[::valid_npix + 1][Diag_Select] += Diag_Add
+							else:
+								AtNiA[::valid_npix + 1] += maxAtNiA * rcond
+						else:
+							AtNiA[::valid_npix + 1] += (maxAtNiA * rcond + 1.j * maxAtNiA * rcond)
+					
+					AtNiA.shape = (valid_npix, valid_npix)
+					print(datetime.datetime.now())
+					timer_AtNiAi = time.time()
+					if Use_LinalgInv:
+						AtNiAi = sp.linalg.inv(AtNiA.astype(Precision_AtNiAi)).astype(Precision_AtNiAi)
+					else:
+						AtNiAi = sv.InverseCholeskyMatrix(AtNiA.astype(Precision_AtNiAi)).astype(Precision_AtNiAi)         # Use scipy.solve_triangle, scipy.linalg.lapack.dtrtrs for triangle matrix. more stable than np.linalg.inv
+					print('Time used for inverting AtNiA: {0} seconds'.format(time.time() - timer_AtNiAi))
+					if Fine_Add:
+						INSTRUMENT += '-{0}'.format(Fine_Add_Scale)
+					# Check Whether the matrix is well-inverse or not using two methods - Mean and RMS.
+					# Check_Iverse_AtNiA = True
+					# Check_Iverse_AtNiA_threshold = 0.1
+					# if Check_Iverse_AtNiA:
+					# 	if Use_LinalgInv:
+					# 		AtNiA_AtNiAi = np.dot(AtNiA, AtNiAi)
+					# 	else:
+					# 		AtNiA_AtNiAi = AtNiAi.dotv(AtNiA)
+					# 	rms_reconstruct = np.std(np.diagonal(AtNiA_AtNiAi))
+					# 	mean_reconstruct = np.mean(np.diagonal(AtNiA_AtNiAi))
+					# 	print('\n >>>>>>>>>>>>>>>>>>>>> rms_reconstruct: {0} <<<<<<<<<<<<<<<<<<<<'.format(rms_reconstruct))
+					# 	print('\n >>>>>>>>>>>>>>>>>>>>> mean_reconstruct: {0} <<<<<<<<<<<<<<<<<<<< \n'.format(mean_reconstruct))
+					
+					
+					# del (AtNiA)
+					if not Use_memmap_AtNiAi:
+						try:
+							AtNiAi.tofile(AtNiAi_path, overwrite=True)
+						except:
+							print('AtNiAi cannot be saved to file via AiNiAi_path.')
+					# del (AtNiA)
+					print ("{0} minutes used" .format((time.time() - timer) / 60.))
+					print ("regularization stength", (maxAtNiA * rcond) ** -.5, "median GSM ranges between", np.median(equatorial_GSM_standard) * min(sizes), np.median(equatorial_GSM_standard) * max(sizes))
+					AtNiA_calculated = True
+					break
+				except:
+					if Add_Rcond:
+						AtNiA.shape = (valid_npix ** 2)
+						if Selected_Diagnal_R:
+							AtNiA[::valid_npix + 1][Diag_Select] -= maxAtNiA * rcond
+						elif Fine_Add:
+							AtNiA[::valid_npix + 1][Diag_Select] -= Diag_Add
+						else:
+							AtNiA[::len(S_diag) + 1] -= maxAtNiA * rcond
+					continue
+			if AtNiA_calculated:
 				break
-			except:
-				if Add_Rcond:
-					AtNiA[::len(S_diag) + 1] -= maxAtNiA * rcond
-				continue
+			
 		if AtNiAi is None:
 			raise ValueError('AtNiA cannot be inversed properly.')
 	
@@ -11496,7 +11541,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		try:
 			for coord in ['C', 'CG']:
 				# plt.clf()
-				plt.figure(9900000000 + 10000*id_Frequency_Select + crd)
+				plt.figure(9900000000 + 10000*id_Frequency_Select + ZxcXcxxxxxxxxxxxxxxxxxxxcxxxxxccccccccccrd)
 				crd += 10
 				plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 				plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
