@@ -5943,7 +5943,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Precision_full = 'complex128' # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 	Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
 	Coarse_Pixels = True if 'blender' in DATA_PATH else True # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
-	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**3
+	Coarse_Pixels_num = 4**4 if 'blender' in DATA_PATH else 4**4
 	valid_pix_threshold_coarse = 10. ** (-1.1) if 'blender' in DATA_PATH else 10. ** (-1.1)
 	Scale_A_extra = True # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
 	Use_rotated_beampattern_as_beamweight = True if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
@@ -6156,8 +6156,8 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	# rcond_list = np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.)))
 	
 	Fine_Add = True  # If to add rcond only onto selected diags according to to its value.
-	Fine_Add_Scale_list = 10. ** np.arange(-3., 0.1, 0.5) if Fine_Add else [1.]
-	rcond_list = (np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))) if not Fine_Add else np.concatenate(([0.], 10. ** np.arange(-12, -2., 0.2)))
+	Fine_Add_Scale_list = 10. ** np.arange(-6., 0.1, 0.5) if Fine_Add else [1.]
+	rcond_list = (np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))) if not Fine_Add else np.concatenate(([0.], 10. ** np.arange(-8, -2., 0.5)))
 	Selected_Diagnal_R = False # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 	diag_threshold = 10. ** (-12.)
 	
@@ -11012,13 +11012,19 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						AtNiA.shape = (valid_npix ** 2)
 						if Selected_Diagnal_R:
 							AtNiA[::valid_npix + 1][Diag_Select] -= maxAtNiA * rcond
-						elif Fine_Add:
+						elif Fine_Add and rcond != 0.:
 							AtNiA[::valid_npix + 1][Diag_Select] -= Diag_Add
 						else:
 							AtNiA[::len(S_diag) + 1] -= maxAtNiA * rcond
 					continue
+				
+				if rcond == 0:
+					break
+			
 			if AtNiA_calculated:
 				break
+			
+
 			
 		if AtNiAi is None:
 			raise ValueError('AtNiA cannot be inversed properly.')
