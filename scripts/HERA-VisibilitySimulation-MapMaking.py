@@ -1076,7 +1076,8 @@ def UVData2AbsCalDict(datanames, pol_select=None, pop_autos=True, return_meta=Fa
 def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_meta=False, filetype='miriad',
 						   pick_data_ants=True, svmemory=True, Time_Average=1, Frequency_Average=1, Dred=False, inplace=True, tol=5.e-4, Select_freq=False, Select_time=False, Badants=[], Parallel_Files=False, nested_dict=False, run_check=False, check_extra=False, run_check_acceptability=False, antenna_nums=None, antenna_names=None,
 						   ant_str=None, bls=None, frequencies=None, freq_chans=None,
-						   times=None, polarizations=None, blt_inds=None, read_data=True, Frequency_Select=None, Use_External_Vis=False):
+						   times=None, polarizations=None, blt_inds=None, read_data=True, Frequency_Select=None, Use_External_Vis=False, Xrfi_flag=False, Xrfi_treshold = 20., Xrfi_algorithm = 'detrend_medfilt', Kt=8, Kf=8, sig_init=6., sig_adj=2., px_threshold=0.2, freq_threshold=0.5, time_threshold=0.05, return_summary=False,
+                           cal_mode='gain'):
 	"""
 	turn a list of pyuvdata.UVData objects or a list of miriad or uvfits file paths
 	into the datacontainer dictionary form that AbsCal requires. This format is
@@ -1129,11 +1130,49 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				uvd.read_uvfits(datanames)
 				uvd.unphase_to_drift()
 			elif filetype == 'miriad':
+				# if Xrfi_flag:
+				# 	uvd_xrfi = UVData()
+				# 	uvd_xrfi.read_miriad(datanames)
+				#
+				# 	data_flag_pre = hqm.xrfi.calculate_metric(uvd_xrfi, algorithm=Xrfi_algorithm)
+				# 	good_freqs_list = np.where(np.max(np.abs(np.ma.masked_invalid(data_flag_pre.metric_array[:, :, :, 0])), axis=0)[0] < Xrfi_treshold)[0]
+				# 	print(good_freqs_list)
+				#
+				# 	if 'xx' in datanames:
+				# 		np.save(DATA_PATH + '/data_flag_pre_xx', arr=data_flag_pre)
+				# 	elif 'yy' in datanames:
+				# 		np.save(DATA_PATH + '/data_flag_pre_yy', arr=data_flag_pre)
+				# 	else:
+				# 		np.save(DATA_PATH + '/data_flag_pre', arr=data_flag_pre)
+				#
+				# 	exit()
+					
 				uvd.read_miriad(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, Parallel_Files=Parallel_Files, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability,
 								Frequency_Select=Frequency_Select, polarizations=polarizations)
+				
+					
+					
 			elif filetype == 'uvh5':
 				if times is not None:
 					print(times[0])
+				
+				# if Xrfi_flag:
+				# 	uvd_xrfi = UVData()
+				# 	uvd_xrfi.read_uvh5(datanames)
+				#
+				# 	data_flag_pre = hqm.xrfi.calculate_metric(uvd_xrfi, algorithm=Xrfi_algorithm)
+				# 	good_freqs_list = np.where(np.max(np.abs(np.ma.masked_invalid(data_flag_pre.metric_array[:, :, :, :])), axis=(0, 3))[0] < Xrfi_treshold)[0]
+				# 	print(good_freqs_list)
+				#
+				# 	if 'xx' in datanames:
+				# 		np.save(DATA_PATH + '/data_flag_pre_xx', arr=data_flag_pre)
+				# 	elif 'yy' in datanames:
+				# 		np.save(DATA_PATH + '/data_flag_pre_yy', arr=data_flag_pre)
+				# 	else:
+				# 		np.save(DATA_PATH + '/data_flag_pre', arr=data_flag_pre)
+				#
+				# 	exit()
+					
 				uvd.read_uvh5(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, Parallel_Files=Parallel_Files, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability,
 							  antenna_nums=antenna_nums, antenna_names=antenna_names,
 							  ant_str=ant_str, bls=bls, frequencies=frequencies, freq_chans=freq_chans,
@@ -1153,11 +1192,49 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				uvd.read_uvfits(datanames)
 				uvd.unphase_to_drift()
 			elif filetype == 'miriad':
+				
+				# if Xrfi_flag:
+				# 	uvd_xrfi = UVData()
+				# 	uvd_xrfi.read_miriad(datanames)
+				#
+				# 	data_flag_pre = hqm.xrfi.calculate_metric(uvd_xrfi, algorithm=Xrfi_algorithm)
+				# 	good_freqs_list = np.where(np.max(np.abs(np.ma.masked_invalid(data_flag_pre.metric_array[:, :, :, 0])), axis=0)[0] < Xrfi_treshold)[0]
+				# 	print(good_freqs_list)
+				#
+				# 	if 'xx' in datanames[0]:
+				# 		np.save(DATA_PATH + '/data_flag_pre_xx', arr=data_flag_pre)
+				# 	elif 'yy' in datanames[0]:
+				# 		np.save(DATA_PATH + '/data_flag_pre_yy', arr=data_flag_pre)
+				# 	else:
+				# 		np.save(DATA_PATH + '/data_flag_pre', arr=data_flag_pre)
+				#
+				# 	exit()
+				
 				uvd.read_miriad(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, Parallel_Files=Parallel_Files, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability,
 								Frequency_Select=Frequency_Select, polarizations=polarizations)
+				
+			
 			elif filetype == 'uvh5':
 				if times is not None:
 					print(times[0])
+				
+				# if Xrfi_flag:
+				# 	uvd_xrfi = UVData()
+				# 	uvd_xrfi.read_uvh5(datanames)
+				#
+				# 	data_flag_pre = hqm.xrfi.calculate_metric(uvd_xrfi, algorithm=Xrfi_algorithm)
+				# 	good_freqs_list = np.where(np.max(np.abs(np.ma.masked_invalid(data_flag_pre.metric_array[:, :, :, :])), axis=(0, 3))[0] < Xrfi_treshold)[0]
+				# 	print(good_freqs_list)
+				#
+				# 	if 'xx' in datanames[0]:
+				# 		np.save(DATA_PATH + '/data_flag_pre_xx', arr=data_flag_pre)
+				# 	elif 'yy' in datanames[0]:
+				# 		np.save(DATA_PATH + '/data_flag_pre_yy', arr=data_flag_pre)
+				# 	else:
+				# 		np.save(DATA_PATH + '/data_flag_pre', arr=data_flag_pre)
+				#
+				# 	exit()
+					
 				uvd.read_uvh5(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, Parallel_Files=Parallel_Files, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability,
 							  antenna_nums=antenna_nums, antenna_names=antenna_names,
 							  ant_str=ant_str, bls=bls, frequencies=frequencies, freq_chans=freq_chans,
@@ -1166,6 +1243,15 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 		else:
 			# assume datanames contains UVData instances
 			uvd = reduce(operator.add, datanames)
+	
+	if Xrfi_flag:
+		uvd.__class__ = UVData().__class__
+		
+		data_flag = hqm.xrfi.xrfi_h1c_pipe(uvd, Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
+		                                   freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
+		                                   cal_mode=cal_mode)
+		uvd.flag_array = data_flag[0].flag_array
+	
 	
 	if return_meta:
 		freqs = np.unique(uvd.freq_array)
@@ -5445,10 +5531,31 @@ def cmap(i, j, n):
 	else:
 		return cmap(j, i, n)
 
+def xrfi(d, f=None, Kt=8, Kf=8, nsig_p=2., nsig_f=6., nsig_t=6.):
+	"""Run best rfi excision we have. Uses detrending and watershed algorithms above.
+    Args:
+        d (array): 2D of data array.
+        f (array, optional): input flag array.
+        Kt (int, optional): time size for detrending box.
+        Kf (int, optional): frequency size for detrending box/
+        sig_init (float, optional): initial sigma to flag.
+        sig_adj (float, optional): number of sigma to flag adjacent to flagged data (sig_init)
+    Returns:
+        bool array: array of flags
+    """
+	import hera_qm
+	try:
+		nsig = hera_qm.xrfi.detrend_medfilt(d, Kt=Kt, Kf=Kf)
+		f = hera_qm.xrfi.watershed_flag(np.abs(nsig), uvf_f=f, nsig_p=nsig_p, nsig_f=nsig_f, nsig_t=nsig_t)
+	except AssertionError:
+		warnings.warn('Kernel size exceeds data. Flagging all data.')
+		f = np.ones_like(d, dtype=np.bool)
+	return f
+
 	
-Frequency_Min = 109.25 if 'blender' in DATA_PATH else 50.0
+Frequency_Min = 120.75 if 'blender' in DATA_PATH else 50.0
 Frequency_Max = 191.75 if 'blender' in DATA_PATH else 51.0
-Frequency_Step = 0.25 if 'blender' in DATA_PATH else 1.
+Frequency_Step = 0.5 if 'blender' in DATA_PATH else 1.
 
 for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
 	# if Frequency_Select == 150.:
@@ -5460,7 +5567,12 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 	Freq_Low = [Frequency_Select - Freq_Width, Frequency_Select - Freq_Width]
 	Freq_High = [Frequency_Select + Freq_Width, Frequency_Select + Freq_Width]
 	Frequency_Select_List = None # np.linspace(Frequency_Select - Freq_Width, Frequency_Select + Freq_Width, 5) * 10. ** 6  # None # np.linspace(Frequency_Select - Freq_Width, Frequency_Select + Freq_Width, 5)
-
+	
+	Xrfi_flag = True # If to calculate rfi and exit afterwards.
+	Kt = 8, Kf = 8, sig_init = 6., sig_adj = 2., px_threshold = 0.2,
+	freq_threshold = 0.5, time_threshold = 0.05, return_summary = False,
+	cal_mode = 'gain'
+	
 	INSTRUMENT = ''
 	
 	#####commandline inputs#####
@@ -5812,7 +5924,7 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 		Specific_FileIndex_end = [int(sys.argv[3]), int(sys.argv[3])]  # Ending point of selected data sets. [51, 51], [26, 27]
 	else:
 		Specific_FileIndex_start = ([4 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [0 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [0 for id_p in range(Num_Pol)] # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
-		Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [120 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+		Specific_FileIndex_end = ([6 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [120 for id_p in range(Num_Pol)] if filetype == 'uvh5' else [40 for id_p in range(Num_Pol)] # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 	Specific_FileIndex_List = [range(Specific_FileIndex_start[id_p], Specific_FileIndex_end[id_p], 1) for id_p in range(Num_Pol)] # [range(Specific_FileIndex_start[0], Specific_FileIndex_end[0], 1), range(Specific_FileIndex_start[1], Specific_FileIndex_end[1], 1)]
 	# Specific_FileIndex_List = [[8, 9, 48, 49, 89, 90], [8, 9, 48, 49, 89, 90]]
 	Focus_PointSource = False if (Specific_Files and not Simulation_For_All) else False
@@ -6662,7 +6774,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																						  Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
 																																																						  Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
-																																																						  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
+																																																						  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
+							                                                                                                                                                                                              , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
+							                                                                                                                                                                                              freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
+							                                                                                                                                                                                              cal_mode=cal_mode
+							                                                                                                                                                                                              )
 							print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 						# specify data file and load into UVData, load into dictionary
 						# for i in range(2):
@@ -6679,7 +6795,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						(data_origin[i], dflags_origin[i], antpos_origin[i], ants_origin[i], data_freqs_origin[i], data_times_origin[i], data_lsts_origin[i], data_pols_origin[i], data_autos_origin[i], data_autos_flags_origin[i], redundancy_origin[i]) = UVData2AbsCalDict_Auto(data_fname[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																	   Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
 																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
-																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
+																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
+	                                                                                                                                                                                                    , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
+	                                                                                                                                                                                                    freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
+	                                                                                                                                                                                                    cal_mode=cal_mode
+	                                                                                                                                                                                                    )
 						print('small_Pol_%s is done.' % ['xx', 'yy'][i])
 						
 						# for i in range(2):
@@ -6709,7 +6829,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							(data_full[i], dflags_full[i], antpos_full[i], ants_full[i], data_freqs_full[i], data_times[i], data_lsts[i], data_pols[i], data_autos[i], data_autos_flags[i], redundancy[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																									Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
 																																																									Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
-																																																									Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
+																																																									Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
+							                                                                                                                                                                                                        , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
+							                                                                                                                                                                                                        freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
+							                                                                                                                                                                                                        cal_mode=cal_mode
+							                                                                                                                                                                                                        )
 							data_freqs_full[i] = data_freqs_full[i] / 1.e6
 							# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
 							findex_list[i] = np.unique(np.array([np.abs(data_freqs_full[i] - flist[i][j]).argmin() for j in range(len(flist[i]))]))
@@ -6768,7 +6892,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 							(model[i], mflags[i], mantpos[i], mants[i], model_freqs[i], model_times[i], model_lsts[i], model_pols[i], model_autos[i], model_autos_flags[i], model_redundancy[i]) = UVData2AbsCalDict_Auto(model_fname[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																						  Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
 																																																						  Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
-																																																						  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
+																																																						  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
+							                                                                                                                                                                                              , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
+							                                                                                                                                                                                              freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
+							                                                                                                                                                                                              cal_mode=cal_mode
+							                                                                                                                                                                                              )
 							print('model_Pol_%s is done.' % Pol_list[i])
 						# specify data file and load into UVData, load into dictionary
 						
@@ -6776,7 +6904,11 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 						(data_origin[i], dflags_origin[i], antpos_origin[i], ants_origin[i], data_freqs_origin[i], data_times_origin[i], data_lsts_origin[i], data_pols_origin[i], data_autos_origin[i], data_autos_flags_origin[i], redundancy_origin[i]) = UVData2AbsCalDict_Auto(data_fnames[i], return_meta=True, Time_Average=Time_Average_preload, filetype=filetype,
 																																																	   Frequency_Average=Frequency_Average_preload, Dred=Dred_preload, inplace=inplace_preload, tol=Tolerance,
 																																																	   Select_freq=Select_freq, Select_time=Select_time, Badants=badants_pre, Parallel_Files=Parallel_Files, run_check=Run_Check,
-																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]])
+																																																	   Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
+                                                                                                                                                                                                        , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
+                                                                                                                                                                                                        freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
+                                                                                                                                                                                                        cal_mode=cal_mode
+                                                                                                                                                                                                        )
 						try:
 							autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
 						except:
@@ -6799,7 +6931,9 @@ for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, 
 				timer = time.time()
 				pool = Pool()
 				PolsData_process = [pool.apply_async(UVData2AbsCalDict_Auto, args=(data_fnames[p], None, True, True, filetype, True, True, Time_Average_preload, Frequency_Average_preload, Dred_preload, True, Tolerance, Select_freq, Select_time, badants_pre, Parallel_Files, Run_Check, False, False, None, None,
-																					None, None, None, None, [Pol_num_list[i]], None, True, Frequency_Select)) for p in range(Num_Pol)]
+																					None, None, None, None, [Pol_num_list[i]], None, True, Frequency_Select, [Pol_num_list[i]], Xrfi_flag, Kt, Kf, sig_init, sig_adj, px_threshold,
+				                                                                   freq_threshold, time_threshold, return_summary,
+				                                                                   cal_mode)) for p in range(Num_Pol)]
 				PolsData = [poldata.get() for poldata in PolsData_process]
 				pool.close()
 				print('Parallel_2Pols is done. %s seconds used.' % (time.time() - timer))
