@@ -15,12 +15,14 @@ import numpy.linalg as la
 import scipy.linalg as sla
 import aipy as ap
 import os
-
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
 import sys
+
+import matplotlib
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 
-plt.switch_backend('agg')
+# plt.switch_backend('agg')
 import healpy as hp
 import healpy.rotator as hpr
 import healpy.pixelfunc as hpf
@@ -73,6 +75,7 @@ import scipy.linalg as spl
 import gc
 
 import numexpr as ne
+from psutil import virtual_memory
 
 print('ne.num_threads: {0} before.'.format(ne.detect_number_of_threads()))
 os.environ['NUMEXPR_MAX_THREADS'] = '{0}'.format(ne.detect_number_of_cores())
@@ -1149,7 +1152,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				# 	exit()
 				
 				uvd.read_miriad(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, Parallel_Files=Parallel_Files, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability,
-								Frequency_Select=Frequency_Select, polarizations=polarizations)
+								Frequency_Select=Frequency_Select, polarizations=polarizations, freq_chans=freq_chans)
 			
 			
 			
@@ -1212,7 +1215,7 @@ def UVData2AbsCalDict_Auto(datanames, pol_select=None, pop_autos=True, return_me
 				# 	exit()
 				
 				uvd.read_miriad(datanames, Time_Average=Time_Average, Frequency_Average=Frequency_Average, Dred=Dred, inplace=inplace, tol=tol, Select_freq=Select_freq, Select_time=Select_time, Badants=Badants, Parallel_Files=Parallel_Files, run_check=run_check, check_extra=check_extra, run_check_acceptability=run_check_acceptability,
-								Frequency_Select=Frequency_Select, polarizations=polarizations)
+								Frequency_Select=Frequency_Select, polarizations=polarizations, freq_chans=freq_chans)
 			
 			
 			elif filetype == 'uvh5':
@@ -5640,9 +5643,9 @@ def Flux_Freqfrom150MHz_Spidx(catalog='TGSS', freq=150., flux_mode='Total',
 		return flux_freqs
 
 
-Frequency_Min = 110. if 'blender' in DATA_PATH else 80.
-Frequency_Max = 190.1 if 'blender' in DATA_PATH else 80.5
-Frequency_Step = 0.1 if 'blender' in DATA_PATH else 1.
+Frequency_Min = 150. if 'blender' in DATA_PATH else 150.
+Frequency_Max = 150.1 if 'blender' in DATA_PATH else 150.1
+Frequency_Step = 0.5 if 'blender' in DATA_PATH else 10.
 
 Part_LST = False  # If loop files
 File_Start = 4 if Part_LST else 0
@@ -5653,9 +5656,9 @@ File_Step = 1 if Part_LST else 1
 for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_Step)):
 	
 	for id_Frequency_Select, Frequency_Select in enumerate(np.arange(Frequency_Min, Frequency_Max, Frequency_Step)):
-		
+		print(id_File_Loop, File_Loop, id_Frequency_Select, Frequency_Select)
 		try:
-			# if Frequency_Select == 150.:
+			# if np.mod(Frequency_Select, 2.5) == 0.:
 			# 	continue
 			timer_freq = time.time()
 			print('Programme Starts for {3}-FileLoop-id-{4} {2}-Frequency-{0}MHz at: {1}'.format(Frequency_Select, datetime.datetime.now(), id_Frequency_Select, id_File_Loop, File_Loop))
@@ -5673,9 +5676,39 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			# else:
 			# 	INSTRUMENT = sys.argv[1]  # 'miteor'#'mwa'#'hera-47''paper'
 			
-			Simulation_For_All = False if 'blender' in DATA_PATH else True  # Simulate from the very beginning: loading data.
-			INSTRUMENT = ('hera-vivaldi' if 'blender' in DATA_PATH else 'hera-vivaldi') if Simulation_For_All else ('hera' if 'blender' in DATA_PATH else 'hera-vivaldi')  # 'hera-vivaldi'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
+			Simulation_For_All = True if 'blender' in DATA_PATH else True  # Simulate from the very beginning: loading data.
+			INSTRUMENT = ('hera-vivaldi' if 'blender' in DATA_PATH else 'hera-vivaldi') if Simulation_For_All else ('hera-vivaldi' if 'blender' in DATA_PATH else 'hera-vivaldi')  # 'hera'; 'miteor' 'hera-spar' (space array, cone) ; 'hera-vivaldi'
 			filetype = 'uvh5' if INSTRUMENT == 'hera' else 'uvh5' if INSTRUMENT == 'hera-vivaldi' else 'uvh5'  # if 'blender' in DATA_PATH else 'uvh5'  # 'miriad', 'uvh5'
+			Vivaldi_Gaussian = False if 'blender' in DATA_PATH else False
+			
+			if not Simulation_For_All and not 'blender' in DATA_PATH:
+				if os.path.exists('/Volumes/Jianshu_Li_SSD/HERA_Data'):
+					DATA_PATH_2 = '/Volumes/Jianshu_Li_SSD/HERA_Data'
+				elif os.path.exists('/Volumes/Jianshu_Li_SSD1/HERA_Data'):
+					DATA_PATH_2 = '/Volumes/Jianshu_Li_SSD1/HERA_Data'
+			else:
+				DATA_PATH_2 = DATA_PATH
+			
+			Calculate_STD = False if 'blender' in DATA_PATH else False
+			Calculate_STD_Only = True if Calculate_STD else False
+			Good_STD_Thrshold = 0.4
+			Good_Freq_STD_LSTRatioThreshold = 0.1
+			
+			Load_by_Frequency = False if (- resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024. ** 3 + virtual_memory().total / 1024. ** 3) > 200. else True if Calculate_STD else (False if 'blender' in DATA_PATH else True)  # If to load data only around the selected frequency.
+			if 'vivaldi' not in INSTRUMENT:
+				Frequency_List = np.arange(100., 200., 0.097656245)
+			else:
+				Frequency_List = np.arange(50., 250., 0.097656245)
+			
+			if Load_by_Frequency:
+				Channel_Select_Center = np.argsort(np.abs(Frequency_List - Frequency_Select))[0]
+				Channel_Select_Width = 3
+				Channel_Select_Step = 1
+				Channel_Select_List = np.arange(np.max([0, Channel_Select_Center - Channel_Select_Width]), np.min([len(Frequency_List), Channel_Select_Center + Channel_Select_Width + Channel_Select_Step]), Channel_Select_Step).astype('int')
+				print('\nChannel_Select_Center: {0}'.format(Channel_Select_Center))
+				print('Channel_Select_List: {0}\n'.format(Channel_Select_List))
+			else:
+				Channel_Select_List = None
 			
 			Xrfi_flag = False  # If to calculate rfi and exit afterwards.
 			Kt = 80 if INSTRUMENT == 'hera-vivaldi' else 32 if INSTRUMENT == 'hera' else 32  # 32 # 8
@@ -5693,7 +5726,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				INSTRUMENT += '-sl'
 			
 			baseline_safety_low = 0.  # Meters
-			baseline_safety_factor = 10. ** (0.2) if 'blender' in DATA_PATH else 10.**(0.3)  # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor
+			baseline_safety_factor = 3. if 'blender' in DATA_PATH else 3. # 10.**(0.3)  # max_ubl = 1.4*lambda*nside_standard/baseline_safety_factor # 0.15, 0.3, 0.47712
 			baseline_safety_xx = 0. if INSTRUMENT == 'hera' else 0. if INSTRUMENT == 'hera-vivaldi' else 0.  # Meters
 			baseline_safety_yy = 0. if INSTRUMENT == 'hera' else 0. if INSTRUMENT == 'hera-vivaldi' else 0.  # Meters
 			baseline_safety_zz = 0. if INSTRUMENT == 'hera' else 0. if INSTRUMENT == 'hera-vivaldi' else 0.
@@ -5705,8 +5738,8 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			# 	continue
 			
 			Num_Pol = 2 if filetype == 'uvh5' else 2  # int(2)
-			Pol_num_list = [-5, -6, -7, -8]  # [-5, -6, -7, -8]
-			INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol) + ('22' if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else '') + '-BS{0:.4f}'.format(baseline_safety_factor)
+			Pol_num_list = [-5, -6, -7, -8]  # [-5, -6, -7, -8]-['xx', 'yy', 'xy', 'yx']
+			INSTRUMENT = INSTRUMENT + '{0}p'.format(Num_Pol) + ('22v2' if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else '') + '-BS{0:.4f}'.format(baseline_safety_factor)
 			if Xrfi_flag:
 				INSTRUMENT += '-Xrfi'
 			
@@ -5934,11 +5967,11 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			#
 			# elif 'hera' in INSTRUMENT:
 			
-			Use_SimulatedData = True if Simulation_For_All else False
+			Use_SimulatedData = (True if Simulation_For_All else False) if 'blender' in DATA_PATH else (True if Simulation_For_All else False)
 			Use_External_Vis = False if filetype == 'miriad' else True if (filetype == 'uvh5' and not Simulation_For_All and 'vivaldi' in INSTRUMENT) else False
 			External_Vis_Directory = [DATA_PATH + '/vis_map_xx.npy', DATA_PATH + '/vis_map_yy.npy'] if Num_Pol == 2 else [DATA_PATH + '/vis_map_xx.npy'] if Num_Pol == 1 else []
 			
-			Artifitial_GSM = False if ('blender' in DATA_PATH and Simulation_For_All) else True if Simulation_For_All else False  # If to use artifitail GSM.
+			Artifitial_GSM = False if ('blender' in DATA_PATH and Simulation_For_All) else False if Simulation_For_All else False  # If to use artifitail GSM.
 			Artifitial_uniform_sky_T = 0.5  # K
 			T_receiver = 0.  # K; 100.
 			INSTRUMENT += ('-AT{0}K-TC{1}K'.format(Artifitial_uniform_sky_T, T_receiver) if Artifitial_GSM else '')
@@ -5987,7 +6020,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			scale_noise = True  # rescale amplitude of noise to data amplitude.
 			scale_noise_ratio = 10. ** 0 if scale_noise else 1.  # comparing to data amplitude.
 			ReCalculate_Auto = False  # Whether to recalculate Autocorrelation using baseline-averaged amplitudes instead of original autocorrelation.
-			Noise_from_Diff_Freq = True if (not Simulation_For_All or Use_External_Vis) else False  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
+			Noise_from_Diff_Freq = True if (((not Simulation_For_All) and  (not Use_SimulatedData)) or Use_External_Vis) else False  # Whether to use difference between neighbor frequency chanels to calculate autocorrelation or not.
 			Gaussianized_Noise = False  # Whether to use the noise amplitude as reference so as to calculate noise or not.
 			Noise_from_IntrumentModel = False if not Noise_from_Diff_Freq else False  # Use (100. + 120.*(frequency/150)**(-2.55)) / (frequency_channel_width * integration_time)**0.5
 			DivedeRedundacny_NoiseDiffFreq = False if Noise_from_Diff_Freq else False
@@ -6035,17 +6068,17 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			LST_binned_Data = True if filetype == 'miriad' else True if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else False  # If to use LST-binned data that average over the observing sessions in each group with two times of the original integration time.
 			# Observing_Session = '/IDR2_1/LSTBIN/two_group/grp1/' if LST_binned_Data else '/IDR2_1/2458105/'  # /IDR2_1/{one/two/three}_group/grp{N}/ '/IDR2_1/2458105/' # '/ObservingSession-1197558062/2458108/'  # '/ObservingSession-1198249262/2458113/' #'/ObservingSession-1192201262/2458043/' #/nfs/blender/data/jshu_li/anaconda3/envs/Cosmology_python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192201262/2458043/  /Users/JianshuLi/anaconda3/envs/Cosmology-Python27/lib/python2.7/site-packages/HERA_MapMaking_VisibilitySimulation/data/ObservingSession-1192115507/2458042/
 			Delay_Filter = False
-			Observing_Session = (['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/']) if filetype != 'uvh5' else ['/ObservingSession1232039492/2458504/'] if Use_External_Vis else (['/IDR2_2/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_2/2458105/']) if 'vivaldi' not in INSTRUMENT else [
+			Observing_Session = (['/IDR2_1/LSTBIN/one_group/grp1/'] if LST_binned_Data else ['/IDR2_1/2458105/']) if filetype != 'uvh5' else ['/ObservingSession1232039492/2458504/'] if Use_External_Vis else (['/IDR2_2/LSTBIN/one_group_v2/grp1/'] if LST_binned_Data else ['/IDR2_2/2458105/']) if 'vivaldi' not in INSTRUMENT else [
 				'/OmnicaledVivaldi6/']  # ['/ObservingSession1232039492/2458504/'] # ['/IDR2_1/2458140/'] #['/IDR2_1/2458099/', '/IDR2_1/2458116/'] # ['/IDR2_1/2458098/', '/IDR2_1/2458105/', '/IDR2_1/2458110/', '/IDR2_1/2458116/', '/IDR2_1/2458140/'] #, '/IDR2_1/LSTBIN/three_group/grp2/', '/IDR2_1/LSTBIN/three_group/grp3/']
 			Filename_Suffix = (('.uvOCRSL' if LST_binned_Data else '.uvOCRS') if not Delay_Filter else ('.uvOCRSDL' if LST_binned_Data else '.uvOCRSD')) if filetype == 'miriad' else ('.uvh5' if filetype == 'uvh5' else '')  # '.uvOCRS' '.uvOCRSD'
 			Nfiles_temp = 7300
-			Specific_Files = (True if 'blender' in DATA_PATH else False) if not Use_External_Vis else True  # Choose a list of Specific Data Sets.
+			Specific_Files = (True if 'blender' in DATA_PATH else True) if not Use_External_Vis else True  # Choose a list of Specific Data Sets.
 			if len(sys.argv) > 2:
 				Specific_FileIndex_start = [int(sys.argv[2]) for id_p in range(Num_Pol)]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]
 				Specific_FileIndex_end = [int(sys.argv[3]) for id_p in range(Num_Pol)]  # Ending point of selected data sets. [51, 51], [26, 27]
 			elif not Part_LST:
-				Specific_FileIndex_start = ([4 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [5 for id_p in range(Num_Pol)] if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else [0 for id_p in range(Num_Pol)]  # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
-				Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [32 for id_p in range(Num_Pol)] if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else [40 for id_p in range(Num_Pol)]  # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
+				Specific_FileIndex_start = ([4 for id_p in range(Num_Pol)] if LST_binned_Data else [15 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [12 for id_p in range(Num_Pol)] if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else [0 for id_p in range(Num_Pol)]  # [3, 3]  # Starting point of selected data sets. [51, 51], 113:[26, 27], 105:[28, 29]; [15, 65], [6,32]
+				Specific_FileIndex_end = ([32 for id_p in range(Num_Pol)] if LST_binned_Data else [60 for id_p in range(Num_Pol)]) if filetype == 'miriad' else [17 for id_p in range(Num_Pol)] if (filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else [40 for id_p in range(Num_Pol)]  # [23, 23]  # Ending point of selected data sets. [51, 51], [26, 27]
 			else:
 				Specific_FileIndex_start = [(File_Loop - Num_Files_pl / 2) for id_p in range(Num_Pol)]
 				Specific_FileIndex_end = [(File_Loop + Num_Files_pl / 2) for id_p in range(Num_Pol)]
@@ -6093,7 +6126,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				# TGSSADR J045826.4-300720	[ra:74.61041, dec:-30.12238] Flux:15692.2 mJy, 911.9 mJy, 32:8662; Map: 35.2429 Jy
 				# TGSSADR J045514.2-300650	[ra:73.80946, dec:-30.11399] Flux:20822.9 mJy, 9501.2 mJy, 32:8662; Map: 35.2429 Jy
 				# TGSSADR J042940.1-363053	[ra:67.41748, dec:-36.51481] Flux:17746.0 mJy, 14607.4 mJy; 32:8643 Map: 27.0642 Jy
-				# TGSSADR J052257.7-362735	[ra:80.74076, dec:-36.45975] Flux:62750.3 mJy, 41460.5 mJy; 64:34264 Map: 31.8555 Jy; 32: 8566
+				# TGSSADR J052257.7-362735	[ra:80.74076, dec:-36.45975] Flux:62750.3 mJy, 41460.5 mJy; 64:34264 Map: 31.8555 Jy; 32: 8566, 8564
 				# TGSSADR J062706.4-352908	[ra:96.77693, dec:-35.48578] Flux:18110.7 mJy, 4117.4 mJy; 32:9914 Map: 24.3569 Jy
 				# TGSSADR J093801.0-291246	[ra:144.50452, dec:-29.21283] Flux:14016.6 mJy, 1482.9 mJy; 32:10005 Map: 73.0347 Jy
 				# TGSSADR J090147.5-255520	[ra:135.44815, dec:-25.92238] Flux:49615.9 mJy, 18238.5 mJy; 32:10035 Map: 31.7665 Jy
@@ -6176,15 +6209,15 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			Parallel_A_fullsky = True if 'blender' in DATA_PATH else True  # Parallel Computing for Fullsky A matrix.
 			nchunk_A_full = (1 if 'blender' in DATA_PATH else 4) if Parallel_A_fullsky else 1  # Cut the sky into nchunk_A_full parts, and parallel calculate A_fullsky for each part seperately to save memory.
 			nchunk_from_memory_calculation_full = True  # IF recalculate nchunk_A_full by comparing memory left and A size
-			Add_Chunks = (1 if 'blender' in DATA_PATH else 2) if not Simulation_For_All else (40 if 'blender' in DATA_PATH else 2) # Add to the number of fullsky chunks.
+			Add_Chunks = (1 if 'blender' in DATA_PATH else 2) if not Simulation_For_All else (2 if 'blender' in DATA_PATH else 2) # Add to the number of fullsky chunks.
 			
 			Precision_full = 'complex128'  # Precision when calculating full-sky A matrix, while masked-sky matrix with default 'complex128'.
 			Parallel_A_Convert = False  # If to parallel Convert A from nside_beam to nside_standard.
-			Coarse_Pixels = (True if 'blender' in DATA_PATH else False) if not Simulation_For_All else (True if 'blender' in DATA_PATH else True) # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
-			Coarse_Pixels_num = 4 ** 2 if 'blender' in DATA_PATH else 4 ** 2
-			valid_pix_threshold_coarse = 10. ** (-2.) if 'blender' in DATA_PATH else 10. ** (-1.5)
+			Coarse_Pixels = (True if 'blender' in DATA_PATH else True) if not Simulation_For_All else (False if 'blender' in DATA_PATH else False) # If to coarse the pixels outside valid_pix_threshold_coarse region by every Coarse_Pixels_num
+			Coarse_Pixels_num = 4 ** 3 if 'blender' in DATA_PATH else 4 ** 10
+			valid_pix_threshold_coarse = 10. ** (-2.) if 'blender' in DATA_PATH else 10. ** (-3.)
 			Scale_A_extra = True  # If to scalse the extra pixels in A_masked by Coarse_Pixels_num.
-			Use_rotated_beampattern_as_beamweight = True if (not Coarse_Pixels and filetype == 'miriad') else True if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
+			Use_rotated_beampattern_as_beamweight = False if (not Coarse_Pixels and filetype == 'miriad') else False if (not Coarse_Pixels and filetype == 'uvh5') else False  # If to use rotated beam pattern to calculate beamweight, good for very low valid_threshold so that all non-zero beam can be valid. If this is the case we can use low resolution fullsky to get fullsim_vis just for its existance.
 			Use_memmap_A_full = False if Use_rotated_beampattern_as_beamweight else False  # If to use np.memmap for A for A_masked calculation in the future.
 			NoA_Out_fullsky = False if Use_memmap_A_full else True  # Whether or not to calculate full A matrix
 			
@@ -6198,9 +6231,9 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			RI = True  # If use cos/sin instead of exp/real/imag when calculate A_masked.
 			
 			Parallel_AtNiA = False  # Parallel Computing for AtNiA (Matrix Multiplication)
-			nchunk = 4 if 'blender' in DATA_PATH else 1  # UseDot to Parallel but not Parallel_AtNiA.
+			nchunk = 1 if 'blender' in DATA_PATH else 1  # UseDot to Parallel but not Parallel_AtNiA.
 			nchunk_from_memory_calculation = True  # If to use recalculated nchunk at current unused memory.
-			Min_Memory_Taken = 28.  # minimum GB forced.
+			Min_Memory_Taken = 40.  # minimum GB forced.
 			nchunk_AtNiA = 24  # nchunk starting number.
 			nchunk_AtNiA_maxcut = 2  # maximum nchunk nchunk_AtNiA_maxcut * nchunk_AtNiA
 			nchunk_AtNiA_step = 0.5  # step from 0 to nchunk_AtNiA_maxcut
@@ -6215,7 +6248,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			Use_h5py = False  # Data format for each chunk of A
 			Use_memmap = False if ChunkbyChunk_all else False  # Data format for each chunk of A, higher priority over the above two.
 			Use_npy = False if Use_memmap else True  # Data format for each chunk of A
-			Use_memmap_AtNiA = True if ChunkbyChunk_all else True  # Use np.memmap for AtNiA so as to access only part of it to save memory.
+			Use_memmap_AtNiA = True if ChunkbyChunk_all else False  # Use np.memmap for AtNiA so as to access only part of it to save memory.
 			Use_memmap_AtNiAi = False
 			
 			Save_Memory = True  # If to apply sqrt(Ni) on each of two chunks before dot so as to save one copy of memory.
@@ -6275,30 +6308,43 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			Bad_Freqs_Channels = np.array([[], []])
 			Comply2RFI = True  # Use RFI_Best as selected frequency.
 			antenna_pick_list = [34, 35, 30, 31, 32, 25, 26]
-			badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 14, 23, 41, 52, 53, 54, 67, 69, 122, 139, 143, 24, 85, 86] if (not Simulation_For_All and filetype == 'miriad') \
-				else [14] if (not Simulation_For_All and filetype == 'uvh5' and Use_External_Vis and 'vivaldi' in INSTRUMENT) else [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 14, 23, 41, 52, 53, 54, 67, 69, 122, 139, 143, 24, 85, 86] if (not Simulation_For_All and filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else []  #  All-IDR2.1: [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
+			Strict_BadAnt = True # LST limited if not strict.
+			if Strict_BadAnt:
+				badants_append = [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 14, 23, 41, 52, 53, 54, 67, 69, 122, 139, 143, 24, 85, 86, 1, 82] if (not Simulation_For_All and filetype == 'miriad') \
+					else [14] if (not Simulation_For_All and filetype == 'uvh5' and Use_External_Vis and 'vivaldi' in INSTRUMENT) else [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 14, 23, 41, 52, 53, 54, 67, 69, 122, 139, 143, 24, 85, 86, 1, 82] if (not Simulation_For_All and filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else []
+			else:
+				badants_append = [0, 2, 11, 24, 50, 53, 54, 67, 69, 98, 136, 52, 122] if (not Simulation_For_All and filetype == 'miriad') \
+					else [14] if (not Simulation_For_All and filetype == 'uvh5' and Use_External_Vis and 'vivaldi' in INSTRUMENT) else [0, 2, 11, 24, 50, 53, 54, 67, 69, 98, 136, 52, 122] if (not Simulation_For_All and filetype == 'uvh5' and 'vivaldi' not in INSTRUMENT) else []
+			#  All-IDR2.1: [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], [0, 2, 11, 14, 26, 50, 68, 84, 98, 104, 117, 121, 136, 137]; plus [12, 23, 24, 37, 38, 52, 53, 54, 67, 69, 85, 86, 122, 142], plus [13, 14, 25, 27, 38, 41, 51, 82, 84, 87, 140, 141, 143]
+			# [0, 2, 11, 24, 50, 53, 54, 67, 69, 98, 136, 52, 122]; [0, 2, 11, 50, 68, 98, 104, 117, 136, 137, 14, 23, 41, 52, 53, 54, 67, 69, 122, 139, 143, 24, 85, 86, 1]
 			badants_pre = [14] if (filetype == 'uvh5' and Use_External_Vis) else []
 			
 			# classic source Confusion limit -- 32: 12.687(0.1), 2.7612(1.)  ;
 			# 040: 3, 74, 277, 368, 526,
-			Plot_RedundanctBaselines = False
+			Plot_RedundanctBaselines = False if 'blender' in DATA_PATH else False
+			if Plot_RedundanctBaselines or Calculate_STD:
+				Freq_Width = 500.
+				Freq_Low = [Frequency_Select - Freq_Width, Frequency_Select - Freq_Width]
+				Freq_High = [Frequency_Select + Freq_Width, Frequency_Select + Freq_Width]
 			PCA_for_RedundancyAnalysis = False
 			Plot_RedundanctBaselines_Only = True  # If True, Terminate the program after Redundancy Analysis.
+			Make_Redundant_Movie = True
+			Make_Redundant_Movie_lst = False
 			
-			Tolerance_2 = 10. ** (-2)  # Tolerance used when Comparing Redundant Baselines.
+			Tolerance_2 = 10. ** (-1)  # Tolerance used when Comparing Redundant Baselines.
 			time_step = 1  # time step used to plot along frequency axis.
 			frequency_step = 1  # frquency step used to plot along temporal axis.
 			Plot_RedundanctBaselines_timeseperate = False  # Whether to plot time-dependant freq-spectrum of redundant baselines by seperate plots or Animation.
 			Plot_RedundanctBaselines_freqseperate = False  # Whether to plot frequency-dependant time-evolution of redundant baselines by seperate plots or Animation.
 			Plot_RedundanctBaselines_frequency_std = True  # Plot STD along redundant baselines along frequency axis or not.
 			Plot_RedundanctBaselines_time_std = True  # Plot STD along redundant baselines along temporal axis or not.
-			length_thresh_redundancy = 3
+			length_thresh_redundancy = 5
 			length_thresh_redundancy_std = 5
-			time_step_std = 24
-			frequency_step_std = 20
+			time_step_std = 1
+			frequency_step_std = 1
 			
 			Check_Dred_AFreq_ATime = False
-			Tolerance = 10.**(-9.) # 10. ** (-9)  # meter, Criterion for De-Redundancy
+			Tolerance = 10.**(-9.) if not Plot_RedundanctBaselines else 10.**(-9.) # 10. ** (-9)  # meter, Criterion for De-Redundancy
 			
 			Synthesize_MultiFreq = False
 			Synthesize_MultiFreq_Nfreq = 7 if Synthesize_MultiFreq else 1  # tempr
@@ -6318,7 +6364,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			else:
 				Integration_Time = 10.7375 * 2. if filetype == 'miriad' else 8.61345 * 2.  # seconds; * 3., 14
 			
-			Frequency_Bin = 101562.5 if not Simulation_For_All else 97656.245  # 1.625 * 1.e6  # Hz
+			Frequency_Bin = 97656.245 if not Simulation_For_All else 97656.245  # 1.625 * 1.e6, 101562.5   # Hz
 			Integration_Time_original = Integration_Time
 			Frequency_Bin_original = Frequency_Bin
 			
@@ -6326,6 +6372,8 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			################################################################# All Simulation Setup ############################################################################
 			if Simulation_For_All:
 				antenna_num = 350 if 'blender' in DATA_PATH else 350  # number of antennas that enter simulation: 37,128,243,350
+				Rescale_Array = True # Rescale the dimension of the array.
+				Rescale_Array_Factor = 1./6.  # 3.; 4.7; 6.;
 				if 'vivaldi' in INSTRUMENT:
 					flist = np.array([np.arange(50., 250., Frequency_Bin * 10. ** (-6)) for i in range(Num_Pol)])
 				else:
@@ -6379,13 +6427,20 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 					antenna_num = len(ants)
 				else:
 					array_position = np.loadtxt(DATA_PATH + '/hera_positions_staged/antenna_positions_{0}.dat'.format(antenna_num))
+				
 				antpos = np.array([array_position for id_p in range(Num_Pol)])
+				if Rescale_Array:
+					antpos *= Rescale_Array_Factor
+					print ('\n>>>>>>>> Rescale_Array_Factor: {0} <<<<<<<< \n'.format(Rescale_Array_Factor))
+					
 				if 'vivaldi' not in INSTRUMENT or not Vivaldi_TrueCoordinate:
 					ants = np.array([np.arange(antenna_num) for i in range(Num_Pol)])
 				else:
 					ants = np.array([ants for i in range(Num_Pol)])
 				
-				INSTRUMENT = INSTRUMENT + '-SimAll-{0:.2f}-{1:.2f}-{2:.4f}'.format(lsts_start, lsts_end, lsts_step * 1000.)
+				INSTRUMENT = (INSTRUMENT + '-RAF{3:.2f}-SimAll-{0:.2f}-{1:.2f}-{2:.4f}'.format(lsts_start, lsts_end, lsts_step * 1000., Rescale_Array_Factor)) if Rescale_Array else (INSTRUMENT + '-SimAll-{0:.2f}-{1:.2f}-{2:.4f}'.format(lsts_start, lsts_end, lsts_step * 1000.))
+			
+
 			
 			Manual_PointSource = True  # Whether to calculate point-spread function for points not on center coordinates of each cell
 			
@@ -6396,7 +6451,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			
 			Fine_Add = False if 'blender' in DATA_PATH else False  # If to add rcond only onto selected diags according to to its value.
 			Fine_Add_Scale_list = 10. ** np.arange(-10., 2., 1.) if Fine_Add else [1.]
-			rcond_list = (np.concatenate(([0.], 10. ** np.arange(-35, 10., 1.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 10., 1.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-30, 10., 1.)))) if not Fine_Add else np.concatenate(([0.], 10. ** np.arange(-15., 0., 1.)))
+			rcond_list = (np.concatenate(([0.], 10. ** np.arange(-20, 0., 2.))) if (filetype == 'uvh5' and Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 1., 2.))) if (filetype == 'uvh5' and not Use_External_Vis) else np.concatenate(([0.], 10. ** np.arange(-20, 1., 2.)))) if not Fine_Add else np.concatenate(([0.], 10. ** np.arange(-15., 0., 1.)))
 			Selected_Diagnal_R = False  # If only add rond onto diagnal elements that are larger than max_diag * diag_threshold.
 			diag_threshold = 10. ** (-12.)
 			
@@ -6414,7 +6469,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				if 'spar' in INSTRUMENT:
 					valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.)
 				else:
-					valid_pix_thresh = 10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10. ** (-6.)
+					valid_pix_thresh = (10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10. ** (-6.)) if Coarse_Pixels else (10. ** (-6.) if Use_rotated_beampattern_as_beamweight else 10. ** (-6.) if 'blender' in DATA_PATH else 10. ** (-6.))
 			
 			Narrow_Beam = True if Simulation_For_All else False  # Narrow the beam to primary beam.
 			Narrow_Beam_threshold = valid_pix_thresh  # 10. ** (-6.)  # Threshold for Primary Beam.
@@ -6434,9 +6489,10 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				nside_standard = int(sys.argv[5])  # resolution of sky, dynamic A matrix length of a row before masking.
 				nside_beamweight = int(sys.argv[6])  # undynamic A matrix shape
 			else:
-				nside_start = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # starting point to calculate dynamic A
-				nside_standard = 64 if ('blender' in DATA_PATH and Simulation_For_All) else 32 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
-				nside_beamweight = nside_standard if Use_memmap_A_full else 128 if (Simulation_For_All and 'blender' in DATA_PATH) else 32 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8  # undynamic A matrix shape
+				nside_start = 32 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 32 # starting point to calculate dynamic A
+				# noinspection PyUnboundLocalVariable
+				nside_standard = 32 if ('blender' in DATA_PATH and Simulation_For_All) else 64 if ('blender' in DATA_PATH and not Simulation_For_All) else 32  # resolution of sky, dynamic A matrix length of a row before masking.
+				nside_beamweight = nside_standard if Use_memmap_A_full else 128 if (Simulation_For_All and 'blender' in DATA_PATH) else 128 if (Simulation_For_All and 'blender' not in DATA_PATH) else 8  # undynamic A matrix shape
 			
 			Fake_BeamFrequency = False # If to use the freq_beam for beam instead of the real freq.
 			freq_beam = 80.
@@ -6494,17 +6550,17 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				if filetype == 'miriad':
 					if LST_binned_Data:
 						for session in Observing_Session:
-							for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.LST.*.*".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[0].append(fname_x)
-							for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.LST.*.*".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[1].append(fname_y)
 						data_fnames_full[0] = sorted(data_fnames_full[0])
 						data_fnames_full[1] = sorted(data_fnames_full[1])
 					else:
 						for session in Observing_Session:
-							for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_x in sorted((glob.glob("{0}/zen.*.*.xx.HH".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[0].append(fname_x)
-							for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_y in sorted((glob.glob("{0}/zen.*.*.yy.HH".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[1].append(fname_y)
 						data_fnames_full[0] = sorted(data_fnames_full[0])
 						data_fnames_full[1] = sorted(data_fnames_full[1])
@@ -6512,14 +6568,14 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				elif (filetype == 'uvh5' and 'vivaldi' in INSTRUMENT):
 					for session in Observing_Session:
 						if not Use_External_Vis:
-							for fname_x in sorted((glob.glob("{0}/zen.*.*.HH.omni_vis".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_x in sorted((glob.glob("{0}/zen.*.*.HH.omni_vis".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[0].append(fname_x)
-							for fname_y in sorted((glob.glob("{0}/zen.*.*.HH.omni_vis".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_y in sorted((glob.glob("{0}/zen.*.*.HH.omni_vis".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[1].append(fname_y)
 						else:
-							for fname_x in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_x in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[0].append(fname_x)
-							for fname_y in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_y in sorted((glob.glob("{0}/zen.*.*.HH".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[1].append(fname_y)
 					
 					data_fnames_full[0] = sorted(data_fnames_full[0])
@@ -6531,16 +6587,16 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 						print(2)
 						if (LST_binned_Data and not Delay_Filter):
 							print(3)
-							print(("{0}/zen.*.*.LST.*.*.HH.OCRS".format(DATA_PATH + session) + Filename_Suffix))
-							for fname_x in sorted((glob.glob("{0}/zen.*.*.LST.*.*.HH.OCRS".format(DATA_PATH + session) + Filename_Suffix))):
+							print(("{0}/zen.*.*.LST.*.*.HH.OCRS".format(DATA_PATH_2 + session) + Filename_Suffix))
+							for fname_x in sorted((glob.glob("{0}/zen.*.*.LST.*.*.HH.OCRS".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[0].append(fname_x)
-							for fname_y in sorted((glob.glob("{0}/zen.*.*.LST.*.*.HH.OCRS".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_y in sorted((glob.glob("{0}/zen.*.*.LST.*.*.HH.OCRS".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[1].append(fname_y)
 						elif (not LST_binned_Data and Delay_Filter):
 							print(4)
-							for fname_x in sorted((glob.glob("{0}/zen.*.*.HH.OCRS".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_x in sorted((glob.glob("{0}/zen.*.*.HH.OCRS".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[0].append(fname_x)
-							for fname_y in sorted((glob.glob("{0}/zen.*.*.HH.OCRS".format(DATA_PATH + session) + Filename_Suffix))):
+							for fname_y in sorted((glob.glob("{0}/zen.*.*.HH.OCRS".format(DATA_PATH_2 + session) + Filename_Suffix))):
 								data_fnames_full[1].append(fname_y)
 					
 					data_fnames_full[0] = sorted(data_fnames_full[0])
@@ -6622,7 +6678,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 					print(excfile)
 					print('Problems happen when analyzing data_filenames.')
 				
-				if id_Frequency_Select == 0:
+				if id_Frequency_Select == 0 or Load_by_Frequency:
 					# specify model file and load into UVData, load into dictionary
 					timer_loading = time.time()
 					model_fname = {}
@@ -6926,7 +6982,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 																																																								  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
 																																																								  , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
 																																																								  freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
-																																																								  cal_mode=cal_mode
+																																																								  cal_mode=cal_mode, freq_chans=Channel_Select_List
 																																																								  )
 									print('model_Pol_%s is done.' % ['xx', 'yy'][i])
 								# specify data file and load into UVData, load into dictionary
@@ -6947,7 +7003,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 																																																																							Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
 																																																																							, Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
 																																																																							freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
-																																																																							cal_mode=cal_mode
+																																																																							cal_mode=cal_mode, freq_chans=Channel_Select_List
 																																																																							)
 								print('small_Pol_%s is done.' % ['xx', 'yy'][i])
 								
@@ -6981,7 +7037,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 																																																											Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
 																																																											, Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
 																																																											freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
-																																																											cal_mode=cal_mode
+																																																											cal_mode=cal_mode, freq_chans=Channel_Select_List
 																																																											)
 									data_freqs_full[i] = data_freqs_full[i] / 1.e6
 									# findex_list[i] = np.array([np.where(data_freqs_full[i] == flist[i][j])[0][0] for j in range(len(flist[i]))])
@@ -7044,7 +7100,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 																																																								  Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
 																																																								  , Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
 																																																								  freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
-																																																								  cal_mode=cal_mode
+																																																								  cal_mode=cal_mode, freq_chans=Channel_Select_List
 																																																								  )
 									print('model_Pol_%s is done.' % Pol_list[i])
 								# specify data file and load into UVData, load into dictionary
@@ -7056,7 +7112,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 																																																																							Frequency_Select=Frequency_Select_List, polarizations=[Pol_num_list[i]], Xrfi_flag=Xrfi_flag
 																																																																							, Kt=Kt, Kf=Kf, sig_init=sig_init, sig_adj=sig_adj, px_threshold=px_threshold,
 																																																																							freq_threshold=freq_threshold, time_threshold=time_threshold, return_summary=return_summary,
-																																																																							cal_mode=cal_mode
+																																																																							cal_mode=cal_mode, freq_chans=Channel_Select_List
 																																																																							)
 								try:
 									autocorr_data_mfreq_origin[i] = np.mean(np.array([np.abs(data_autos_origin[i][data_autos_origin[i].keys()[k]]) for k in range(len(data_autos_origin[i].keys()))]), axis=0)
@@ -7080,7 +7136,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 						timer = time.time()
 						pool = Pool()
 						PolsData_process = [pool.apply_async(UVData2AbsCalDict_Auto, args=(data_fnames[p], None, True, True, filetype, True, True, Time_Average_preload, Frequency_Average_preload, Dred_preload, True, Tolerance, Select_freq, Select_time, badants_pre, Parallel_Files, Run_Check, False, False, None, None,
-																						   None, None, None, None, [Pol_num_list[i]], None, True, Frequency_Select, [Pol_num_list[i]], Xrfi_flag, Kt, Kf, sig_init, sig_adj, px_threshold,
+																						   None, None, Channel_Select_List, None, [Pol_num_list[i]], None, True, Frequency_Select, [Pol_num_list[i]], Xrfi_flag, Kt, Kf, sig_init, sig_adj, px_threshold,
 																						   freq_threshold, time_threshold, return_summary,
 																						   cal_mode)) for p in range(Num_Pol)]
 						PolsData = [poldata.get() for poldata in PolsData_process]
@@ -7142,6 +7198,9 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				redundancy = copy.deepcopy(redundancy_origin)
 				
 				autocorr_data_mfreq = copy.deepcopy(autocorr_data_mfreq_origin)
+				
+				if Load_by_Frequency:
+					del(data_origin, dflags_origin, antpos_origin, ants_origin, data_freqs_origin, data_times_origin, data_lsts_origin, data_pols_origin, data_autos_origin, data_autos_flags_origin, redundancy_origin)
 				
 				Freq_RFI = {}
 				Freq_RFI_Sort = {}
@@ -7358,7 +7417,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				plt.title('%s-polarization selected subarray' % Pol_list[j])
 				# plt.xlim(-30, 30)
 				# plt.ylim(-30, 30)
-				plt.savefig(script_dir + '/../Output/%s-Nant%s-Ant_Locations.pdf' % (INSTRUMENT, len(antloc[0])))
+				plt.savefig(script_dir + '/../Output/{0}-Nant{1}-Pol{2}-Ant_Locations.pdf'.format(INSTRUMENT, len(antloc[0]), j))
 				plt.show(block=False)
 			plt.clf()
 			
@@ -7566,29 +7625,60 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			# elif Num_Pol == 3:
 			# 	bls = [[], [], []]
 			
-			bls = [[] for id_p in range(Num_Pol)]
+			# bls = [[] for id_p in range(Num_Pol)]
+			#
+			# # bls_test = [[], []]
+			# for i in range(Num_Pol):
+			# 	bls[i] = odict()
+			# 	if not Simulation_For_All:
+			# 		for x in data[i].keys():
+			# 			if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
+			# 					and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
+			# 				if Conjugate_CertainBSL:
+			# 					bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			# 				elif Conjugate_CertainBSL2:
+			# 					bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			# 				elif Conjugate_CertainBSL3:
+			# 					if np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == 1:
+			# 						bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			# 					elif np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == -1:
+			# 						bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			# 				else:
+			# 					bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			#
+			# 				bls[i][x][0] = - bls[i][x][0]  # [S, E, U]
+			#
+			# 	else:
+			# 		for ant1 in range(antenna_num - 1):
+			# 			for ant2 in range(ant1 + 1, antenna_num):
+			# 				x = (ants[i][ant1], ants[i][ant2])
+			# 				if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
+			# 						and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
+			# 					bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+			# 					bls[i][x][0] = - bls[i][x][0]
+			#
+			# bls = np.array(bls)
 			
+			bls = [[] for id_p in range(Num_Pol)]
 			# bls_test = [[], []]
 			for i in range(Num_Pol):
 				bls[i] = odict()
 				if not Simulation_For_All:
 					for x in data[i].keys():
-						if (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) <= 1.4 * nside_standard / baseline_safety_factor) and (la.norm((antpos[i][x[0]] - antpos[i][x[1]])) / (C / freq) >= baseline_safety_low) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] >= baseline_safety_xx) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] >= baseline_safety_yy) \
-								and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
-							if Conjugate_CertainBSL:
-								bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
-							elif Conjugate_CertainBSL2:
+						if Conjugate_CertainBSL:
+							bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+						elif Conjugate_CertainBSL2:
+							bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+						elif Conjugate_CertainBSL3:
+							if np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == 1:
 								bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
-							elif Conjugate_CertainBSL3:
-								if np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == 1:
-									bls[i][x] = np.sign(np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] - np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
-								elif np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == -1:
-									bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
-							else:
-								bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
-							
-							bls[i][x][0] = - bls[i][x][0]  # [S, E, U]
-				
+							elif np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) == -1:
+								bls[i][x] = np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+						else:
+							bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
+						
+						bls[i][x][0] = - bls[i][x][0]  # [S, E, U]
+			
 				else:
 					for ant1 in range(antenna_num - 1):
 						for ant2 in range(ant1 + 1, antenna_num):
@@ -7597,7 +7687,10 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 									and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] >= baseline_safety_zz) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[0] <= baseline_safety_xx_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[1] <= baseline_safety_yy_max) and (np.abs(antpos[i][x[0]] - antpos[i][x[1]])[2] <= baseline_safety_zz_max):
 								bls[i][x] = (antpos[i][x[0]] - antpos[i][x[1]])[[1, 0, 2]]
 								bls[i][x][0] = - bls[i][x][0]
-			
+
+						
+			# bls[i] = odict([(x, np.prod(np.sign(antpos[i][x[0]] - antpos[i][x[1]])[:2]) * (antpos[i][x[0]] - antpos[i][x[1]])) for x in data[i].keys()])
+			# bls[1] = odict([(y, antpos_yy[y[0]] - antpos_yy[y[1]]) for y in data_yy.keys()])
 			bls = np.array(bls)
 			
 			bsl_coord = [[] for id_p in range(Num_Pol)]
@@ -7823,9 +7916,9 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				#	tlist[i] = '%.2f' %si_t
 				
 				if tag == '-ampcal-':
-					tag = '{0}-{1:.2f}'.format(INSTRUMENT, freq) + '-{0}-{1:.6f}'.format('bW' if Use_BeamWeight else 'gW', valid_pix_thresh) + tag
+					tag = '{0}'.format(INSTRUMENT) + '-{0}-{1:.6f}'.format('bW' if Use_BeamWeight else 'gW', valid_pix_thresh) + tag
 				else:
-					tag = '{0}-{1:.2f}'.format(INSTRUMENT, freq) + '-{0}-{1:.6f}'.format('bW' if Use_BeamWeight else 'gW', valid_pix_thresh)
+					tag = '{0}'.format(INSTRUMENT) + '-{0}-{1:.6f}'.format('bW' if Use_BeamWeight else 'gW', valid_pix_thresh)
 				
 				tmasks = {}
 				for id_p, p in enumerate(pol_list):
@@ -7999,12 +8092,20 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			# PCA_for_RedundancyAnalysis = False
 			# Plot_RedundanctBaselines_Only = True
 			# Tolerance_2 = 10. ** (-2)
-			if Plot_RedundanctBaselines:
+			if Plot_RedundanctBaselines or Calculate_STD:
+				# Ubl_list_2 = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
+				# 						   data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
+				# 						   FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants, freq=freq, nside_standard=nside_standard,
+				# 						   baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
+				# 						   baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
+				
 				Ubl_list_2 = De_Redundancy(dflags=dflags, antpos=antpos, ants=ants, SingleFreq=SingleFreq, MultiFreq=MultiFreq, Conjugate_CertainBSL=Conjugate_CertainBSL, Conjugate_CertainBSL2=Conjugate_CertainBSL2, Conjugate_CertainBSL3=Conjugate_CertainBSL3,
-										   data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
-										   FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants, freq=freq, nside_standard=nside_standard,
-										   baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
-										   baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen)[-1]
+				                           data_freqs=data_freqs, Nfreqs=64, data_times=data_times, Ntimes=60, Flist_select_index=Flist_select_index, Synthesize_MultiFreq=Synthesize_MultiFreq,
+				                           FreqScaleFactor=1.e6, Frequency_Select=Frequency_Select, vis_data_mfreq=vis_data_mfreq, tol=Tolerance_2, Badants=badants_ev, freq=freq, nside_standard=nside_standard,
+				                           baseline_safety_factor=baseline_safety_factor, baseline_safety_low=baseline_safety_low, baseline_safety_xx=baseline_safety_xx, baseline_safety_yy=baseline_safety_yy, baseline_safety_zz=baseline_safety_zz, baseline_safety_zz_max=baseline_safety_zz_max,
+				                           baseline_safety_xx_max=baseline_safety_xx_max, baseline_safety_yy_max=baseline_safety_yy_max, RFI_Free_Thresh=RFI_Free_Thresh, RFI_AlmostFree_Thresh=RFI_AlmostFree_Thresh, RFI_Free_Thresh_bslStrengthen=RFI_Free_Thresh_bslStrengthen, Num_Pol=Num_Pol, Pol_list=Pol_list)[-1]
+				
+				# Ubl_list_2 = Ubl_list
 				
 				tmasks_mfreq = [[], []]
 				vis_data_time_std = [[], []]
@@ -8030,10 +8131,51 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				tmask_mfreq = tmasks_mfreq[0] & tmasks_mfreq[1]
 				tmask_mfreq_uni = np.prod(tmask_mfreq, axis=1)
 				
+				print('\n>>>>> Ubl_list_2: {0}'.format(Ubl_list_2))
+				
+				Flag_STD_Red = {}
+				Flag_STD_Red_ratio = {}
+				Flag_Freqs_STD = np.array([np.ones_like(flist[0]).astype('bool') for id_p in range(Num_Pol)])
+				
+				for i in range(Num_Pol):
+					for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
+						# if len(redundant_baselines) > length_thresh_redundancy:
+							Flag_STD_Red[(i, id_rbl, len(redundant_baselines))] = np.array([np.sum((np.std((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1) / np.mean((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1)) > Good_STD_Thrshold).astype('float') for id_freq in range(len(flist[i]))])
+							Flag_STD_Red_ratio[(i, id_rbl, len(redundant_baselines))] = Flag_STD_Red[(i, id_rbl, len(redundant_baselines))] / np.sum(tmask_mfreq, axis = 0).astype('float')
+							Flag_Freqs_STD[i] *= Flag_STD_Red_ratio[(i, id_rbl, len(redundant_baselines))] < Good_Freq_STD_LSTRatioThreshold
+							if np.mean(Flag_STD_Red_ratio[(i, id_rbl, len(redundant_baselines))]) > Good_Freq_STD_LSTRatioThreshold:
+								print('\npol: {0}; id_rbl: {1}; ratio: {2}'.format(i, id_rbl, np.mean(Flag_STD_Red_ratio[(i, id_rbl, len(redundant_baselines))])))
+								for id_freq in range(len(flist[i])):
+									print('\nFrequency: {0}'.format(flist[i][id_freq]))
+									print('Bad Lsts: {0}'.format(data_lsts[i][tmask_mfreq[:, id_freq]][(np.std((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1) / np.mean((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1)) > Good_STD_Thrshold]))
+								print('\n>>>>>>>><<<<<<<<<<\n')
+								for redundant_baseline in redundant_baselines:
+									print('>>>>{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+								print('\n>>>>>>>><<<<<<<<<<\n')
+							
+				print('\nGood_STD_Thrshold = {0}; \nGood_Freq_STD_LSTRatioThreshold = {1}\n'.format(Good_STD_Thrshold, Good_Freq_STD_LSTRatioThreshold))
+				print('Flag_STD_Red_ratio (True is Good): {0}'.format(Flag_STD_Red_ratio))
+				
+				for i in range(Num_Pol):
+					for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
+						print('id_rbl: {0}'.format(id_rbl))
+						for redundant_baseline in redundant_baselines:
+							print('>>>>{0}-{1}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]]))
+				print('Flag_STD_Red (True is Good): {0}'.format(Flag_STD_Red))
+				print('Flag_Freqs_STD(True is Good): {0}'.format(Flag_Freqs_STD))
+				for id_pol in range(Num_Pol):
+					print('\nGood Frequencies, {0}:\n{1}'.format(id_pol, flist[id_pol][Flag_Freqs_STD[id_pol]]))
+				print('\nGood_STD_Thrshold = {0}; \nGood_Freq_STD_LSTRatioThreshold = {1}\n'.format(Good_STD_Thrshold, Good_Freq_STD_LSTRatioThreshold))
+				
+				if Calculate_STD and Calculate_STD_Only:
+					print('Programme Ends at: {0}'.format(datetime.datetime.now()))
+					print('>>>>>>>>>>>>>>>>>> Total Used Time: {0} seconds. <<<<<<<<<<<<<<<<<<<< \n'.format(Timer_End - Timer_Start))
+					sys.exit('Exit right after Frequency Flagging from Redundancy Analysis.')
+				
 				# time_step = 60
 				import matplotlib.animation as animation
 				
-				for i in range(2):
+				for i in range(Num_Pol):
 					for id_rbl, redundant_baselines in enumerate(Ubl_list_2[i]):
 						if len(redundant_baselines) > length_thresh_redundancy:
 							timer_red_bsl = time.time()
@@ -8045,81 +8187,81 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 							ax1_pha = fig_animate_redundancy_pha.add_subplot(1, 1, 1)
 							ax1_std = fig_animate_redundancy_std.add_subplot(1, 1, 1)
 							
-							
-							def Animate_Redundancy_amp(id_time):
-								if id_time < len(range(0, len(data_lsts[i]), time_step)):
-									id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
-									ax1_amp.clear()
-									for redundant_baseline in redundant_baselines:
-										ax1_amp.plot(flist[i][list(tmask_mfreq[id_time])], np.abs((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}-LST{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], data_lsts[i][id_time]))
-									# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-									ax1_amp.legend(loc='best', fontsize='xx-small')
-							
-							
-							# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-							
-							def Animate_Redundancy_pha(id_time):
-								if id_time < len(range(0, len(data_lsts[i]), time_step)):
-									id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
-									ax1_pha.clear()
-									for redundant_baseline in redundant_baselines:
-										ax1_pha.plot(flist[i][list(tmask_mfreq[id_time])], np.angle((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}-LST{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], data_lsts[i][id_time]))
-									# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-									ax1_pha.legend(loc='best', fontsize='xx-small')
-							
-							
-							# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-							
-							def Animate_Redundancy_std(id_time):
-								if id_time < len(range(0, len(data_lsts[i]), time_step_std)):
-									id_time = range(0, len(data_lsts[i]), time_step_std)[id_time % len(range(0, len(data_lsts[i]), time_step_std))]
-									ax1_std.clear()
-									ax1_std.plot(flist[i][list(tmask_mfreq[id_time])], np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1), label='STD at LST{}'.format(data_lsts[i][id_time]))
-									# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-									ax1_std.legend(loc='best')
-							
-							
-							# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-							
-							ani_amp = animation.FuncAnimation(fig_animate_redundancy_amp, Animate_Redundancy_amp, interval=100, frames=len(range(0, len(data_lsts[i]), time_step)))
-							# try:
-							# 	ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-							# except:
-							# 	print('Something gets wrong when saving .html file')
-							# try:
-							# 	ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-							# except:
-							# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
-							ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-							plt.show(block=False)
-							plt.close()
-							
-							ani_pha = animation.FuncAnimation(fig_animate_redundancy_pha, Animate_Redundancy_pha, interval=100, frames=len(range(0, len(data_lsts[i]), time_step)))
-							# try:
-							# 	ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-							# except:
-							# 	print('Something gets wrong when saving .html file')
-							# try:
-							# 	ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-							# except:
-							# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
-							ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
-							plt.show(block=False)
-							plt.close()
-							
-							if (len(redundant_baselines) > length_thresh_redundancy_std) and Plot_RedundanctBaselines_frequency_std:
-								ani_std = animation.FuncAnimation(fig_animate_redundancy_std, Animate_Redundancy_std, interval=100, frames=len(range(0, len(data_lsts[i]), time_step_std)))
+							if Make_Redundant_Movie_lst:
+								def Animate_Redundancy_amp(id_time):
+									if id_time < len(range(0, len(data_lsts[i]), time_step)):
+										id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
+										ax1_amp.clear()
+										for redundant_baseline in redundant_baselines:
+											ax1_amp.plot(flist[i][list(tmask_mfreq[id_time])], np.abs((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}-LST{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], data_lsts[i][id_time]))
+										# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+										ax1_amp.legend(loc='best', fontsize='xx-small')
+								
+								
+								# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+								
+								def Animate_Redundancy_pha(id_time):
+									if id_time < len(range(0, len(data_lsts[i]), time_step)):
+										id_time = range(0, len(data_lsts[i]), time_step)[id_time % len(range(0, len(data_lsts[i]), time_step))]
+										ax1_pha.clear()
+										for redundant_baseline in redundant_baselines:
+											ax1_pha.plot(flist[i][list(tmask_mfreq[id_time])], np.angle((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])] * vis_data_mfreq[i][list(tmask_mfreq[id_time]), id_time, redundant_baseline]), label='{0}-{1}-LST{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], data_lsts[i][id_time]))
+										# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+										ax1_pha.legend(loc='best', fontsize='xx-small')
+								
+								
+								# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+								
+								def Animate_Redundancy_std(id_time):
+									if id_time < len(range(0, len(data_lsts[i]), time_step_std)):
+										id_time = range(0, len(data_lsts[i]), time_step_std)[id_time % len(range(0, len(data_lsts[i]), time_step_std))]
+										ax1_std.clear()
+										ax1_std.plot(flist[i][list(tmask_mfreq[id_time])], np.std((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1)/np.mean((1. / jansky2kelvin_multifreq)[list(tmask_mfreq[id_time])].reshape(len(jansky2kelvin_multifreq[list(tmask_mfreq[id_time])]), 1) * vis_data_mfreq[i][list(tmask_mfreq[id_time])][:, id_time, list(redundant_baselines)], axis=1), label='STD at LST{}'.format(data_lsts[i][id_time]))
+										# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+										ax1_std.legend(loc='best')
+								
+								
+								# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+								
+								ani_amp = animation.FuncAnimation(fig_animate_redundancy_amp, Animate_Redundancy_amp, interval=100, frames=len(range(0, len(data_lsts[i]), time_step)))
 								# try:
-								# 	ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+								# 	ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 								# except:
 								# 	print('Something gets wrong when saving .html file')
 								# try:
-								# 	ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+								# 	ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 								# except:
-								# 	print('Necessary Modules (such as) ffmpeg have not been installed yet')
-								ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+								# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+								ani_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
 								plt.show(block=False)
 								plt.close()
+								
+								ani_pha = animation.FuncAnimation(fig_animate_redundancy_pha, Animate_Redundancy_pha, interval=100, frames=len(range(0, len(data_lsts[i]), time_step)))
+								# try:
+								# 	ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+								# except:
+								# 	print('Something gets wrong when saving .html file')
+								# try:
+								# 	ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+								# except:
+								# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+								ani_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+								plt.show(block=False)
+								plt.close()
+								
+								if (len(redundant_baselines) > length_thresh_redundancy_std) and Plot_RedundanctBaselines_frequency_std:
+									ani_std = animation.FuncAnimation(fig_animate_redundancy_std, Animate_Redundancy_std, interval=100, frames=len(range(0, len(data_lsts[i]), time_step_std)))
+									# try:
+									# 	ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+									# except:
+									# 	print('Something gets wrong when saving .html file')
+									# try:
+									# 	ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+									# except:
+									# 	print('Necessary Modules (such as) ffmpeg have not been installed yet')
+									ani_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-nt{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(data_lsts[i]), time_step))))
+									plt.show(block=False)
+									plt.close()
 							
 							# Plot_RedundanctBaselines_timeseperate = False
 							if Plot_RedundanctBaselines_timeseperate:
@@ -8153,94 +8295,97 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 									plt.savefig(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-mfreq-{1}-{2}-STD_bsl_LST{3:.4f}.pdf'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, data_lsts[i][id_time]))
 									plt.show(block=False)
 									plt.close()
-							
+									
+								print ('Figures Saved for Baselines-{0}'.format(id_rbl))
 							print('Time consumed by Plotting mfreq-movie for redundant Baselines-{0}: {1} minutes'.format(id_rbl, (time.time() - timer_red_bsl) / 60.))
 							timer_red_bsl = time.time()
 							
 							# frequency_step = 64
 							
-							fig_animate_redundancy_time_amp = plt.figure(37000000000 + 1000000000 * i + id_rbl)
-							fig_animate_redundancy_time_pha = plt.figure(47000000000 + 1000000000 * i + id_rbl)
-							fig_animate_redundancy_time_std = plt.figure(70000000000 + 10000000000 * i + id_rbl)
-							ax1_time_amp = fig_animate_redundancy_time_amp.add_subplot(1, 1, 1)
-							ax1_time_pha = fig_animate_redundancy_time_pha.add_subplot(1, 1, 1)
-							ax1_time_std = fig_animate_redundancy_time_std.add_subplot(1, 1, 1)
 							
-							
-							def Animate_Redundancy_time_amp(id_freq):
-								if id_freq < len(range(0, len(flist[i]), frequency_step)):
-									id_freq = range(0, len(flist[i]), frequency_step)[id_freq % len(range(0, len(flist[i]), frequency_step))]
-									ax1_time_amp.clear()
-									for redundant_baseline in redundant_baselines:
-										ax1_time_amp.plot(data_lsts[i][tmask_mfreq[:, id_freq]], np.abs((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][id_freq, tmask_mfreq[:, id_freq], redundant_baseline]), label='{0}-{1}-Freq{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], flist[i][id_freq]))
-									# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-									ax1_time_amp.legend(loc='best', fontsize='xx-small')
-							
-							
-							# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-							
-							def Animate_Redundancy_time_pha(id_freq):
-								if id_freq < len(range(0, len(flist[i]), frequency_step)):
-									id_freq = range(0, len(flist[i]), frequency_step)[id_freq % len(range(0, len(flist[i]), frequency_step))]
-									ax1_time_pha.clear()
-									for redundant_baseline in redundant_baselines:
-										ax1_time_pha.plot(data_lsts[i][tmask_mfreq[:, id_freq]], np.angle((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][id_freq, tmask_mfreq[:, id_freq], redundant_baseline]), label='{0}-{1}-Freq{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], flist[i][id_freq]))
-									# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-									ax1_time_pha.legend(loc='best', fontsize='xx-small')
-							
-							
-							# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-							
-							def Animate_Redundancy_time_std(id_freq):
-								if id_freq < len(range(0, len(flist[i]), frequency_step_std)):
-									id_freq = range(0, len(flist[i]), frequency_step_std)[id_freq % len(range(0, len(flist[i]), frequency_step_std))]
-									ax1_time_std.clear()
-									ax1_time_std.plot(data_lsts[i][tmask_mfreq[:, id_freq]], np.std((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1), label='STD at Freq{}'.format(flist[i][id_freq]))
-									# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
-									ax1_time_std.legend(loc='best')
-							
-							
-							# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
-							
-							ani_time_amp = animation.FuncAnimation(fig_animate_redundancy_time_amp, Animate_Redundancy_time_amp, interval=100, frames=len(range(0, len(flist[i]), frequency_step)))
-							# try:
-							# 	ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-							# except:
-							# 	print('Something gets wrong when saving .html file')
-							# try:
-							# 	ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-							# except:
-							# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
-							ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-							plt.show(block=False)
-							plt.close()
-							
-							ani_time_pha = animation.FuncAnimation(fig_animate_redundancy_time_pha, Animate_Redundancy_time_pha, interval=100, frames=len(range(0, len(flist[i]), frequency_step)))
-							# try:
-							# 	ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-							# except:
-							# 	print('Something gets wrong when saving .html file')
-							# try:
-							# 	ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-							# except:
-							# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
-							ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
-							plt.show(block=False)
-							plt.close()
-							
-							if (len(redundant_baselines) > length_thresh_redundancy_std) and Plot_RedundanctBaselines_time_std:
-								ani_time_std = animation.FuncAnimation(fig_animate_redundancy_time_std, Animate_Redundancy_time_std, interval=100, frames=len(range(0, len(flist[i]), frequency_step_std)))
+							if Make_Redundant_Movie:
+								fig_animate_redundancy_time_amp = plt.figure(37000000000 + 1000000000 * i + id_rbl)
+								fig_animate_redundancy_time_pha = plt.figure(47000000000 + 1000000000 * i + id_rbl)
+								fig_animate_redundancy_time_std = plt.figure(70000000000 + 10000000000 * i + id_rbl)
+								ax1_time_amp = fig_animate_redundancy_time_amp.add_subplot(1, 1, 1)
+								ax1_time_pha = fig_animate_redundancy_time_pha.add_subplot(1, 1, 1)
+								ax1_time_std = fig_animate_redundancy_time_std.add_subplot(1, 1, 1)
+								
+								
+								def Animate_Redundancy_time_amp(id_freq):
+									if id_freq < len(range(0, len(flist[i]), frequency_step)):
+										id_freq = range(0, len(flist[i]), frequency_step)[id_freq % len(range(0, len(flist[i]), frequency_step))]
+										ax1_time_amp.clear()
+										for redundant_baseline in redundant_baselines:
+											ax1_time_amp.plot(data_lsts[i][tmask_mfreq[:, id_freq]], np.abs((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][id_freq, tmask_mfreq[:, id_freq], redundant_baseline]), label='{0}-{1}-Freq{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], flist[i][id_freq]))
+										# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+										ax1_time_amp.legend(loc='best', fontsize='xx-small')
+								
+								
+								# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+								
+								def Animate_Redundancy_time_pha(id_freq):
+									if id_freq < len(range(0, len(flist[i]), frequency_step)):
+										id_freq = range(0, len(flist[i]), frequency_step)[id_freq % len(range(0, len(flist[i]), frequency_step))]
+										ax1_time_pha.clear()
+										for redundant_baseline in redundant_baselines:
+											ax1_time_pha.plot(data_lsts[i][tmask_mfreq[:, id_freq]], np.angle((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][id_freq, tmask_mfreq[:, id_freq], redundant_baseline]), label='{0}-{1}-Freq{2}'.format(bls[i].keys()[redundant_baseline], bls[i][bls[i].keys()[redundant_baseline]], flist[i][id_freq]))
+										# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+										ax1_time_pha.legend(loc='best', fontsize='xx-small')
+								
+								
+								# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+								
+								def Animate_Redundancy_time_std(id_freq):
+									if id_freq < len(range(0, len(flist[i]), frequency_step_std)):
+										id_freq = range(0, len(flist[i]), frequency_step_std)[id_freq % len(range(0, len(flist[i]), frequency_step_std))]
+										ax1_time_std.clear()
+										ax1_time_std.plot(data_lsts[i][tmask_mfreq[:, id_freq]], np.std((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1)/np.mean((1. / jansky2kelvin_multifreq)[id_freq] * vis_data_mfreq[i][:, tmask_mfreq[:, id_freq]][id_freq][:, list(redundant_baselines)], axis=1), label='STD at Freq{}'.format(flist[i][id_freq]))
+										# plt.legend(bbox_to_anchor=(0., 1.1, 1., .102), loc=3, ncol=1, mode="expand", borderaxespad=1)
+										ax1_time_std.legend(loc='best')
+								
+								
+								# plt.title('Redundant Baselines Comparison along Frequency Axis-Amp-{0}-LST{1:.4f}'.format(id_rbl, data_lsts[i][id_time]))
+								
+								ani_time_amp = animation.FuncAnimation(fig_animate_redundancy_time_amp, Animate_Redundancy_time_amp, interval=100, frames=len(range(0, len(flist[i]), frequency_step)))
 								# try:
-								# 	ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+								# 	ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
 								# except:
 								# 	print('Something gets wrong when saving .html file')
 								# try:
-								# 	ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+								# 	ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
 								# except:
-								# 	print('Necessary Modules (such as) ffmpeg have not been installed yet')
-								ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+								# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+								ani_time_amp.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-abs.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
 								plt.show(block=False)
 								plt.close()
+								
+								ani_time_pha = animation.FuncAnimation(fig_animate_redundancy_time_pha, Animate_Redundancy_time_pha, interval=100, frames=len(range(0, len(flist[i]), frequency_step)))
+								# try:
+								# 	ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+								# except:
+								# 	print('Something gets wrong when saving .html file')
+								# try:
+								# 	ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+								# except:
+								# 	print('Necessary Modules (such as ffmpeg) have not been installed yet')
+								ani_time_pha.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-pha.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+								plt.show(block=False)
+								plt.close()
+								
+								if (len(redundant_baselines) > length_thresh_redundancy_std) and Plot_RedundanctBaselines_time_std:
+									ani_time_std = animation.FuncAnimation(fig_animate_redundancy_time_std, Animate_Redundancy_time_std, interval=100, frames=len(range(0, len(flist[i]), frequency_step_std)))
+									# try:
+									# 	ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.html'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+									# except:
+									# 	print('Something gets wrong when saving .html file')
+									# try:
+									# 	ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+									# except:
+									# 	print('Necessary Modules (such as) ffmpeg have not been installed yet')
+									ani_time_std.save(script_dir + '/../Output/{0}-Redundant_Baselines_Comparison-time-{1}-{2}-nf{3}-std.mp4'.format(INSTRUMENT, ['xx', 'yy'][i], id_rbl, len(range(0, len(flist[i]), frequency_step))))
+									plt.show(block=False)
+									plt.close()
 							
 							if Plot_RedundanctBaselines_freqseperate:
 								# Plot_RedundanctBaselines_freqseperate = False
@@ -8358,16 +8503,20 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			
 			
 			elif 'vivaldi' in INSTRUMENT:
-				Vivaldi_Gaussian = False
+				
 				thetas_beam, phis_beam = hpf.pix2ang(bnside, range(hpf.nside2npix(bnside)), nest=False)
 				if Vivaldi_Gaussian:
 					# freq = 10. ** (0)  # MHz
 					flist_beam = flist[0][::10]
-					lambda_D_list = (C / flist_beam) / 14.  # Diameter of HERA
+					if Rescale_Array:
+						lambda_D_list = (C / flist_beam) / (14. / Rescale_Array_Factor)  # Diameter of HERA
+					else:
+						lambda_D_list = (C / flist_beam) / 14.  # Diameter of HERA
 					# for id_pix in range(12 * nside_standard ** 2):
 					# 	beam_pattern_map[id_pix] = (((np.cos(np.pi * length_lambda * np.cos(thetas_standard[id_pix])) - np.cos(np.pi * length_lambda))) / np.sin(thetas_standard[id_pix])) ** 2.
 					
 					beam_pattern_map_mfreq = np.array([[sps.norm.pdf(thetas_beam[id_pix], loc=0, scale=0.5 * lambda_D / (2. * np.log(2)) ** 0.5) for id_pix in range(12 * bnside ** 2)] for lambda_D in lambda_D_list])
+					INSTRUMENT = INSTRUMENT + '-GA'
 					print('lambda_over_D_list: {0}-{1}'.format(lambda_D_list.min(), lambda_D_list.max()))
 				
 				else:
@@ -8443,7 +8592,8 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 					beam_EN = np.array([beam_E])
 				
 				local_beam_unpol = si.interp1d(beam_freqs, beam_EN.transpose(1, 0, 2), axis=0)
-				del (beam_N)
+				if Num_Pol > 1:
+					del (beam_N)
 				del (beam_E)
 			
 			else:
@@ -9001,7 +9151,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			# from random import *
 			# num_figures_theta = 5
 			# num_figures_phi = 5
-			num_figures = 15 if not Simulation_For_All else 20
+			num_figures = 15 if not Simulation_For_All else 1
 			# point_step = int(total_num / num_figures)
 			thetas_beamweight, phis_beamweight = hpf.pix2ang(nside_beamweight, range(hpf.nside2npix(nside_beamweight)), nest=True)
 			thetas_standard, phis_standard = hpf.pix2ang(nside_standard, range(hpf.nside2npix(nside_standard)), nest=True)
@@ -11588,7 +11738,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				hpv.graticule(dmer=30, dpar=30, coord=coord)
 			
 			
-			def plot_IQU_limit_up_down(solution, title, col, shape=(2, 3), coord='C', maxflux_index=None):
+			def plot_IQU_limit_up_down(solution, title, col, shape=(2, 3), coord='C', maxflux_index=None, Min_Scale=100., Max_Scale=1.):
 				# Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
 				# I = Es[0] + Es[3]
 				# Q = Es[0] - Es[3]
@@ -11596,11 +11746,23 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
 				plotcoordtmp = coord
 				if maxflux_index is not False:
-					hpv.mollview(map=np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I[maxflux_index]) / 1000.), max=np.log10(np.max(I[maxflux_index])), title=title, nest=True, sub=(shape[0], shape[1], col))
+					hpv.mollview(map=np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I[maxflux_index]) / Min_Scale), max=np.log10(np.max(I[maxflux_index])/Max_Scale), title=title, nest=True, sub=(shape[0], shape[1], col))
 				else:
 					hpv.mollview(np.log10(I), coord=plotcoordtmp, min=np.log10(np.max(I) / 10.), max=np.log10(np.max(I)), title=title, nest=True, sub=(shape[0], shape[1], col))
 				hpv.graticule(dmer=30, dpar=30, coord=coord)
 			
+			def plot_IQU_limit_up_down_linear(solution, title, col, shape=(2, 3), coord='C', maxflux_index=None):
+				# Es=solution[np.array(final_index).tolist()].reshape((4, len(final_index)/4))
+				# I = Es[0] + Es[3]
+				# Q = Es[0] - Es[3]
+				# U = Es[1] + Es[2]
+				I = sol2map(solution, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+				plotcoordtmp = coord
+				if maxflux_index is not False:
+					hpv.mollview(map=I, coord=plotcoordtmp, min=np.max(I[maxflux_index]) / 10.**3, max=np.max(I[maxflux_index]), title=title, nest=True, sub=(shape[0], shape[1], col))
+				else:
+					hpv.mollview(I, coord=plotcoordtmp, min=np.max(I) / 10.**4, max=np.max(I), title=title, nest=True, sub=(shape[0], shape[1], col))
+				hpv.graticule(dmer=30, dpar=30, coord=coord)
 			
 			# if col == shape[0] * shape[1]:
 			# plt.show(block=False)
@@ -11879,10 +12041,10 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 					plt.figure(9000000000 + 10000 * id_Frequency_Select + crd)
 					crd += 10
 					plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-					plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-					plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 4, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
-					plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-					plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
+					plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'GSM_Reproduced', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+					plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'GSM_Reproduced_noise', 4, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
+					plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'GSM_Reproduced_Coarse', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
+					plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nstand-%s-rs-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
 								bbox_inches='tight')
 					plt.show(block=False)
 				
@@ -11893,7 +12055,7 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 					plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)
 					plot_IQU_limit_up_down((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM noise', 2, shape=(1, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 					# plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-					plt.savefig(script_dir + '/../Output/Results_wGSM-GSM-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
+					plt.savefig(script_dir + '/../Output/Results_wGSM-GSM-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nstand-%s-rs-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
 								bbox_inches='tight')
 					plt.show(block=False)
 			
@@ -11902,12 +12064,12 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				try:
 					for coord in ['C', 'CG']:
 						# plt.clf()
-						plt.figure(9900000000 + 10000 * id_Frequency_Select + ZxcXcxxxxxxxxxxxxxxxxxxxcxxxxxccccccccccrd)
+						plt.figure(9900000000 + 10000 * id_Frequency_Select + crd)
 						crd += 10
 						plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
 						plot_IQU_limit_up_down((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6, 'wienered GSM', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)  # (clean dynamic_data)
 						plot_IQU_limit_up_down((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6, 'wienered solution(data)', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
-						plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nside_standard-%s-rescale-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
+						plt.savefig(script_dir + '/../Output/Results_Data-GSM-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nstand-%s-rs-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
 									bbox_inches='tight')
 						plt.show(block=False)
 				except:
@@ -12118,6 +12280,21 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 				print('>>>>>>>>>>>>>> Mean of Sigma Stripe: {0}'.format(np.mean(sol2map(Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask] ** 0.5, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)[id_primary])))
 				print('>>>>>>>>>>>>>> Max of Sigma Stripe: {0}'.format(np.max(sol2map(Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask] ** 0.5, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)[id_primary])))
 				print('>>>>>>>>>>>>>> Min of Sigma Stripe: {0}'.format(np.min(sol2map(Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask] ** 0.5, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)[id_primary])))
+				noise_map = fits.HDUList()
+				sigma_full = sol2map(Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask]**0.5, valid_npix=valid_npix, npix=npix, valid_pix_mask=valid_pix_mask, final_index=final_index, sizes=sizes)
+				noise_map.append(fits.ImageHDU(data=np.real(sigma_full)))
+				# new_map.append(fits.ImageHDU(data=freqs, name='FREQS'))
+				outfile_data_name = script_dir + '/../Output/results_Noise-{0}-{1:.4f}MHz-nubl{2}-nt{3}-mtb{4}-mfb{5}-tb{6}-bnside-{7}-nside_standard-{8}-rescale-{9:.3f}-Deg-unl-All-S-{10}-rec-{11}.fits'.format(tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N')
+				noise_map.writeto(outfile_data_name, overwrite=True)
+				crd = 0
+				for coord in ['C', 'CG']:
+					crd += 10
+					plt.figure(crd)
+					plot_IQU_limit_up_down_linear(np.log10(sigma_full), 'Noise_Sigma-0.5', 1, shape=(1, 1), coord=coord)
+					plt.savefig(script_dir + '/../Output/Noise-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nstand-%s-rs-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
+					            bbox_inches='tight')
+					plt.show(block=False)
+					
 			except:
 				continue
 			print('\nValid Threshold: {0} ; Number of Valid Pixels: {1} ; nUBL_used: {2} ; nt_used: {3} ; nside_standard: {4} ; nside_beamweight: {5} ; freq: {6} ; Integration Time: {7} ; ants_with_bad: {8}.\n'.format(valid_pix_thresh, valid_npix, nUBL_used, nt_used, nside_standard, nside_beamweight, freq, Integration_Time, len(ants[0])))
@@ -12125,6 +12302,19 @@ for id_File_Loop, File_Loop in enumerate(np.arange(File_Start, File_End, File_St
 			print('>>>>>>>LST-Range: {0}-{1} \n'.format(lsts.min(), lsts.max()))
 			print('\n>>>>>>>>>>>> UBL_used_max: {0} meters ; UBL_used_max_wavelength: {1}. <<<<<<<<<<<<<<< \n'.format(UBL_used_max, UBL_used_max / (C / freq)))
 			print('>>>>>>>>>>>> Baseline Safety Factor: {0}; {1}\n'.format(baseline_safety_factor, np.log10(baseline_safety_factor)))
+			
+			crd = 0
+			for coord in ['C', 'CG']:
+				# plt.clf()
+				plt.figure(90000000 + 10000 * id_Frequency_Select + crd)
+				crd += 10
+				plot_IQU_limit_up_down(GSM, 'GSM', 1, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index)
+				plot_IQU_limit_up_down(((ww_GSM + np.abs(ww_GSM)) * 0.5 * rescale_factor + 1.e-6 - GSM) / Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask]**0.5, 'GSM_Reproduced-Error', 3, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index, Min_Scale=10.**1, Max_Scale=10.**0)  # (clean dynamic_data)
+				plot_IQU_limit_up_down(((ww_sim_GSM + np.abs(ww_sim_GSM)) * 0.5 * rescale_factor + 1.e-6 - GSM) / Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask]**0.5, 'GSM_Reproduced_noise-Error', 4, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index, Min_Scale=10.**1, Max_Scale=10.**0)  # (clean dynamic_data)
+				plot_IQU_limit_up_down(((ww_solution + np.abs(ww_solution)) * 0.5 * rescale_factor + 1.e-6 - GSM) / Sigma[np.arange(Sigma.shape[0]), np.arange(Sigma.shape[1])][Re_Mask]**0.5, 'GSM_Reproduced_Coarse-Error', 2, shape=(2, 2), coord=coord, maxflux_index=FornaxA_Index, Min_Scale=10.**2, Max_Scale=10.**0)
+				plt.savefig(script_dir + '/../Output/Results_Data-Sigma-%s-%s-%.4fMHz-nubl%s-nt%s-mtb%s-mfb%s-tb%s-bnside-%s-nstand-%s-rs-%.3f-Deg-unl_ud-S-%s-rec-%s-%.2f.png' % (coord, tag, freq, nUBL_used, nt_used, mocal_time_bin if Absolute_Calibration_dred_mfreq else '_N', mocal_freq_bin if Absolute_Calibration_dred_mfreq else '_N', precal_time_bin if pre_calibrate else '_N', bnside, nside_standard, rescale_factor, S_type, rcond if Add_Rcond else 'N', Flux_FornaxA_solution),
+				            bbox_inches='tight')
+				plt.show(block=False)
 			
 			del (Sigma)
 			
